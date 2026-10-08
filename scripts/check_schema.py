@@ -1,6 +1,6 @@
 r"""Check the draft JSON Schema and the example document.
 
-1. The current schema (0.4) and the older schemas are valid draft 2020-12 schemas.
+1. The current schema (0.5) and the older schemas are valid draft 2020-12 schemas.
 2. src/schema/example.json validates. Its .meta.json form (no stations)
    validates against #/$defs/meta, and each station (one .jsonl line)
    validates against #/$defs/station.
@@ -12,7 +12,8 @@ r"""Check the draft JSON Schema and the example document.
    convention_id or quantity, a local convention without utc_offset_hours, a
    bad datestamp, a constituent name over 15 characters, duplicate aliases,
    a current set without current_bins (or with water-level constituents),
-   current offsets without a reference bin, and a value with a trailing
+   current offsets without a reference bin, a mean current written as a
+   constituent Z0 or as a string, and a value with a trailing
    newline. Python's re lets $ match before a
    final newline; ECMA-262 does not. The schema ends every pattern with
    $(?![\s\S]) so both reject it.
@@ -28,7 +29,7 @@ from jsonschema import Draft202012Validator
 
 root = Path(__file__).resolve().parent.parent
 schema_dir = root / "src/schema"
-schema = json.loads((schema_dir / "otc-0.4.schema.json").read_text())
+schema = json.loads((schema_dir / "otc-0.5.schema.json").read_text())
 example = json.loads((schema_dir / "example.json").read_text())
 
 for old in sorted(schema_dir.glob("otc-*.schema.json")):
@@ -208,3 +209,33 @@ must_fail("current offsets reference id with a trailing newline",
           lambda d: current_offset(d).__setitem__("reference_station_id", "OTC-EXAMPLE-0003\n"))
 must_fail("default_current_bin 0",
           lambda d: station(d, "OTC-EXAMPLE-0003").__setitem__("default_current_bin", 0))
+must_fail("mean current as constituent Z0",
+          lambda d: current_bin(d)["constituents"].append(
+              {"name": "Z0", "speed_deg_per_hour": 0.0, "major_amplitude_ms": 0.0772, "major_phase_deg": 0.0,
+               "minor_amplitude_ms": 0.0, "minor_phase_deg": 0.0}))
+must_fail("mean_major_ms as a string",
+          lambda d: current_bin(d).__setitem__("mean_major_ms", "0.0772"))
+must_fail("mean current in cm/s under NOAA's name",
+          lambda d: current_bin(d).__setitem__("majorMeanSpeed", 7.72))
+must_fail("depth_type as NOAA letter B",
+          lambda d: current_bin(d).__setitem__("depth_type", "B"))
+
+
+def must_pass(label, mutate):
+    doc = copy.deepcopy(example)
+    mutate(doc)
+    errors = problems(doc)
+    if errors:
+        print(f"FAIL: {label}: {errors[0]}")
+        sys.exit(1)
+    print(f"ok: accepted {label}")
+
+
+must_pass("a negative mean current (BOS1101 bin 1: -2.06 / 0.21 cm/s)",
+          lambda d: current_bin(d).update(mean_major_ms=-0.0206, mean_minor_ms=0.0021))
+must_pass("a current bin with no mean current",
+          lambda d: [current_bin(d).pop(k) for k in ("mean_major_ms", "mean_minor_ms")])
+must_pass("depth_type below_chart_datum (NOAA B)",
+          lambda d: current_bin(d).__setitem__("depth_type", "below_chart_datum"))
+must_pass("depth_type above_bottom (kept from 0.4)",
+          lambda d: current_offset(d).__setitem__("depth_type", "above_bottom"))

@@ -1,5 +1,5 @@
 {
-  "format_version": "0.4",
+  "format_version": "0.5",
   "release": {
     "datestamp": "20991231",
     "created": "2099-12-31T00:00:00Z",
@@ -158,6 +158,8 @@
               "azimuth_deg": 37.0,
               "mean_flood_dir_deg": 37.0,
               "mean_ebb_dir_deg": 226.0,
+              "mean_major_ms": 0.0772,
+              "mean_minor_ms": 0.0,
               "constituents": [
                 { "name": "M2", "speed_deg_per_hour": 28.9841042, "major_amplitude_ms": 0.9353, "major_phase_deg": 322.3, "minor_amplitude_ms": 0.0, "minor_phase_deg": 0.0 },
                 { "name": "S2", "speed_deg_per_hour": 30.0, "major_amplitude_ms": 0.1389, "major_phase_deg": 356.3, "minor_amplitude_ms": 0.0, "minor_phase_deg": 0.0 },

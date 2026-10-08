@@ -53,6 +53,7 @@ order: 6
 
 <h2 id="units">Units</h2>
 <p>Amplitudes in metres (tidal-current amplitudes in metres per second), phases in degrees, speeds in degrees per hour, times in UTC. Field names are stable within a major <code>format_version</code>; see <a href="/data-format/">Data format</a>.</p>
+<p>A current bin's velocity along each axis is a constant plus a harmonic sum. The constant is the bin's mean current, <code>mean_major_ms</code> along the major axis (positive toward <code>azimuth_deg</code>) and <code>mean_minor_ms</code> along the minor axis, in metres per second. It is not a constituent, and no current constituent is called Z0. NOAA's predictions include it: leaving it out moved slack times by up to 34 minutes at the stations checked (ACT1616, BOS1101 and PUG1501).</p>
 
 <h2 id="table">The convention table</h2>
 <p>The full constituent table (Doodson numbers, speeds, node-factor formula ids and the IHO standard name where one exists) is in every release, in the <code>constituents</code> field of the JSON file and in <code>OTC_{YYYYMMDD}.meta.json</code>.</p>
