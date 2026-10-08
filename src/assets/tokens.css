@@ -51,7 +51,18 @@
   --space-5: 1.5rem; --space-6: 2rem; --space-7: 3.5rem;
   --space-8: clamp(3rem, 2rem + 3vw, 4.5rem);
   --space-flow: 1.25rem;                          /* between paragraphs */
-  --space-head: clamp(2rem, 1rem + 3vw, 3.5rem);  /* below a section introduction */
+  /* Section rhythm, measured on aimock.copilotkit.dev (same at 375px and 1440px):
+     144px from the end of a section to the next heading, 56px from a heading to its content,
+     16px from a heading to its subtitle, 56px from a subtitle to the content. aimock's section
+     headings have line-height 1.6 and ours 1.1, so each gap at a heading adds
+     --space-h2-leading (half the difference, 0.25em) to keep the visible gap the same.
+     aimock keeps these gaps at every width, but on a phone they leave docs headings floating,
+     so the three larger gaps scale from about 60% at 375px to the full value at 1024px. */
+  --space-section: clamp(5.25rem, 3.083rem + 9.245vw, 9rem);       /* end of a section to the next heading */
+  --space-h2-content: clamp(1.875rem, 0.936rem + 4.006vw, 3.5rem); /* heading to its content */
+  --space-h2-sub: 1rem;                           /* heading to its subtitle */
+  --space-h2-leading: 0.25em;                     /* in the heading's em: (1.6 - 1.1) / 2 */
+  --space-head: clamp(1.875rem, 0.936rem + 4.006vw, 3.5rem);       /* below a section introduction */
   --gutter: clamp(1rem, 0.4rem + 2.6vw, 2rem);
   --content-max: 70rem;
   --header-h: 4rem;                               /* sticky header height, for scroll-margin */
