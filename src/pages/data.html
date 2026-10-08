@@ -1,6 +1,6 @@
 ---
 title: Data and downloads
-description: The OpenTideConstants release files, their format, the JSON Schema and where downloads will be served.
+description: The OpenTideConstants release files, their format, the JSON Schema and the file names of each release.
 nav: Data
 order: 5
 ---
@@ -68,7 +68,7 @@ order: 5
   <li><a href="/schema/otc-0.1.schema.json">otc-0.1.schema.json</a>: the earlier draft, for <code>format_version</code> 0.1. Kept for reference.</li>
   <li><a href="/schema/example.json">example.json</a>: a small example document with illustrative values (not data). It has one station with two constant sets and one tombstone.</li>
 </ul>
-<p>The format version is separate from the release date. A new field is a minor change; a removed or renamed field, or a changed unit or convention, is a major change. The schema may still change before the first release.</p>
+<p>The format version is separate from the release date. A new field is a minor change; a removed or renamed field, or a changed unit or convention, is a major change. The schema is a draft and can change.</p>
 
 <h2 id="converters">Converters</h2>
 <p>Converters, in both directions, with a lossless round trip as a release gate: TICON CSV, XTide TCD (through libtcd), and NOAA harmonic-constant JSON. The reference predictor will publish conformance vectors (expected high and low water times and heights at named stations and dates) so that other predictors can check their results.</p>
