@@ -80,15 +80,11 @@ table code { white-space: nowrap; overflow-wrap: normal; }
 .nav-list a { color: var(--color-text); text-decoration: none; }
 .nav-list a:hover { color: var(--color-link); text-decoration: underline; }
 .nav-list a[aria-current="page"] { color: var(--color-link); font-weight: 600; text-decoration: underline; text-decoration-thickness: 2px; }
-.mode { font: inherit; font-family: var(--font-mono); font-size: 0.75rem; white-space: nowrap; min-height: 2rem; color: var(--color-text-muted); background: none; border: var(--border-width) solid var(--color-border); border-radius: var(--radius-md); padding: 0.35rem 0.7rem; cursor: pointer; transition: color var(--duration-fast) var(--easing), border-color var(--duration-fast) var(--easing); }
-.mode:hover { color: var(--color-text); border-color: var(--color-text-muted); }
 
-/* Below the width where all eleven links fit beside the brand (phones, tablets): brand and palette
-   button on one line, the navigation one sideways-scrolling row below */
+/* Below the width where all eleven links fit beside the brand (phones, tablets): brand on one line, the navigation one sideways-scrolling row below */
 @media (max-width: 70rem) {
   .header-inner { padding-block: var(--space-3) 0; gap: 0 var(--space-4); }
   .nav-wrap { display: contents; }
-  .mode { order: 1; }
   .nav-wrap > nav { order: 2; flex: 1 0 100%; min-width: 0; margin-inline: calc(-1 * var(--gutter)); }
   .nav-list { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: var(--space-5); padding: var(--space-3) var(--gutter); font-size: var(--font-size-label);
     mask-image: linear-gradient(to right, transparent, #000 var(--gutter), #000 calc(100% - 2.5rem), transparent); }

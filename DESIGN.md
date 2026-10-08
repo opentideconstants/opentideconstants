@@ -23,8 +23,7 @@ Contrast is checked by `node scripts/check-contrast.mjs` for every pair the site
 
 ### Night palette
 
-- The night palette applies when the OS asks for dark (`prefers-color-scheme: dark`), unless the reader picked the day palette.
-- The header button ("Night palette" / "Day palette") sets `data-theme` on `<html>` and keeps the choice in `localStorage` (`otc-palette`). Storage access is wrapped in `try`/`catch`; when it is blocked, the choice lasts for the page.
+- The night palette applies when the OS asks for dark (`prefers-color-scheme: dark`). It is automatic: there is no switch.
 - Without JavaScript the button stays hidden and the OS setting applies.
 - The night accent is sea-glass green (`0.68 0.12 158`, `#4dae7b`), not magenta. It is 7.2:1 on the night background and is used for links, the button, the focus ring, caution frames, badges, the compass rose and highlight, and our fit line. The day palette keeps chart magenta.
 
@@ -36,7 +35,7 @@ The type system follows aimock.copilotkit.dev: Instrument Sans for prose and hea
 |---|---|---|
 | `--font-body`, `--font-heading`, `--font-display` (`--font-sans`) | Instrument Sans, 400–700 | body text, headings (700), card and list headings (600), nav links (500) |
 | `--font-label` | Instrument Sans italic 500 | hydrographic names only (Helgoland, German Bight), as names are set on charts |
-| `--font-mono` | JetBrains Mono, 300–700, italic 400 | the brand, buttons, tags and status labels, table heads, the palette button, code and file names, numbers, coordinates, compass and plot labels, chart soundings (italic) |
+| `--font-mono` | JetBrains Mono, 300–700, italic 400 | the brand, buttons, tags and status labels, table heads, code and file names, numbers, coordinates, compass and plot labels, chart soundings (italic) |
 
 Fonts are self-hosted in `src/assets/fonts/` (woff2, latin subset, SIL Open Font License, licence files beside them). Every `@font-face` uses `font-display: swap`. The layout preloads the upright sans and mono; the two italics load on demand. No third-party font service is used. Code turns off ligatures (`--font-features-mono`).
 

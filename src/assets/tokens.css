@@ -1,8 +1,7 @@
 /*
   Design tokens: theme B2 "Contour" (Chart Datum as cartographic texture).
   site.css reads only these custom properties. Day palette by default. The night palette
-  follows prefers-color-scheme: dark, or data-theme="dark" set by the header toggle
-  (assets/mode.js); data-theme="light" forces the day palette.
+  follows prefers-color-scheme: dark; there is no manual switch.
   Fonts are self-hosted (SIL Open Font License; licences in assets/fonts/), latin subset.
   Type scale and spacing follow aimock.copilotkit.dev.
 */
@@ -116,7 +115,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root {
     color-scheme: dark;
     --color-bg: oklch(0.15 0.005 250);
     --color-surface: oklch(0.2 0.008 250);
@@ -150,38 +149,6 @@
   }
 }
 
-:root[data-theme="dark"] {
-  color-scheme: dark;
-  --color-bg: oklch(0.15 0.005 250);
-  --color-surface: oklch(0.2 0.008 250);
-  --color-text: oklch(0.86 0.008 250);
-  --color-text-muted: oklch(0.635 0.02 250);
-  --color-border: oklch(0.3 0.01 250);
-  --color-link: oklch(0.68 0.12 158);
-  --color-link-hover: oklch(0.78 0.09 160);
-  --color-accent: oklch(0.68 0.12 158);
-  --color-focus: oklch(0.68 0.12 158);
-  --color-note-bg: oklch(0.15 0.005 250);
-  --color-note-border: oklch(0.68 0.12 158);
-  --color-note-text: oklch(0.86 0.008 250);
-  --color-code-bg: oklch(0.2 0.008 250);
-  --color-code-text: oklch(0.86 0.008 250);
-  --color-shoal: oklch(0.3 0.045 235);
-  --color-shallow: oklch(0.22 0.03 235);
-  --color-land: oklch(0.34 0.04 85);
-  --color-coast: oklch(0.66 0.012 250);
-  --color-on-accent: oklch(0.15 0.005 250);
-  --color-grat: oklch(0.27 0.02 245);
-  --color-contour: oklch(0.5 0.05 235);
-  --color-sounding: oklch(0.68 0.02 245);
-  --color-d10: oklch(0.18 0.018 240);
-  --color-panel: oklch(0.15 0.005 250);
-  --color-plot-official: oklch(0.86 0.008 250);
-  --color-plot-ticon: oklch(0.8 0.1 225);
-  --color-plot-fit: oklch(0.68 0.12 158);
-  --color-plot-grid: oklch(0.27 0.02 245);
-  --color-plot-grid-strong: oklch(0.4 0.03 245);
-}
 
 @media (max-width: 70rem) {
   :root { --header-h: 5.75rem; }                 /* two-row header: brand line + nav row */
