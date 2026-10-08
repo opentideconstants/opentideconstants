@@ -1,6 +1,6 @@
 r"""Check the draft JSON Schema and the example document.
 
-1. The current schema (0.3) and the older schemas are valid draft 2020-12 schemas.
+1. The current schema (0.4) and the older schemas are valid draft 2020-12 schemas.
 2. src/schema/example.json validates. Its .meta.json form (no stations)
    validates against #/$defs/meta, and each station (one .jsonl line)
    validates against #/$defs/station.
@@ -11,7 +11,9 @@ r"""Check the draft JSON Schema and the example document.
 5. negative controls must fail: for example a constant set without
    convention_id or quantity, a local convention without utc_offset_hours, a
    bad datestamp, a constituent name over 15 characters, duplicate aliases,
-   and a value with a trailing newline. Python's re lets $ match before a
+   a current set without current_bins (or with water-level constituents),
+   current offsets without a reference bin, and a value with a trailing
+   newline. Python's re lets $ match before a
    final newline; ECMA-262 does not. The schema ends every pattern with
    $(?![\s\S]) so both reject it.
 
@@ -26,7 +28,7 @@ from jsonschema import Draft202012Validator
 
 root = Path(__file__).resolve().parent.parent
 schema_dir = root / "src/schema"
-schema = json.loads((schema_dir / "otc-0.3.schema.json").read_text())
+schema = json.loads((schema_dir / "otc-0.4.schema.json").read_text())
 example = json.loads((schema_dir / "example.json").read_text())
 
 for old in sorted(schema_dir.glob("otc-*.schema.json")):
@@ -117,7 +119,7 @@ def first_set(d):
 
 def second_station_same_aliases(d):
     twin = copy.deepcopy(d["stations"][0])
-    twin["station_id"] = "OTC-EXAMPLE-0003"
+    twin["station_id"] = "OTC-EXAMPLE-9999"
     d["stations"].append(twin)
 
 
@@ -154,3 +156,55 @@ must_fail("pegelonline shortname instead of uuid",
           lambda d: d["stations"][0]["aliases"].__setitem__("pegelonline", "CUXHAVEN STEUBENHOEFT"))
 must_fail("unknown alias system",
           lambda d: d["stations"][0]["aliases"].__setitem__("bogus", "1"))
+
+
+def station(d, station_id):
+    return next(st for st in d["stations"] if st["station_id"] == station_id)
+
+
+def current_set(d):
+    return station(d, "OTC-EXAMPLE-0003")["constant_sets"][0]
+
+
+def current_bin(d):
+    return current_set(d)["current_bins"][0]
+
+
+def current_offset(d):
+    return station(d, "OTC-EXAMPLE-0004")["current_offsets"][0]
+
+
+must_fail("current set without current_bins",
+          lambda d: current_set(d).pop("current_bins"))
+must_fail("current set with water-level constituents",
+          lambda d: current_set(d)["constituents"].append(copy.deepcopy(first_set(d)["constituents"][0])))
+must_fail("water-level set with current_bins",
+          lambda d: first_set(d).__setitem__("current_bins", copy.deepcopy(current_set(d)["current_bins"])))
+must_fail("current set with empty current_bins",
+          lambda d: current_set(d).__setitem__("current_bins", []))
+must_fail("current bin 0",
+          lambda d: current_bin(d).__setitem__("bin", 0))
+must_fail("current bin without depth_type",
+          lambda d: current_bin(d).pop("depth_type"))
+must_fail("current bin depth_type as NOAA letter",
+          lambda d: current_bin(d).__setitem__("depth_type", "S"))
+must_fail("azimuth of 360 degrees",
+          lambda d: current_bin(d).__setitem__("azimuth_deg", 360))
+must_fail("current constituent with amplitude_m instead of major_amplitude_ms",
+          lambda d: current_bin(d)["constituents"][0].__setitem__("amplitude_m", 0.9))
+must_fail("current constituent without minor_phase_deg",
+          lambda d: current_bin(d)["constituents"][0].pop("minor_phase_deg"))
+must_fail("current constituent major phase of 360 degrees",
+          lambda d: current_bin(d)["constituents"][0].__setitem__("major_phase_deg", 360))
+must_fail("current constituent name of 16 characters",
+          lambda d: current_bin(d)["constituents"][0].__setitem__("name", "M" * 16))
+must_fail("current constituent with NOAA majorMeanSpeed",
+          lambda d: current_bin(d)["constituents"][0].__setitem__("majorMeanSpeed", 7.72))
+must_fail("current offsets without reference_bin",
+          lambda d: current_offset(d).pop("reference_bin"))
+must_fail("current offsets with a NOAA reference id",
+          lambda d: current_offset(d).__setitem__("reference_station_id", "ACT1616"))
+must_fail("current offsets reference id with a trailing newline",
+          lambda d: current_offset(d).__setitem__("reference_station_id", "OTC-EXAMPLE-0003\n"))
+must_fail("default_current_bin 0",
+          lambda d: station(d, "OTC-EXAMPLE-0003").__setitem__("default_current_bin", 0))
