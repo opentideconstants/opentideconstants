@@ -1,72 +1,199 @@
 ---
 title: Home
-description: OpenTideConstants is an open dataset of tidal harmonic constants, rebuilt automatically from the latest upstream data, with declared conventions and published accuracy for every station.
+description: OpenTideConstants combines open tide data (official agency constants and constants fitted from gauge records, with tide-model constants planned) into one consistent dataset with one format, declared conventions, per-record provenance and published accuracy for every station.
 nav: Home
 order: 1
+layout: full
 ---
-<h1>Open tidal harmonic constants, rebuilt from the latest data</h1>
-<p class="lead">OpenTideConstants (OTC) is one open dataset of tidal harmonic constants. It is rebuilt automatically from the latest upstream data, checked against official predictions, and released under CC BY 4.0 with a DOI for each release.</p>
-
-<div class="note" role="note">
-  <p><strong>Status: there is no release yet.</strong> This site describes the method and the format. Downloads, DOIs and release accuracy figures are coming with the first release. The only accuracy numbers on this site come from a proof of concept at 11 stations, and they are labelled as such.</p>
+<section class="sheet" aria-labelledby="hero-title">
+  <div class="wrap">
+    <div class="sheet-frame">
+      <div class="sheet-art">
+        {{include chart-sheet.svg}}
+        <span class="lat l1" aria-hidden="true">54°15′N</span><span class="lat l2" aria-hidden="true">54°10′N</span><span class="lon o1" aria-hidden="true">7°50′E</span><span class="lon o2" aria-hidden="true">7°55′E</span>
+      </div>
+      <div class="title-block">
+        <h1 id="hero-title">Open tide data, combined into <em>one dataset.</em></h1>
+        <p class="lead">OpenTideConstants (OTC) combines official agency constants and constants that we fit from gauge records, with tide-model constants to follow, into one consistent dataset: one format, declared conventions, provenance for every record, and the accuracy of every station against official predictions. It is rebuilt automatically from the latest upstream data and released under CC BY 4.0, with a DOI for each release.</p>
+        <div class="actions">
+          <a class="button" href="/data/">Data and downloads <span aria-hidden="true">→</span></a>
+          <a class="more" href="/method/">Read the method</a>
+        </div>
+      </div>
+      <p class="sheet-note"><span class="place">Helgoland.</span> In the proof of concept, TICON-4's mean time error here was 88–90 min. Our fit, with the time base corrected, was 6.7 min.</p>
+    </div>
+  </div>
+</section>
+<div class="wrap">
+  <div class="note" role="note">
+    <p><strong>Status: there is no release yet.</strong> This site describes the method and the format. Downloads, DOIs and release accuracy figures are coming with the first release. The only accuracy numbers on this site come from a proof of concept at 11 stations, and they are labelled as such.</p>
+  </div>
 </div>
 
-<h2>What is different</h2>
-<ul class="cards">
-  <li>
-    <h3>Accuracy for every station</h3>
-    <p>Every release publishes, per station, how well the constants reproduce official predictions: time and height errors, missed and extra events, and the same numbers for the previous release.</p>
-  </li>
-  <li>
-    <h3>Declared conventions</h3>
-    <p>Every set of constants states its phase reference, time zone, astronomical-argument model, nodal corrections and constituent definitions. A converter never guesses.</p>
-  </li>
-  <li>
-    <h3>Time bases checked</h3>
-    <p>Every input record is checked for a wrong or undeclared clock before it is used. A record whose time base cannot be explained is not used.</p>
-  </li>
-  <li>
-    <h3>Automatic and current</h3>
-    <p>Weekly watchers detect upstream changes. A build that passes all gates is published with no person in the loop. A build that fails keeps the last good release live.</p>
-  </li>
-  <li>
-    <h3>Open format</h3>
-    <p>JSON first, with a published JSON Schema, plus JSON Lines and CSV. Every file is named <code>OTC_{YYYYMMDD}</code> and comes with SHA-256 checksums.</p>
-  </li>
-  <li>
-    <h3>Open process</h3>
-    <p>The build code, the rules, every automated decision and the issue tracker will be public. Anyone will be able to report a problem with a station.</p>
-  </li>
-</ul>
+<section class="section wrap flow" aria-labelledby="combined">
+  <div class="section-head">
+    <h2 id="combined">Three kinds of source, one release</h2>
+    <p>Each source has its own licence, format and conventions. OTC reads each one with its own adapter, checks it, and writes everything into one format. At one location, official constants rank before a gauge fit, and a gauge fit before model constants.</p>
+  </div>
+  <ul class="streams">
+    <li class="stream">
+      <h3>Official constants</h3>
+      <p class="rank">Published by the agency responsible for the gauge. Ranked first.</p>
+      <ul>
+        <li><a href="/sources/#noaa">NOAA CO-OPS</a> <span class="status launch">Launch set</span></li>
+        <li><span><a href="/sources/#kartverket">Kartverket</a> <span class="country">Norway</span></span> <span class="status launch">Launch set</span></li>
+        <li><a href="/sources/#noaa-currents">NOAA CO-OPS currents</a> <span class="status planned">Planned</span></li>
+      </ul>
+    </li>
+    <li class="stream">
+      <h3>Gauge records that OTC fits</h3>
+      <p class="rank">Sea-level records, fitted after the time-base checks. Ranked second.</p>
+      <ul>
+        <li><a href="/sources/#gesla">GESLA</a> <span class="status launch">Launch set</span></li>
+        <li><span><a href="/sources/#pegelonline">PEGELONLINE</a> <span class="country">Germany</span></span> <span class="status planned">Planned</span></li>
+        <li><span><a href="/sources/#rijkswaterstaat">Rijkswaterstaat</a> <span class="country">Netherlands</span></span> <span class="status planned">Planned</span></li>
+        <li><span><a href="/sources/#marine-institute">Marine Institute</a> <span class="country">Ireland</span></span> <span class="status planned">Planned</span></li>
+        <li><span><a href="/sources/#dmi">DMI</a> <span class="country">Denmark</span></span> <span class="status planned">Planned</span></li>
+        <li><span><a href="/sources/#smhi">SMHI</a> <span class="country">Sweden</span></span> <span class="status planned">Planned</span></li>
+        <li><span><a href="/sources/#fmi">FMI</a> <span class="country">Finland</span></span> <span class="status planned">Planned</span></li>
+        <li><a href="/sources/#uhslc-fast">UHSLC Fast Delivery</a> <span class="status planned">Planned</span></li>
+      </ul>
+    </li>
+    <li class="stream">
+      <h3>Model constants</h3>
+      <p class="rank">From global tide models at station points, always labelled as model constants. Ranked third.</p>
+      <ul>
+        <li><a href="/sources/#eot20">EOT20</a> <span class="status planned">Planned</span></li>
+        <li><a href="/sources/#fes2022">FES2022</a> <span class="status planned">Planned</span></li>
+      </ul>
+    </li>
+  </ul>
+  <svg class="confluence" viewBox="0 0 600 80" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M100 0 C100 45, 300 35, 300 80"/>
+    <path d="M500 0 C500 45, 300 35, 300 80"/>
+    <path class="main" d="M300 0 V80"/>
+  </svg>
+  <div class="release">
+    <div>
+      <h3>One OTC release</h3>
+      <p class="stem">OTC_{YYYYMMDD}</p>
+      <p class="pending">No release yet. Coming with the first release.</p>
+    </div>
+    <ul>
+      <li><strong>One format.</strong> JSON with a published JSON Schema, plus JSON Lines and CSV.</li>
+      <li><strong>Declared conventions</strong> for every constant set.</li>
+      <li><strong>Provenance</strong> for every record.</li>
+      <li><strong>Accuracy for every station</strong> against official predictions.</li>
+      <li><strong>Every set kept.</strong> A station lists every constant set, with one recommended by a published rule.</li>
+      <li><strong>SHA-256 checksums</strong> for every file, and a DOI for each release.</li>
+    </ul>
+  </div>
+  <p class="flow-key"><span class="status launch">Launch set</span>: planned for the first release. <span class="status planned">Planned</span>: licence and access verified, not in the first release. Details for each source are on <a href="/sources/">Sources</a>.</p>
+</section>
 
-<h2>Sources at a glance</h2>
-<div class="table-wrap">
-<table>
-  <caption>Launch set (planned for the first release)</caption>
-  <thead><tr><th scope="col">Source</th><th scope="col">What OTC takes</th><th scope="col">Licence</th><th scope="col">Rank</th></tr></thead>
-  <tbody>
-    <tr><th scope="row"><a href="/sources/#noaa">NOAA CO-OPS</a></th><td>Official constants and subordinate-station offsets</td><td>Public domain (US Government)</td><td>Official</td></tr>
-    <tr><th scope="row"><a href="/sources/#kartverket">Kartverket</a> (Norway)</th><td>Official constants</td><td>CC BY 4.0</td><td>Official</td></tr>
-    <tr><th scope="row"><a href="/sources/#gesla">GESLA</a></th><td>Gauge records that OTC fits (derived constants only)</td><td>CC BY 4.0 on derived constants, per-provider attribution</td><td>Gauge fit</td></tr>
-  </tbody>
-</table>
-</div>
-<div class="table-wrap">
-<table>
-  <caption>Planned (verified licence and access), not in the first release</caption>
-  <thead><tr><th scope="col">Source</th><th scope="col">What OTC takes</th><th scope="col">Licence</th><th scope="col">Rank</th></tr></thead>
-  <tbody>
-    <tr><th scope="row"><a href="/sources/#noaa-currents">NOAA CO-OPS currents</a></th><td>Official tidal-current constants</td><td>Public domain (US Government)</td><td>Official (currents)</td></tr>
-    <tr><th scope="row"><a href="/sources/#pegelonline">PEGELONLINE</a> (Germany)</th><td>Gauge records that OTC fits</td><td>DL-DE->Zero-2.0</td><td>Gauge fit</td></tr>
-    <tr><th scope="row"><a href="/sources/#rijkswaterstaat">Rijkswaterstaat</a> (Netherlands)</th><td>Gauge records that OTC fits</td><td>CC0</td><td>Gauge fit</td></tr>
-    <tr><th scope="row"><a href="/sources/#marine-institute">Marine Institute</a> (Ireland)</th><td>Gauge records that OTC fits</td><td>CC BY 4.0</td><td>Gauge fit</td></tr>
-    <tr><th scope="row"><a href="/sources/#dmi">DMI</a> (Denmark)</th><td>Gauge records that OTC fits</td><td>CC BY 4.0</td><td>Gauge fit</td></tr>
-    <tr><th scope="row"><a href="/sources/#smhi">SMHI</a> (Sweden)</th><td>Gauge records that OTC fits</td><td>CC BY 4.0 SE</td><td>Gauge fit</td></tr>
-    <tr><th scope="row"><a href="/sources/#fmi">FMI</a> (Finland)</th><td>Gauge records that OTC fits</td><td>CC BY 4.0</td><td>Gauge fit</td></tr>
-    <tr><th scope="row"><a href="/sources/#uhslc-fast">UHSLC Fast Delivery</a></th><td>Gauge records that OTC fits</td><td>Free use and redistribution, with citation</td><td>Gauge fit</td></tr>
-    <tr><th scope="row"><a href="/sources/#eot20">EOT20</a></th><td>Model constants at station points</td><td>CC BY 4.0</td><td>Model</td></tr>
-    <tr><th scope="row"><a href="/sources/#fes2022">FES2022</a></th><td>Model constants at station points (planned, needs a free registration)</td><td>AVISO licence (CC BY 4.0 based)</td><td>Model</td></tr>
-  </tbody>
-</table>
-</div>
-<p>At one location, official constants rank before a gauge fit, and a gauge fit before model constants. Model constants are always labelled as such. Sources that were checked and not added are listed under <a href="/sources/#not-used">Considered, not added</a>. See <a href="/sources/">Sources</a> for licences, attribution, update cadence and coverage, <a href="/method/">Method</a> for how each source is processed, and <a href="/why/">Why</a> for the problems this project addresses.</p>
+<section class="section proof" aria-labelledby="proof">
+  <div class="wrap">
+    <div class="section-head">
+      <h2 id="proof">Why one consistent dataset matters <span class="tag">Proof of concept</span></h2>
+      <p>The German WSV gauge records in GESLA-4.0 are in German civil time but are labelled UTC. TICON-4 fitted them as they were, so its phases for those gauges are late. A dataset that combines sources must check every time base and convention before it uses them.</p>
+      <p>At Helgoland, the proof of concept scored TICON-4 at 88–90 min mean time error, and our fit of the same station, with the time base corrected, at 6.7 min. These are proof-of-concept numbers, not release results.</p>
+    </div>
+    <figure class="plot">
+      <div class="plot-head"><p class="place">Helgoland</p><p>Schematic of one tide. Time of high water against the official prediction.</p></div>
+      <div class="plot-box">{{include tide-wide.svg}}{{include tide-compact.svg}}</div>
+      <figcaption>
+        <ul class="plot-key">
+          <li><i class="k-official" aria-hidden="true"></i>Official prediction</li>
+          <li><i class="k-ticon" aria-hidden="true"></i>TICON-4, mean time error 88–90 min</li>
+          <li><i class="k-fit" aria-hidden="true"></i>Our fit from GESLA, mean time error 6.7 min</li>
+        </ul>
+        <p>Schematic: each curve is the official curve shifted by that set's mean time error in the proof of concept of 2026-10-07. The direction of our fit's shift is for illustration only. All 11 stations and the method are on <a href="/validation/#poc">Validation</a>.</p>
+      </figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="section wrap" aria-labelledby="different">
+  <div class="section-head">
+    <h2 id="different">What is different</h2>
+  </div>
+  <ul class="marked">
+    <li class="first">
+      <div>
+        <h3>One dataset from many open sources</h3>
+        <p>Official constants, constants fitted from gauge records and, later, model constants, in one format. Every station has a stable id, its aliases in other systems (NOAA, GESLA, TICON, XTide, Kartverket, Slackwater), and every constant set from every source, with one recommended by a published rule.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Accuracy for every station</h3>
+        <p>Every release publishes, per station, how well the constants reproduce official predictions: time and height errors, missed and extra events, and the same numbers for the previous release.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Declared conventions</h3>
+        <p>Every set of constants states its phase reference, time zone, astronomical-argument model, nodal corrections and constituent definitions. A converter never guesses.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Time bases checked</h3>
+        <p>Every input record is checked for a wrong or undeclared clock before it is used. A record whose time base cannot be explained is not used.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Automatic and current</h3>
+        <p>Weekly watchers detect upstream changes. A build that passes all gates is published with no person in the loop. A build that fails keeps the last good release live.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Open format</h3>
+        <p>JSON first, with a published JSON Schema, plus JSON Lines and CSV. Every file is named <code>OTC_{YYYYMMDD}</code> and comes with SHA-256 checksums.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Open process</h3>
+        <p>The build code, the rules, every automated decision and the issue tracker will be public. Anyone will be able to report a problem with a station.</p>
+      </div>
+    </li>
+  </ul>
+</section>
+
+<section class="section wrap glance" aria-labelledby="glance">
+  <h2 id="glance">Sources at a glance</h2>
+  <div class="table-wrap">
+  <table>
+    <caption>Launch set (planned for the first release)</caption>
+    <thead><tr><th scope="col">Source</th><th scope="col">What OTC takes</th><th scope="col">Licence</th><th scope="col">Rank</th></tr></thead>
+    <tbody>
+      <tr><th scope="row"><a href="/sources/#noaa">NOAA CO-OPS</a></th><td>Official constants and subordinate-station offsets</td><td>Public domain (US Government)</td><td>Official</td></tr>
+      <tr><th scope="row"><a href="/sources/#kartverket">Kartverket</a> (Norway)</th><td>Official constants</td><td>CC BY 4.0</td><td>Official</td></tr>
+      <tr><th scope="row"><a href="/sources/#gesla">GESLA</a></th><td>Gauge records that OTC fits (derived constants only)</td><td>CC BY 4.0 on derived constants, per-provider attribution</td><td>Gauge fit</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="table-wrap">
+  <table>
+    <caption>Planned (verified licence and access), not in the first release</caption>
+    <thead><tr><th scope="col">Source</th><th scope="col">What OTC takes</th><th scope="col">Licence</th><th scope="col">Rank</th></tr></thead>
+    <tbody>
+      <tr><th scope="row"><a href="/sources/#noaa-currents">NOAA CO-OPS currents</a></th><td>Official tidal-current constants</td><td>Public domain (US Government)</td><td>Official (currents)</td></tr>
+      <tr><th scope="row"><a href="/sources/#pegelonline">PEGELONLINE</a> (Germany)</th><td>Gauge records that OTC fits</td><td>DL-DE-&gt;Zero-2.0</td><td>Gauge fit</td></tr>
+      <tr><th scope="row"><a href="/sources/#rijkswaterstaat">Rijkswaterstaat</a> (Netherlands)</th><td>Gauge records that OTC fits</td><td>CC0</td><td>Gauge fit</td></tr>
+      <tr><th scope="row"><a href="/sources/#marine-institute">Marine Institute</a> (Ireland)</th><td>Gauge records that OTC fits</td><td>CC BY 4.0</td><td>Gauge fit</td></tr>
+      <tr><th scope="row"><a href="/sources/#dmi">DMI</a> (Denmark)</th><td>Gauge records that OTC fits</td><td>CC BY 4.0</td><td>Gauge fit</td></tr>
+      <tr><th scope="row"><a href="/sources/#smhi">SMHI</a> (Sweden)</th><td>Gauge records that OTC fits</td><td>CC BY 4.0 SE</td><td>Gauge fit</td></tr>
+      <tr><th scope="row"><a href="/sources/#fmi">FMI</a> (Finland)</th><td>Gauge records that OTC fits</td><td>CC BY 4.0</td><td>Gauge fit</td></tr>
+      <tr><th scope="row"><a href="/sources/#uhslc-fast">UHSLC Fast Delivery</a></th><td>Gauge records that OTC fits</td><td>Free use and redistribution, with citation</td><td>Gauge fit</td></tr>
+      <tr><th scope="row"><a href="/sources/#eot20">EOT20</a></th><td>Model constants at station points</td><td>CC BY 4.0</td><td>Model</td></tr>
+      <tr><th scope="row"><a href="/sources/#fes2022">FES2022</a></th><td>Model constants at station points (planned, needs a free registration)</td><td>AVISO licence (CC BY 4.0 based)</td><td>Model</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>At one location, official constants rank before a gauge fit, and a gauge fit before model constants. Model constants are always labelled as such. Sources that were checked and not added are listed under <a href="/sources/#not-used">Considered, not added</a>. See <a href="/sources/">Sources</a> for licences, attribution, update cadence and coverage, <a href="/method/">Method</a> for how each source is processed, and <a href="/why/">Why</a> for the problems this project addresses.</p>
+</section>
+<script src="/assets/plot.js" defer></script>
