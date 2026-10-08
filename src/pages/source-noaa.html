@@ -1,0 +1,23 @@
+---
+title: NOAA CO-OPS
+description: NOAA CO-OPS: what it is, what OpenTideConstants takes from it, its licence and attribution, how it is watched, its coverage and how it ranks.
+---
+<h1>NOAA CO-OPS</h1>
+<dl>
+  <dt>What it is</dt>
+  <dd>The Center for Operational Oceanographic Products and Services of the US National Oceanic and Atmospheric Administration, which publishes tide predictions and harmonic constants for US stations through a public API.</dd>
+  <dt>What OTC takes</dt>
+  <dd><strong>Official constants</strong> for reference stations (Greenwich phases), and <strong>subordinate-station offsets</strong> (time and height corrections to a reference station). OTC publishes them unmodified and marks them as NOAA data.</dd>
+  <dt>Licence</dt>
+  <dd>US Government work in the public domain (<code>LicenseRef-PublicDomain-USGov</code>). NOAA's disclaimer says the data “may be used freely by the public” and “shall not be modified in content and then presented as official government material”. OTC never presents its files as an official NOAA product.</dd>
+  <dt>Attribution line OTC uses</dt>
+  <dd>“Contains NOAA CO-OPS data (public domain). Not an official NOAA product.”</dd>
+  <dt>Update cadence and watching</dt>
+  <dd>The API sends no ETag or Last-Modified headers, so a weekly watcher hashes the normalised response for every station and rebuilds only the stations that changed.</dd>
+  <dt>Coverage</dt>
+  <dd>NOAA's tide-prediction station list had 3,502 stations when checked on 2026-10-07: 1,260 reference stations and 2,242 subordinate stations. Mostly the United States and its territories.</dd>
+  <dt>Rank</dt>
+  <dd>Official constants.</dd>
+</dl>
+
+<p><a href="/sources/">All sources and how they rank</a></p>

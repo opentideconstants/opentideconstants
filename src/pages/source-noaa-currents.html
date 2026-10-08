@@ -1,0 +1,25 @@
+---
+title: NOAA CO-OPS tidal-current constants
+description: NOAA CO-OPS tidal-current constants: what it is, what OpenTideConstants takes from it, its licence and attribution, how it is watched, its coverage and how it ranks.
+---
+<h1>NOAA CO-OPS tidal-current constants</h1>
+<dl>
+  <dt>What it is</dt>
+  <dd>Harmonic constants for tidal currents (velocity, not water level) at NOAA current-meter stations, published through NOAA's metadata API.</dd>
+  <dt>Publisher</dt>
+  <dd>NOAA CO-OPS (US National Oceanic and Atmospheric Administration).</dd>
+  <dt>What OTC takes</dt>
+  <dd><strong>Official current constants</strong>: per depth bin, the major and minor axis amplitude and phase, and the azimuth of the current ellipse. These need their own record type (quantity “current”), separate from water-level constants. Subordinate current stations publish offsets only, with no constants.</dd>
+  <dt>Licence</dt>
+  <dd>US Government work in the public domain (17 U.S.C. §105). <a href="https://tidesandcurrents.noaa.gov/disclaimers.html">NOAA's disclaimer</a> says the information “may be used freely by the public”.</dd>
+  <dt>Attribution line OTC uses</dt>
+  <dd>“Contains NOAA CO-OPS data (public domain). Not an official NOAA product.”</dd>
+  <dt>Access and watching</dt>
+  <dd>Keyless JSON API: a station list, then one constants request per station. The constants are static and change only when NOAA re-analyses a station, so a weekly watcher hashes each station's response, as for the NOAA water-level constants.</dd>
+  <dt>Coverage</dt>
+  <dd>US coasts and estuaries. NOAA's current-prediction list had 4,439 stations when checked on 2026-10-07, of which 2,221 are harmonic stations and the rest subordinate.</dd>
+  <dt>Rank</dt>
+  <dd>Official constants (currents). They are ranked only against other current constants.</dd>
+</dl>
+
+<p><a href="/sources/">All sources and how they rank</a></p>

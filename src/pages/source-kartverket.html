@@ -1,0 +1,23 @@
+---
+title: Kartverket (Norway)
+description: Kartverket (Norway): what it is, what OpenTideConstants takes from it, its licence and attribution, how it is watched, its coverage and how it ranks.
+---
+<h1>Kartverket (Norway)</h1>
+<dl>
+  <dt>What it is</dt>
+  <dd>The Norwegian Mapping Authority, which operates Norway's permanent tide gauges and publishes their harmonic constants through its tide API.</dd>
+  <dt>What OTC takes</dt>
+  <dd><strong>Official constants</strong>: amplitude, phase, speed, Doodson code and observation span per station. The API gives phases relative to UTC+1 (<code>utcoffset="+01:00"</code>); OTC converts them to Greenwich and records the conversion.</dd>
+  <dt>Licence</dt>
+  <dd>CC BY 4.0, as stated on Kartverket's API page.</dd>
+  <dt>Attribution line OTC uses</dt>
+  <dd>“Contains data from Kartverket (Norwegian Mapping Authority), CC BY 4.0.”</dd>
+  <dt>Update cadence and watching</dt>
+  <dd>A weekly watcher hashes the response for every station and rebuilds only the stations that changed.</dd>
+  <dt>Coverage</dt>
+  <dd>Norway's permanent tide gauges. The station count will be published with the first release.</dd>
+  <dt>Rank</dt>
+  <dd>Official constants.</dd>
+</dl>
+
+<p><a href="/sources/">All sources and how they rank</a></p>
