@@ -20,6 +20,8 @@ order: 5
     <tr><td><code>OTC_{YYYYMMDD}.json</code></td><td><strong>Primary format.</strong> One document with every station, its constant sets, constituents, offsets, conventions, validation and provenance.</td><td class="pending">Coming with the first release</td></tr>
     <tr><td><code>OTC_{YYYYMMDD}.json.gz</code></td><td>The same file, gzip-compressed.</td><td class="pending">Coming with the first release</td></tr>
     <tr><td><code>OTC_{YYYYMMDD}.jsonl</code></td><td>One station document per line, for streaming and for clean per-station diffs between releases.</td><td class="pending">Coming with the first release</td></tr>
+    <tr><td><code>OTC_{YYYYMMDD}.meta.json</code></td><td>The release document without <code>stations</code>: release metadata, conventions, licences and the constituent table. A <code>.jsonl</code> reader needs it.</td><td class="pending">Coming with the first release</td></tr>
+    <tr><td><code>OTC_{YYYYMMDD}.jsonl.gz</code></td><td><em>Optional.</em> The <code>.jsonl</code> file, gzip-compressed. A release is complete without it.</td><td class="pending">Coming with the first release</td></tr>
     <tr><td><code>OTC_{YYYYMMDD}.csv</code></td><td>One long table for spreadsheets, with a <code>record_type</code> column (<code>station</code>, <code>constant_set</code>, <code>constituent</code>, <code>offset</code>, <code>convention</code>, <code>validation</code>, <code>tombstone</code>). Columns that do not apply to a row type are empty. RFC 4180 quoting, UTF-8, LF line endings.</td><td class="pending">Coming with the first release</td></tr>
     <tr><td><code>OTC_{YYYYMMDD}.parquet</code></td><td><em>Optional.</em> The CSV table, typed and compressed, for analysts. A release is complete without it.</td><td class="pending">Coming with the first release</td></tr>
     <tr><td><code>OTC_{YYYYMMDD}.sha256</code></td><td>SHA-256 checksums of every file in the release, in <code>sha256sum</code> format.</td><td class="pending">Coming with the first release</td></tr>
@@ -31,20 +33,25 @@ order: 5
 <ul>
   <li><strong>Files:</strong> <code>{{site.dataUrl}}/OTC_{YYYYMMDD}.{ext}</code>, served from Cloudflare R2. Every release stays available, and a dated file is never overwritten.</li>
   <li><strong>Latest pointer:</strong> <code>{{site.dataUrl}}/OTC_latest.json</code> is a small manifest, not a data file. It gives the current release date, its <code>format_version</code>, its DOI, and the URL, size and SHA-256 of each file. It is updated only after every file of a release is uploaded and verified. Read it first, then download the dated files.</li>
+  <li><strong>Latest pointer per format major:</strong> <code>{{site.dataUrl}}/OTC_latest-f{MAJOR}.json</code> (for example <code>OTC_latest-f0.json</code>) has the same fields for the newest release of that <code>format_version</code> major. A reader that supports only an older major keeps getting updates after a new major comes out.</li>
+  <li><strong>Release index:</strong> <code>{{site.dataUrl}}/OTC_index.json</code> lists every release, newest first, with the same fields as the pointer.</li>
+  <li><strong>Browsers:</strong> the data host allows cross-origin <code>GET</code> and <code>HEAD</code> from any site, so a web page can read the files directly.</li>
   <li><strong>Archive:</strong> the same public files are deposited at Zenodo with a DOI for each release (coming with the first release). See <a href="/citation/">Citation</a>.</li>
 </ul>
 <p>Check a download with:</p>
 <pre><code>sha256sum -c OTC_{YYYYMMDD}.sha256 --ignore-missing</code></pre>
 
 <h2 id="format">Format</h2>
-<p>The JSON document has five top-level fields: <code>format_version</code>, <code>release</code>, <code>conventions</code>, <code>licences</code> and <code>stations</code>.</p>
+<p>The JSON document has six top-level fields: <code>format_version</code>, <code>release</code>, <code>conventions</code>, <code>licences</code>, <code>constituents</code> and <code>stations</code>.</p>
 <dl>
   <dt>station</dt>
-  <dd>A stable <code>station_id</code> in the OTC namespace (never changed, never reused), name, country, position, type (<code>reference</code> or <code>subordinate</code>), aliases in other systems (NOAA, GESLA, TICON, XTide, Kartverket, Slackwater), and the <code>recommended_set_id</code>. A removed station stays as a tombstone with its reason.</dd>
+  <dd>A stable <code>station_id</code> in the OTC namespace (never changed, never reused), name, country, position, IANA time zone, type (<code>reference</code> or <code>subordinate</code>), aliases in other systems (NOAA, GESLA, TICON, XTide, Kartverket, Slackwater), and the <code>recommended_set_id</code>. An alias id belongs to one station only in a release. A removed station stays as a tombstone with its reason.</dd>
   <dt>constant set</dt>
-  <dd>One per source record: source, record id and version, record span, datum, <code>convention_id</code>, <code>licence_id</code>, QC status and flags, the constituents, and provenance. A station can have several sets; one is recommended by a published rule.</dd>
+  <dd>One per source record: source, source type (<code>official</code>, <code>gauge</code> or <code>model</code>), quantity (<code>water_level</code> or <code>current</code>), record id and version, record span, datum, <code>convention_id</code>, <code>licence_id</code>, QC status and flags, the constituents, and provenance. A station can have several sets; one is recommended by a published rule.</dd>
   <dt>constituent</dt>
-  <dd>OTC canonical name and the source's own name, Doodson number, speed (°/h), amplitude (m), Greenwich phase (°), uncertainties, and why it was kept. Dropped constituents are listed with the reason.</dd>
+  <dd>OTC canonical name and the source's own name, Doodson number, speed (°/h), amplitude (m), Greenwich phase (°), uncertainties, and why it was kept. Dropped constituents are listed with the reason. Names are at most 15 characters.</dd>
+  <dt>constituent table</dt>
+  <dd>One row per constituent name and constituent-table version in the release: Doodson number, speed (°/h) and nodal formula id.</dd>
   <dt>subordinate offsets</dt>
   <dd>Reference station, time offsets at high and low water (minutes), height offsets, and whether they are ratios or additive, as NOAA gives them.</dd>
   <dt>convention</dt>
@@ -57,7 +64,8 @@ order: 5
 
 <h2 id="schema">JSON Schema</h2>
 <ul>
-  <li><a href="/schema/otc-0.1.schema.json">otc-0.1.schema.json</a>: the <strong>draft</strong> JSON Schema (draft 2020-12) for <code>format_version</code> 0.1. Each line of the <code>.jsonl</code> file validates against <code>#/$defs/station</code>.</li>
+  <li><a href="/schema/otc-0.2.schema.json">otc-0.2.schema.json</a>: the <strong>draft</strong> JSON Schema (draft 2020-12) for <code>format_version</code> 0.2. Each line of the <code>.jsonl</code> file validates against <code>#/$defs/station</code>, and the <code>.meta.json</code> file against <code>#/$defs/meta</code>.</li>
+  <li><a href="/schema/otc-0.1.schema.json">otc-0.1.schema.json</a>: the earlier draft, for <code>format_version</code> 0.1. Kept for reference.</li>
   <li><a href="/schema/example.json">example.json</a>: a small example document with illustrative values (not data). It has one station with two constant sets and one tombstone.</li>
 </ul>
 <p>The format version is separate from the release date. A new field is a minor change; a removed or renamed field, or a changed unit or convention, is a major change. The schema may still change before the first release.</p>
