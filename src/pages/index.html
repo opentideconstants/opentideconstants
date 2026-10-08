@@ -16,8 +16,8 @@ layout: full
         <h1 id="hero-title">Open tide data, combined into <em>one dataset.</em></h1>
         <p class="lead">OpenTideConstants (OTC) combines official agency constants, constants that we fit from gauge records, and tide-model constants into one consistent dataset: one format, declared conventions, provenance for every record, and the accuracy of every station against official predictions. It is rebuilt automatically from the latest upstream data and released under CC BY 4.0, with a DOI for each release.</p>
         <div class="actions">
-          <a class="button" href="/data/">Data and downloads <span aria-hidden="true">→</span></a>
-          <a class="more" href="/method/">Read the method</a>
+          <a class="button" href="/downloads/">Downloads <span aria-hidden="true">→</span></a>
+          <a class="more" href="/documentation/#method">Read the method</a>
         </div>
       </div>
       <p class="sheet-note"><span class="place">Helgoland.</span> TICON-4's mean time error here is 88–90 min. OTC's fit, with the time base corrected, is 6.7 min.</p>
@@ -34,33 +34,33 @@ layout: full
       <h3>Official constants</h3>
       <p class="rank">Published by the agency responsible for the gauge. Ranked first.</p>
       <ul>
-        <li><a href="/sources/#noaa">NOAA CO-OPS</a></li>
-        <li><span><a href="/sources/#kartverket">Kartverket</a> <span class="country">Norway</span></span></li>
-        <li><span><a href="/sources/#linz">LINZ</a> <span class="country">New Zealand</span></span></li>
-        <li><a href="/sources/#noaa-currents">NOAA CO-OPS currents</a></li>
+        <li><a href="/documentation/#noaa">NOAA CO-OPS</a></li>
+        <li><span><a href="/documentation/#kartverket">Kartverket</a> <span class="country">Norway</span></span></li>
+        <li><span><a href="/documentation/#linz">LINZ</a> <span class="country">New Zealand</span></span></li>
+        <li><a href="/documentation/#noaa-currents">NOAA CO-OPS currents</a></li>
       </ul>
     </li>
     <li class="stream">
       <h3>Gauge records that OTC fits</h3>
       <p class="rank">Sea-level records, fitted after the time-base checks. Ranked second.</p>
       <ul>
-        <li><a href="/sources/#gesla">GESLA</a></li>
-        <li><span><a href="/sources/#pegelonline">PEGELONLINE</a> <span class="country">Germany</span></span></li>
-        <li><span><a href="/sources/#rijkswaterstaat">Rijkswaterstaat</a> <span class="country">Netherlands</span></span></li>
-        <li><span><a href="/sources/#marine-institute">Marine Institute</a> <span class="country">Ireland</span></span></li>
-        <li><span><a href="/sources/#dmi">DMI</a> <span class="country">Denmark</span></span></li>
-        <li><span><a href="/sources/#smhi">SMHI</a> <span class="country">Sweden</span></span></li>
-        <li><span><a href="/sources/#fmi">FMI</a> <span class="country">Finland</span></span></li>
-        <li><a href="/sources/#uhslc-fast">UHSLC Fast Delivery</a></li>
-        <li><span><a href="/sources/#shom-refmar">SHOM REFMAR</a> <span class="country">France</span></span></li>
+        <li><a href="/documentation/#gesla">GESLA</a></li>
+        <li><span><a href="/documentation/#pegelonline">PEGELONLINE</a> <span class="country">Germany</span></span></li>
+        <li><span><a href="/documentation/#rijkswaterstaat">Rijkswaterstaat</a> <span class="country">Netherlands</span></span></li>
+        <li><span><a href="/documentation/#marine-institute">Marine Institute</a> <span class="country">Ireland</span></span></li>
+        <li><span><a href="/documentation/#dmi">DMI</a> <span class="country">Denmark</span></span></li>
+        <li><span><a href="/documentation/#smhi">SMHI</a> <span class="country">Sweden</span></span></li>
+        <li><span><a href="/documentation/#fmi">FMI</a> <span class="country">Finland</span></span></li>
+        <li><a href="/documentation/#uhslc-fast">UHSLC Fast Delivery</a></li>
+        <li><span><a href="/documentation/#shom-refmar">SHOM REFMAR</a> <span class="country">France</span></span></li>
       </ul>
     </li>
     <li class="stream">
       <h3>Model constants</h3>
       <p class="rank">From global tide models at station points, always labelled as model constants. Ranked third.</p>
       <ul>
-        <li><a href="/sources/#eot20">EOT20</a></li>
-        <li><a href="/sources/#fes2022">FES2022</a></li>
+        <li><a href="/documentation/#eot20">EOT20</a></li>
+        <li><a href="/documentation/#fes2022">FES2022</a></li>
       </ul>
     </li>
   </ul>
@@ -83,7 +83,7 @@ layout: full
       <li><strong>SHA-256 checksums</strong> for every file, and a DOI for each release.</li>
     </ul>
   </div>
-  <p class="flow-key">Licence, attribution, access and coverage for each source are on <a href="/sources/">Sources</a>.</p>
+  <p class="flow-key">Licence, attribution, access and coverage for each source are on <a href="/documentation/#sources">Sources</a>.</p>
 </section>
 
 <section class="section proof" aria-labelledby="proof">
@@ -102,7 +102,7 @@ layout: full
           <li><i class="k-ticon" aria-hidden="true"></i>TICON-4, mean time error 88–90 min</li>
           <li><i class="k-fit" aria-hidden="true"></i>OTC fit from GESLA, mean time error 6.7 min</li>
         </ul>
-        <p>Each curve is the official curve shifted by that set's mean time error. All 11 stations and the method are on <a href="/validation/#poc">Validation</a>.</p>
+        <p>Each curve is the official curve shifted by that set's mean time error. All 11 stations and the method are on <a href="/documentation/#results">Validation</a>.</p>
       </figcaption>
     </figure>
   </div>
@@ -165,24 +165,24 @@ layout: full
     <caption>Every source in an OTC release</caption>
     <thead><tr><th scope="col">Source</th><th scope="col">What OTC takes</th><th scope="col">Licence</th><th scope="col">Rank</th></tr></thead>
     <tbody>
-      <tr><th scope="row"><a href="/sources/#noaa">NOAA CO-OPS</a></th><td>Official constants and subordinate-station offsets</td><td>Public domain (US Government)</td><td>Official</td></tr>
-      <tr><th scope="row"><a href="/sources/#kartverket">Kartverket</a> (Norway)</th><td>Official constants</td><td>CC BY 4.0</td><td>Official</td></tr>
-      <tr><th scope="row"><a href="/sources/#linz">LINZ</a> (New Zealand)</th><td>Official constants</td><td>CC BY 4.0</td><td>Official</td></tr>
-      <tr><th scope="row"><a href="/sources/#noaa-currents">NOAA CO-OPS currents</a></th><td>Official tidal-current constants</td><td>Public domain (US Government)</td><td>Official (currents)</td></tr>
-      <tr><th scope="row"><a href="/sources/#gesla">GESLA</a></th><td>Gauge records that OTC fits (derived constants only)</td><td>CC BY 4.0 on derived constants, per-provider attribution</td><td>Gauge fit</td></tr>
-      <tr><th scope="row"><a href="/sources/#pegelonline">PEGELONLINE</a> (Germany)</th><td>Gauge records that OTC fits</td><td>DL-DE-&gt;Zero-2.0</td><td>Gauge fit</td></tr>
-      <tr><th scope="row"><a href="/sources/#rijkswaterstaat">Rijkswaterstaat</a> (Netherlands)</th><td>Gauge records that OTC fits</td><td>CC0</td><td>Gauge fit</td></tr>
-      <tr><th scope="row"><a href="/sources/#marine-institute">Marine Institute</a> (Ireland)</th><td>Gauge records that OTC fits</td><td>CC BY 4.0</td><td>Gauge fit</td></tr>
-      <tr><th scope="row"><a href="/sources/#dmi">DMI</a> (Denmark)</th><td>Gauge records that OTC fits</td><td>CC BY 4.0</td><td>Gauge fit</td></tr>
-      <tr><th scope="row"><a href="/sources/#smhi">SMHI</a> (Sweden)</th><td>Gauge records that OTC fits</td><td>CC BY 4.0 SE</td><td>Gauge fit</td></tr>
-      <tr><th scope="row"><a href="/sources/#fmi">FMI</a> (Finland)</th><td>Gauge records that OTC fits</td><td>CC BY 4.0</td><td>Gauge fit</td></tr>
-      <tr><th scope="row"><a href="/sources/#uhslc-fast">UHSLC Fast Delivery</a></th><td>Gauge records that OTC fits</td><td>Free use and redistribution, with citation</td><td>Gauge fit</td></tr>
-      <tr><th scope="row"><a href="/sources/#shom-refmar">SHOM REFMAR</a> (France)</th><td>Gauge records that OTC fits (observations only)</td><td>Etalab Licence Ouverte 2.0</td><td>Gauge fit</td></tr>
-      <tr><th scope="row"><a href="/sources/#eot20">EOT20</a></th><td>Model constants at station points</td><td>CC BY 4.0</td><td>Model</td></tr>
-      <tr><th scope="row"><a href="/sources/#fes2022">FES2022</a></th><td>Model constants at station points</td><td>AVISO licence (CC BY 4.0 based)</td><td>Model</td></tr>
+      <tr><th scope="row"><a href="/documentation/#noaa">NOAA CO-OPS</a></th><td>Official constants and subordinate-station offsets</td><td>Public domain (US Government)</td><td>Official</td></tr>
+      <tr><th scope="row"><a href="/documentation/#kartverket">Kartverket</a> (Norway)</th><td>Official constants</td><td>CC BY 4.0</td><td>Official</td></tr>
+      <tr><th scope="row"><a href="/documentation/#linz">LINZ</a> (New Zealand)</th><td>Official constants</td><td>CC BY 4.0</td><td>Official</td></tr>
+      <tr><th scope="row"><a href="/documentation/#noaa-currents">NOAA CO-OPS currents</a></th><td>Official tidal-current constants</td><td>Public domain (US Government)</td><td>Official (currents)</td></tr>
+      <tr><th scope="row"><a href="/documentation/#gesla">GESLA</a></th><td>Gauge records that OTC fits (derived constants only)</td><td>CC BY 4.0 on derived constants, per-provider attribution</td><td>Gauge fit</td></tr>
+      <tr><th scope="row"><a href="/documentation/#pegelonline">PEGELONLINE</a> (Germany)</th><td>Gauge records that OTC fits</td><td>DL-DE-&gt;Zero-2.0</td><td>Gauge fit</td></tr>
+      <tr><th scope="row"><a href="/documentation/#rijkswaterstaat">Rijkswaterstaat</a> (Netherlands)</th><td>Gauge records that OTC fits</td><td>CC0</td><td>Gauge fit</td></tr>
+      <tr><th scope="row"><a href="/documentation/#marine-institute">Marine Institute</a> (Ireland)</th><td>Gauge records that OTC fits</td><td>CC BY 4.0</td><td>Gauge fit</td></tr>
+      <tr><th scope="row"><a href="/documentation/#dmi">DMI</a> (Denmark)</th><td>Gauge records that OTC fits</td><td>CC BY 4.0</td><td>Gauge fit</td></tr>
+      <tr><th scope="row"><a href="/documentation/#smhi">SMHI</a> (Sweden)</th><td>Gauge records that OTC fits</td><td>CC BY 4.0 SE</td><td>Gauge fit</td></tr>
+      <tr><th scope="row"><a href="/documentation/#fmi">FMI</a> (Finland)</th><td>Gauge records that OTC fits</td><td>CC BY 4.0</td><td>Gauge fit</td></tr>
+      <tr><th scope="row"><a href="/documentation/#uhslc-fast">UHSLC Fast Delivery</a></th><td>Gauge records that OTC fits</td><td>Free use and redistribution, with citation</td><td>Gauge fit</td></tr>
+      <tr><th scope="row"><a href="/documentation/#shom-refmar">SHOM REFMAR</a> (France)</th><td>Gauge records that OTC fits (observations only)</td><td>Etalab Licence Ouverte 2.0</td><td>Gauge fit</td></tr>
+      <tr><th scope="row"><a href="/documentation/#eot20">EOT20</a></th><td>Model constants at station points</td><td>CC BY 4.0</td><td>Model</td></tr>
+      <tr><th scope="row"><a href="/documentation/#fes2022">FES2022</a></th><td>Model constants at station points</td><td>AVISO licence (CC BY 4.0 based)</td><td>Model</td></tr>
     </tbody>
   </table>
   </div>
-  <p>At one location, official constants rank before a gauge fit, and a gauge fit before model constants. Model constants are always labelled as such. Sources that were checked and not added are listed under <a href="/sources/#not-used">Considered, not added</a>. See <a href="/sources/">Sources</a> for licences, attribution, update cadence and coverage, <a href="/method/">Method</a> for how each source is processed, and <a href="/why/">Why</a> for the problems this project addresses.</p>
+  <p>At one location, official constants rank before a gauge fit, and a gauge fit before model constants. Model constants are always labelled as such. Sources that were checked and not added are listed under <a href="/documentation/#not-used">Considered, not added</a>. See <a href="/documentation/#sources">Sources</a> for licences, attribution, update cadence and coverage, <a href="/documentation/#method">Method</a> for how each source is processed, and <a href="/why/">Why</a> for the problems this project addresses.</p>
 </section>
 <script src="/assets/plot.js" defer></script>
