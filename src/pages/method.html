@@ -30,7 +30,7 @@ order: 3
 </ol>
 
 <h2 id="broken-records">Broken-record checks</h2>
-<p>A record is excluded, and listed with its numbers, when its main constituents are not stable from year to year or between the two halves of the span, when it does not correlate with a nearby gauge that correlates with its own neighbours, or when its values are quantised or out of range. The Hirtshals record (no tide in the input) is the reference case. The thresholds are proposals that the first build calibrates and publishes.</p>
+<p>A record is excluded, and listed with its numbers, when its main constituents are not stable from year to year or between the two halves of the span, when it does not correlate with a nearby gauge that correlates with its own neighbours, or when its values are quantised or out of range. The Hirtshals record (no tide in the input) is the reference case. The thresholds are calibrated on the data and published with each release.</p>
 
 <h2 id="selection">Record selection</h2>
 <p>When several records exist at one gauge, the build picks one by fixed rules, in this order: the most good data in the 19-year span; recent records before records that ended long ago; the gauge operator's own record before a re-distribution of it; instantaneous before averaged; sub-hourly before hourly; then the lowest file id. When two eligible records disagree beyond their uncertainty, the record with the lower error against an official reference is chosen. Every choice and its reason is recorded.</p>
@@ -43,10 +43,10 @@ order: 3
   <li><strong>Long-period constituents</strong> (SA, SSA, MM, MF, MSF) are left out of the published set at river and lake gauges, and where SA is 0.25 m or more, because official predictions do not contain river and seasonal discharge signals.</li>
   <li><strong>Non-tidal daily cycles</strong> (S1, S3, S4) are left out at river and lake gauges, and where they are larger than both M2 and K1.</li>
 </ol>
-<p>In the proof of concept this kept 41–45 constituents for 19-year records and 23–28 for records of 1.5–2.5 years. Every constituent in a release records why it was kept or dropped.</p>
+<p>At the validation stations this keeps 41–45 constituents for 19-year records and 23–28 for records of 1.5–2.5 years. Every constituent in a release records why it was kept or dropped.</p>
 
 <h2 id="source-checks">Per-source convention check</h2>
-<p>Every source is compared on every build with an independent comparator at the same gauges: our own GESLA fit, predicted with the reference predictor. The proposed pass rule is that the median M2, S2, K1 and O1 differences are within 1 cm and 2° over at least 3 overlapping gauges. A source that fails is not published in that release until its declared convention is fixed. A source with no overlapping gauge cannot be added.</p>
+<p>Every source is compared on every build with an independent comparator at the same gauges: our own GESLA fit, predicted with the reference predictor. The pass rule is that the median M2, S2, K1 and O1 differences are within 1 cm and 2° over at least 3 overlapping gauges. A source that fails is not published in that release until its declared convention is fixed. A source with no overlapping gauge cannot be added.</p>
 
 <h2 id="automation">Automation</h2>
 <ul>

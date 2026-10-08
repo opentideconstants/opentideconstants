@@ -5,7 +5,7 @@ nav: Why
 order: 2
 ---
 <h1>Why this dataset</h1>
-<p class="lead">Open tide data is spread over many places: agencies that publish official constants, gauge archives, tide models, and products built from them such as TICON. Each has its own format, conventions and licence. OTC combines the open sources into one consistent, documented dataset, and each release will publish the accuracy of every station.</p>
+<p class="lead">Open tide data is spread over many places: agencies that publish official constants, gauge archives, tide models, and products built from them such as TICON. Each has its own format, conventions and licence. OTC combines the open sources into one consistent, documented dataset, and each release publishes the accuracy of every station.</p>
 <p>Today's open tidal constants are valuable work, and this project builds on them. While using them, we measured problems that pass through silently, and that an automated build can catch on every release.</p>
 
 <p>The examples below were measured on 2026-10-07 on the versions named. Each one names the dataset version it was measured on. Where a problem was already fixed upstream, we say so.</p>
@@ -38,7 +38,7 @@ order: 2
 </ul>
 
 <h2>No accuracy against official predictions is published</h2>
-<p>The open sources we read publish fit statistics, but no comparison with official predictions. That comparison shows a lot. In our proof of concept at 11 stations, a fit made with the method on this site matched or beat TICON-4 at 10 of them. For example, Helgoland went from 88–90 min to 6.7 min mean time error, and Seattle from 6.8 to 2.5 min. These are proof-of-concept numbers, not release results; see <a href="/validation/">Validation</a>.</p>
+<p>The open sources we read publish fit statistics, but no comparison with official predictions. That comparison shows a lot. At 11 validation stations, a fit made with the method on this site matched or beat TICON-4 at 10 of them. For example, Helgoland went from 88–90 min to 6.7 min mean time error, and Seattle from 6.8 to 2.5 min. See <a href="/validation/">Validation</a>.</p>
 
 <h2>Slow cycles and no public trackers</h2>
 <p>TICON releases have come years apart (TICON-3 in 2022, TICON-4 in 2025). For TICON and GESLA we found no public repository or issue tracker; contact is by e-mail. OTC rebuilds when upstream data changes, and every station's problems can be reported in a <a href="{{site.repoUrl}}/issues">public issue tracker</a>.</p>

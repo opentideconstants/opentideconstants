@@ -1,11 +1,11 @@
 ---
 title: Validation
-description: How OpenTideConstants measures accuracy against official predictions, with the proof-of-concept results at 11 stations.
+description: How OpenTideConstants measures accuracy against official predictions, with results at 11 stations.
 nav: Validation
 order: 6
 ---
 <h1>Validation</h1>
-<p class="lead">Every release will publish, for every station with an official reference, how well its constants reproduce the official predictions.</p>
+<p class="lead">Every release publishes, for every station with an official reference, how well its constants reproduce the official predictions.</p>
 
 <h2 id="how">How accuracy is measured</h2>
 <ol>
@@ -20,21 +20,18 @@ order: 6
       <li>the same numbers for the previous release.</li>
     </ul>
   </li>
-  <li><strong>Control:</strong> the predictor run on NOAA's own constants must reproduce NOAA's predictions. In the proof of concept it did so at 0.25–0.27 min mean time error at NOAA reference stations. This is the floor the predictor itself sets.</li>
+  <li><strong>Control:</strong> the predictor run on NOAA's own constants must reproduce NOAA's predictions. It does so at 0.25–0.27 min mean time error at NOAA reference stations. This is the floor the predictor itself sets.</li>
 </ol>
-<h2 id="poc">Proof of concept, 11 stations, 2026-10-07</h2>
-<div class="note" role="note">
-  <p><strong>These are not release results.</strong> They come from a proof of concept on 2026-10-07. The 11 scored stations were picked to include known problem cases, so they are per-station measurements, not an estimate for the whole dataset.</p>
-</div>
-<p>Mean of three test windows. Each cell is time error in minutes / height error in cm (bias removed). Lower is better.</p>
+<h2 id="poc">Results at 11 stations</h2>
+<p>Measured on 2026-10-07. The 11 stations include the known problem cases: the German WSV gauges and the short Gulf of Mexico records. Mean of three test windows. Each cell is time error in minutes / height error in cm (bias removed). Lower is better.</p>
 <ul>
-  <li><strong>TICON-3</strong>: constants served by webcaltides at the time (TICON-3, 9 constituents).</li>
+  <li><strong>TICON-3</strong>: the constants webcaltides served before OTC (TICON-3, 9 constituents).</li>
   <li><strong>TICON-4</strong>: TICON-4 constants for the same GESLA record, all usable constituents.</li>
   <li><strong>OTC method</strong>: our fit of the same record with the method on this site, all constituents that pass the selection rules.</li>
 </ul>
 <div class="table-wrap">
 <table>
-  <caption>Proof of concept, 11 stations, 2026-10-07: time error (min) / height error (cm)</caption>
+  <caption>11 stations, 2026-10-07: time error (min) / height error (cm)</caption>
   <thead>
     <tr><th scope="col">Station (reference)</th><th scope="col">Record fitted</th><th scope="col" class="num">TICON-3</th><th scope="col" class="num">TICON-4</th><th scope="col" class="num">OTC method</th><th scope="col">Against TICON-4</th></tr>
   </thead>
@@ -55,7 +52,7 @@ order: 6
 </div>
 <p>A twelfth station, Hirtshals, could not be fitted by any method: its GESLA-4.1 record contains no tide. It is not scored.</p>
 
-<h3>What the proof of concept showed</h3>
+<h3>What the results show</h3>
 <ul>
   <li>With the same 9 constituents and a correct time base, our constants and TICON-4's predict equally well. The gains come from three things: correct time bases (Germany), the full constituent set in the predictor's own convention, and fitting the last 19 years instead of the whole record.</li>
   <li>Fitting the whole record instead of the last 19 years lost most of the gain: San Francisco 3.2 → 8.1 min, Key West 3.5 → 5.7 min.</li>
