@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 const css = readFileSync(new URL("../src/assets/tokens.css", import.meta.url), "utf8");
 const block = (re) => Object.fromEntries([...css.match(re)[1].matchAll(/--color-([\w-]+):\s*(oklch\([^)]*\))/g)].map((m) => [m[1], m[2]]));
 const day = block(/:root \{([\s\S]*?)\n\}/);
-const night = block(/:root\[data-theme="dark"\] \{([\s\S]*?)\n\}/);
+const night = block(/@media \(prefers-color-scheme: dark\) \{\s*:root \{([\s\S]*?)\n  \}/);
 
 function oklchToSrgb(s) {
   const [L, C, H] = s.replace(/oklch\(|\)/g, "").trim().split(/\s+/).map(Number);

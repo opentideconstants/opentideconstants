@@ -1,0 +1,46 @@
+---
+title: Downloads
+description: Every OpenTideConstants release, newest first, with its changes, files, sizes and SHA-256 checksums.
+nav: Downloads
+order: 4
+---
+<h1>Downloads</h1>
+<p class="lead">Every OTC release, newest first, with what changed and its files. The list is read from the release index on the data host, so it shows each release as soon as it is published.</p>
+
+<h2 id="releases">Releases</h2>
+<div class="releases" data-index="{{site.dataUrl}}/OTC_index.json">
+  <p>The release list is read from <a href="{{site.dataUrl}}/OTC_index.json"><code>OTC_index.json</code></a>.</p>
+</div>
+<p>Each release lists the changes that matter to a user of the data: stations added or removed, stations whose recommended constant set changed, stations whose M2 phase or amplitude moved, the upstream source versions, and any change of <code>format_version</code>. The full per-station list is in the release files.</p>
+
+<h2 id="files">Files in a release</h2>
+<p>Every release has one stem, <code>OTC_{YYYYMMDD}</code>, where the date is the UTC day the release was built. A second release on the same day gets a counter: <code>OTC_{YYYYMMDD}.2</code>.</p>
+<div class="table-wrap">
+<table>
+  <caption>Files in each release</caption>
+  <thead><tr><th scope="col">File</th><th scope="col">Contents</th></tr></thead>
+  <tbody>
+    <tr><td><code>OTC_{YYYYMMDD}.json</code></td><td><strong>Primary format.</strong> One document with every station, its constant sets, constituents, offsets, conventions, validation and provenance.</td></tr>
+    <tr><td><code>OTC_{YYYYMMDD}.json.gz</code></td><td>The same file, gzip-compressed.</td></tr>
+    <tr><td><code>OTC_{YYYYMMDD}.jsonl</code></td><td>One station document per line, for streaming and for clean per-station diffs between releases.</td></tr>
+    <tr><td><code>OTC_{YYYYMMDD}.meta.json</code></td><td>The release document without <code>stations</code>: release metadata, conventions, licences and the constituent table. A <code>.jsonl</code> reader needs it.</td></tr>
+    <tr><td><code>OTC_{YYYYMMDD}.jsonl.gz</code></td><td><em>Optional.</em> The <code>.jsonl</code> file, gzip-compressed. A release is complete without it.</td></tr>
+    <tr><td><code>OTC_{YYYYMMDD}.csv</code></td><td>One long table for spreadsheets, with a <code>record_type</code> column (<code>station</code>, <code>constant_set</code>, <code>constituent</code>, <code>offset</code>, <code>convention</code>, <code>validation</code>, <code>tombstone</code>). Columns that do not apply to a row type are empty. RFC 4180 quoting, UTF-8, LF line endings.</td></tr>
+    <tr><td><code>OTC_{YYYYMMDD}.parquet</code></td><td><em>Optional.</em> The CSV table, typed and compressed, for analysts. A release is complete without it.</td></tr>
+    <tr><td><code>OTC_{YYYYMMDD}.sha256</code></td><td>SHA-256 checksums of every file in the release, in <code>sha256sum</code> format.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2 id="hosting">Where the files are</h2>
+<ul>
+  <li><strong>Files:</strong> <code>{{site.dataUrl}}/OTC_{YYYYMMDD}.{ext}</code>, served from Cloudflare R2. Every release stays available, and a dated file is never overwritten.</li>
+  <li><strong>Latest pointer:</strong> <code>{{site.dataUrl}}/OTC_latest.json</code> is a small manifest, not a data file. It gives the current release date, its <code>format_version</code>, its DOI, and the URL, size and SHA-256 of each file. It is updated only after every file of a release is uploaded and verified. Read it first, then download the dated files.</li>
+  <li><strong>Latest pointer per format major:</strong> <code>{{site.dataUrl}}/OTC_latest-f{MAJOR}.json</code> (for example <code>OTC_latest-f0.json</code>) has the same fields for the newest release of that <code>format_version</code> major. A reader that supports only an older major keeps getting updates after a new major comes out.</li>
+  <li><strong>Release index:</strong> <code>{{site.dataUrl}}/OTC_index.json</code> lists every release, newest first, with the same fields as the pointer.</li>
+  <li><strong>Browsers:</strong> the data host allows cross-origin <code>GET</code> and <code>HEAD</code> from any site, so a web page can read the files directly.</li>
+  <li><strong>Archive:</strong> the same public files are deposited at Zenodo with a DOI for each release. See <a href="/about/#cite">How to cite</a>.</li>
+</ul>
+<p>Check a download with:</p>
+<pre><code>sha256sum -c OTC_{YYYYMMDD}.sha256 --ignore-missing</code></pre>
+<script src="/assets/releases.js" defer></script>
