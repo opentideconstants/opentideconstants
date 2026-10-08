@@ -1,15 +1,19 @@
-"""Check the draft JSON Schema and the example document.
+r"""Check the draft JSON Schema and the example document.
 
-1. The current schema (0.2) and the older schemas are valid draft 2020-12 schemas.
+1. The current schema (0.3) and the older schemas are valid draft 2020-12 schemas.
 2. src/schema/example.json validates. Its .meta.json form (no stations)
    validates against #/$defs/meta, and each station (one .jsonl line)
    validates against #/$defs/station.
 3. Alias ids are unique within each alias system across the release. JSON
    Schema cannot express this, so this script checks it, as the release
    build will.
-4. Negative controls must fail: for example a constant set without
+4. Every alias system accepts a real id from its source, and
+5. negative controls must fail: for example a constant set without
    convention_id or quantity, a local convention without utc_offset_hours, a
-   bad datestamp, a constituent name over 15 characters, and duplicate aliases.
+   bad datestamp, a constituent name over 15 characters, duplicate aliases,
+   and a value with a trailing newline. Python's re lets $ match before a
+   final newline; ECMA-262 does not. The schema ends every pattern with
+   $(?![\s\S]) so both reject it.
 
 Needs the jsonschema package (pip install jsonschema).
 """
@@ -22,7 +26,7 @@ from jsonschema import Draft202012Validator
 
 root = Path(__file__).resolve().parent.parent
 schema_dir = root / "src/schema"
-schema = json.loads((schema_dir / "otc-0.2.schema.json").read_text())
+schema = json.loads((schema_dir / "otc-0.3.schema.json").read_text())
 example = json.loads((schema_dir / "example.json").read_text())
 
 for old in sorted(schema_dir.glob("otc-*.schema.json")):
@@ -76,6 +80,28 @@ for station in example["stations"]:
 print("ok: each station is a valid .jsonl line")
 
 
+# One real id per alias system, taken from each source's station list.
+REAL_ALIASES = {
+    "linz": "077NELSON",                                       # LINZ NZ_Tide_Constituents_2025.zip
+    "shom": "3",                                               # SHOM tidegauges list: BREST
+    "pegelonline": "aad49293-242a-43ad-a8b1-e91d7792c4b2",     # CUXHAVEN STEUBENHOEFT
+    "rws": "hoekvanholland",                                   # RWS OphalenCatalogus
+    "mi": "Ballycotton Harbour",                               # Marine Institute ERDDAP station_id
+    "dmi": "20002",                                            # DMI oceanObs: Skagen Havn
+    "smhi": "2545",                                            # SMHI ocobs: Arkö
+    "fmi": "132310",                                           # FMI fmisid: Helsinki Kaivopuisto
+    "uhslc": "001",                                            # UHSLC Fast Delivery h001.csv
+}
+doc = copy.deepcopy(example)
+doc["stations"][0]["aliases"].update(REAL_ALIASES)
+errors = problems(doc)
+if errors:
+    for e in errors:
+        print("real aliases:", e)
+    sys.exit(1)
+print(f"ok: accepted real ids for {', '.join(REAL_ALIASES)}")
+
+
 def must_fail(label, mutate):
     doc = copy.deepcopy(example)
     mutate(doc)
@@ -120,3 +146,11 @@ must_fail("constituent source_name of 32 characters",
 must_fail("duplicate gesla alias in one station",
           lambda d: d["stations"][0]["aliases"].__setitem__("gesla", ["example-file-id", "example-file-id"]))
 must_fail("two stations with the same aliases", second_station_same_aliases)
+must_fail("datestamp with a trailing newline",
+          lambda d: d["release"].__setitem__("datestamp", "20261008\n"))
+must_fail("linz alias with a trailing newline",
+          lambda d: d["stations"][0]["aliases"].__setitem__("linz", "077NELSON\n"))
+must_fail("pegelonline shortname instead of uuid",
+          lambda d: d["stations"][0]["aliases"].__setitem__("pegelonline", "CUXHAVEN STEUBENHOEFT"))
+must_fail("unknown alias system",
+          lambda d: d["stations"][0]["aliases"].__setitem__("bogus", "1"))
