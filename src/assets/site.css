@@ -22,7 +22,7 @@ figure { margin: 0; }
 
 h1, h2, h3 { font-family: var(--font-heading); font-weight: var(--font-weight-heading); line-height: var(--line-height-heading); letter-spacing: var(--tracking-heading); text-wrap: balance; }
 h1 { font-size: var(--font-size-h1); letter-spacing: var(--tracking-title); line-height: 1.1; margin: 0 0 var(--space-5); }
-h2 { font-size: var(--font-size-h2); margin: 0 0 var(--space-5); }
+h2 { font-size: var(--font-size-h2); margin: 0 0 calc(var(--space-h2-content) + var(--space-h2-leading)); }
 h3 { font-size: var(--font-size-h3); font-weight: 600; line-height: 1.5; margin: 0 0 var(--space-2); letter-spacing: 0; }
 [id] { scroll-margin-top: calc(var(--header-h) + var(--space-4)); }
 p { margin: 0 0 var(--space-flow); line-height: var(--line-height-prose); text-wrap: pretty; }
@@ -119,8 +119,7 @@ table code { white-space: nowrap; overflow-wrap: normal; }
 .doc li, .doc dd { line-height: var(--line-height-prose); }
 .doc :is(p, li, dd) strong { color: var(--color-text); font-weight: 600; }   /* aimock card titles: 600, not 700 */
 .doc .note p, .doc .note li { color: var(--color-note-text); }
-.doc h2 { margin-top: var(--space-8); letter-spacing: var(--tracking-doc); }
-.doc h1 + h2, .doc .lead + h2 { margin-top: var(--space-6); }
+.doc h2 { margin-top: calc(var(--space-section) + var(--space-h2-leading)); letter-spacing: var(--tracking-doc); }
 .doc h3 { margin-top: var(--space-6); margin-bottom: var(--space-3); }
 .doc ul, .doc ol { padding-left: 1.3rem; }
 .doc li { margin-block: var(--space-3); }
@@ -143,8 +142,9 @@ table code { white-space: nowrap; overflow-wrap: normal; }
 }
 
 /* ---------- Home ---------- */
-.section { padding-top: var(--space-8); }
+.section { padding-top: calc(var(--space-section) + var(--font-size-h2) / 4); }   /* --space-h2-leading, in the heading's size */
 .section-head { max-width: 46rem; text-wrap: pretty; margin-bottom: var(--space-head); }
+.section-head h2:not(:last-child) { margin-bottom: calc(var(--space-h2-sub) + var(--space-h2-leading)); }
 .section-head p { color: var(--color-prose); font-size: var(--font-size-sub); line-height: var(--line-height-lead); max-width: var(--measure-lead); margin: 0; }
 .tag { display: inline-block; font-family: var(--font-mono); font-size: 0.75rem; font-weight: 500; letter-spacing: 0; color: var(--color-link); border: 1.5px solid currentColor; border-radius: 999px; padding: 0.15rem 0.75rem; vertical-align: 0.3em; white-space: nowrap; }
 .actions { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5); align-items: center; margin-top: var(--space-5); }
