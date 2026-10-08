@@ -52,8 +52,10 @@ order: 5
   <dd>OTC canonical name and the source's own name, Doodson number, speed (°/h), amplitude (m), Greenwich phase (°), uncertainties, and why it was kept. Dropped constituents are listed with the reason. Names are at most 15 characters.</dd>
   <dt>constituent table</dt>
   <dd>One row per constituent name and constituent-table version in the release: Doodson number, speed (°/h) and nodal formula id.</dd>
+  <dt>current bin</dt>
+  <dd>Only in a set with quantity <code>current</code>, which has no water-level constituents. One per depth bin: bin number, depth (m) and how it is measured, major-axis azimuth (° true), mean flood and ebb directions, and per constituent the speed (°/h), major- and minor-axis amplitude (m/s) and Greenwich phase (°). The station's <code>default_current_bin</code> names the bin to show first.</dd>
   <dt>subordinate offsets</dt>
-  <dd>Reference station, time offsets at high and low water (minutes), height offsets, and whether they are ratios or additive, as NOAA gives them.</dd>
+  <dd>Reference station, time offsets at high and low water (minutes), height offsets, and whether they are ratios or additive, as NOAA gives them. A subordinate current station has <code>current_offsets</code> instead, one per bin: reference station and bin, mean flood and ebb directions, time adjustments for maximum flood, slack before ebb, maximum ebb and slack before flood (minutes), and flood and ebb amplitude ratios.</dd>
   <dt>convention</dt>
   <dd>Phase reference, V0 model, nodal handling, constituent-table version, and the result of the per-source check that confirmed it. See <a href="/conventions/">Conventions</a>.</dd>
   <dt>validation</dt>
@@ -64,9 +66,9 @@ order: 5
 
 <h2 id="schema">JSON Schema</h2>
 <ul>
-  <li><a href="/schema/otc-0.3.schema.json">otc-0.3.schema.json</a>: the <strong>draft</strong> JSON Schema (draft 2020-12) for <code>format_version</code> 0.3. Each line of the <code>.jsonl</code> file validates against <code>#/$defs/station</code>, and the <code>.meta.json</code> file against <code>#/$defs/meta</code>.</li>
-  <li><a href="/schema/otc-0.2.schema.json">otc-0.2.schema.json</a> and <a href="/schema/otc-0.1.schema.json">otc-0.1.schema.json</a>: the earlier drafts, for <code>format_version</code> 0.2 and 0.1. Kept for reference. 0.3 adds alias systems for the gauge and official sources (linz, shom, pegelonline, rws, mi, dmi, smhi, fmi, uhslc).</li>
-  <li><a href="/schema/example.json">example.json</a>: a small example document with illustrative values (not data). It has one station with two constant sets and one tombstone.</li>
+  <li><a href="/schema/otc-0.4.schema.json">otc-0.4.schema.json</a>: the <strong>draft</strong> JSON Schema (draft 2020-12) for <code>format_version</code> 0.4. Each line of the <code>.jsonl</code> file validates against <code>#/$defs/station</code>, and the <code>.meta.json</code> file against <code>#/$defs/meta</code>.</li>
+  <li><a href="/schema/otc-0.3.schema.json">otc-0.3.schema.json</a>, <a href="/schema/otc-0.2.schema.json">otc-0.2.schema.json</a> and <a href="/schema/otc-0.1.schema.json">otc-0.1.schema.json</a>: the earlier drafts, for <code>format_version</code> 0.3, 0.2 and 0.1. Kept for reference. 0.3 adds alias systems for the gauge and official sources (linz, shom, pegelonline, rws, mi, dmi, smhi, fmi, uhslc). 0.4 adds tidal-current constants (<code>current_bins</code>), current offsets and <code>default_current_bin</code>.</li>
+  <li><a href="/schema/example.json">example.json</a>: a small example document with illustrative values (not data). It has one tide station with two constant sets, one tombstone, one current station (NOAA ACT1616, with five of its constituents converted from NOAA's published values) and one subordinate current station.</li>
 </ul>
 <p>The format version is separate from the release date. A new field is a minor change; a removed or renamed field, or a changed unit or convention, is a major change. The schema is a draft and can change.</p>
 
