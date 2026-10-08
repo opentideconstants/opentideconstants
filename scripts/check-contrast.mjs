@@ -28,6 +28,7 @@ const pairs = [
   ["link-hover", "bg", 4.5, "hovered links"],
   ["text", "surface", 4.5, "text on surface"],
   ["text-muted", "surface", 4.5, "muted text on surface"],
+  ["link", "surface", 4.5, "documentation sidebar, current page"],
   ["code-text", "code-bg", 4.5, "code"],
   ["link", "code-bg", 4.5, "links next to code"],
   ["on-accent", "accent", 4.5, "button label"],

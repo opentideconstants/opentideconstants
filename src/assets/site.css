@@ -6,7 +6,7 @@
 
 /* ---------- Base ---------- */
 *, *::before, *::after { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
 body {
   margin: 0;
   background: var(--color-bg);
@@ -143,36 +143,47 @@ table code { white-space: nowrap; overflow-wrap: normal; }
   .doc dd { border-top: 0; padding-top: var(--space-1); }
 }
 
-/* Documentation layout: page list on the left, "On this page" on the right, as on the
-   aimock docs. Both sidebars stick under the header and scroll on their own. */
-.docs-layout { max-width: 90rem; display: grid; grid-template-columns: 14rem minmax(0, 1fr) 13rem; gap: 0 var(--space-7); align-items: start; }
-.docs-layout.no-toc { grid-template-columns: 14rem minmax(0, 1fr); }
-.docs-main { min-width: 0; }
-.docs-menu, .page-toc { position: sticky; top: var(--header-h); max-height: calc(100vh - var(--header-h)); overflow-y: auto; padding-block: var(--space-6); scrollbar-width: thin; }
-.docs-menu { border-right: var(--border-width) solid var(--color-border); padding-right: var(--space-4); }
-.docs-menu > summary { display: none; }
-.docs-group { font-family: var(--font-mono); font-size: var(--font-size-eyebrow); text-transform: uppercase; letter-spacing: var(--tracking-eyebrow); color: var(--color-text-muted); margin: var(--space-5) 0 var(--space-2); }
-.docs-nav > .docs-group:first-child, .page-toc > .docs-group:first-child { margin-top: 0; }
-.docs-nav ul, .page-toc ul { list-style: none; margin: 0; padding: 0; }
-.docs-nav a { display: block; padding: 0.3rem 0.6rem; border-radius: var(--radius-sm); color: var(--color-text); text-decoration: none; font-size: var(--font-size-small); line-height: 1.4; }
-.docs-nav a:hover { color: var(--color-link); background: var(--color-surface); }
-.docs-nav a[aria-current] { color: var(--color-link); background: var(--color-surface); font-weight: 600; }
-.page-toc { font-size: var(--font-size-label); }
-.page-toc a { display: block; padding: 0.25rem 0 0.25rem 0.75rem; border-left: 2px solid var(--color-border); color: var(--color-text-muted); text-decoration: none; line-height: 1.4; }
-.page-toc .toc-h3 a { padding-left: 1.5rem; }
-.page-toc a:hover { color: var(--color-link); }
-.page-toc a.is-current { color: var(--color-link); border-left-color: var(--color-accent); }
-@media (max-width: 75rem) {
-  .docs-layout, .docs-layout.no-toc { grid-template-columns: 13rem minmax(0, 1fr); gap: 0 var(--space-6); }
+/* Documentation layout, as on the aimock docs: a fixed left sidebar (260px) under the header
+   that scrolls on its own, the text in a centred column of at most 960px, and a sticky
+   "On this page" list (220px) at the right edge. --docs-top is the header height, set by
+   assets/docs.js. */
+.docs-layout { display: flex; min-height: calc(100vh - var(--docs-top, 4rem)); }
+.sidebar { position: fixed; top: var(--docs-top, 4rem); left: 0; z-index: 15; width: var(--sidebar-w); height: calc(100vh - var(--docs-top, 4rem)); overflow-y: auto; background: var(--color-surface); border-right: var(--border-width) solid var(--color-border); padding: var(--space-5) 0; scrollbar-width: thin; }
+.sidebar-section { padding: 0 1.25rem; margin-bottom: var(--space-5); }
+.sidebar-title { font-family: var(--font-mono); font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-text-muted); margin: 0 0 var(--space-2); padding: 0 var(--space-2); }
+.sidebar-section a { display: block; padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.85rem; line-height: 1.4; color: var(--color-prose); text-decoration: none; transition: color var(--duration-fast) var(--easing), background var(--duration-fast) var(--easing); }
+.sidebar-section a:hover { color: var(--color-text); background: var(--color-bg); }
+.sidebar-section a.active { color: var(--color-link); background: var(--color-accent-glow); font-weight: 600; }
+.docs-content { flex: 1; min-width: 0; max-width: 960px; padding: 3rem 4rem; margin-right: auto; margin-left: calc(var(--sidebar-w) + max(0px, (100vw - var(--sidebar-w) - 220px - 960px) / 2)); }
+.docs-content.doc > * { max-width: var(--measure); }
+.docs-content.doc > :is(.table-wrap, h1) { max-width: none; }
+.page-toc { position: sticky; top: 80px; align-self: flex-start; flex-shrink: 0; width: 220px; max-height: calc(100vh - 100px); overflow-y: auto; padding: var(--space-4) var(--space-4) var(--space-4) 0; font-size: 0.78rem; scrollbar-width: thin; }
+.page-toc-label { font-family: var(--font-mono); font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-text-muted); margin: 0 0 var(--space-2); padding: 0 0.5rem; }
+.page-toc a { display: block; padding: 0.3rem 0.5rem; border-radius: 4px; color: var(--color-text-muted); text-decoration: none; line-height: 1.4; transition: color var(--duration-fast) var(--easing), background var(--duration-fast) var(--easing); }
+.page-toc a.toc-h3 { padding-left: 1.25rem; }
+.page-toc a:hover { color: var(--color-text); }
+.page-toc a.active { color: var(--color-link); background: var(--color-accent-glow); }
+.sidebar-toggle { display: none; font: inherit; font-size: 1.25rem; line-height: 1; color: var(--color-text); background: none; border: 0; padding: 0.25rem; margin-right: var(--space-2); cursor: pointer; }
+/* The footer lines up with the text column */
+body:has(.docs-layout) .site-footer { margin-left: calc(var(--sidebar-w) + max(0px, (100vw - var(--sidebar-w) - 220px - 960px) / 2)); max-width: 960px; }
+body:has(.docs-layout) .footer-inner { padding-inline: 4rem; max-width: none; }
+@media (max-width: 75rem) {   /* 1200px: the right list is hidden */
   .page-toc { display: none; }
+  .docs-content, body:has(.docs-layout) .site-footer { margin-left: calc(var(--sidebar-w) + max(0px, (100vw - var(--sidebar-w) - 960px) / 2)); }
 }
-/* Phones and small tablets: the page list folds into a menu above the text */
-@media (max-width: 60rem) {
-  .docs-layout, .docs-layout.no-toc { display: block; }
-  .docs-menu { position: static; max-height: none; overflow: visible; border-right: 0; padding: var(--space-4) 0 0; }
-  .docs-menu > summary { display: list-item; cursor: pointer; font-family: var(--font-mono); font-size: var(--font-size-small); font-weight: 600; padding: var(--space-2) var(--space-3); border: var(--border-width) solid var(--color-border); border-radius: var(--radius-md); }
-  .docs-menu[open] > summary { margin-bottom: var(--space-3); }
-  .docs-menu .docs-nav { padding: 0 var(--space-2) var(--space-3); border-bottom: var(--border-width) solid var(--color-border); }
+@media (max-width: 64rem) {   /* 1024px */
+  .docs-content { padding: 2rem; margin-left: var(--sidebar-w); margin-right: 0; }
+  body:has(.docs-layout) .site-footer { margin-left: var(--sidebar-w); }
+  body:has(.docs-layout) .footer-inner { padding-inline: 2rem; }
+}
+@media (max-width: 48rem) {   /* 768px: the sidebar slides in from the left */
+  .sidebar-toggle { display: block; }
+  .header-inner:has(.sidebar-toggle) { justify-content: flex-start; }
+  .sidebar { transform: translateX(-100%); transition: transform 300ms var(--easing-expo); }
+  .sidebar.open { transform: translateX(0); }
+  .docs-content, body:has(.docs-layout) .site-footer { margin-left: 0; }
+  .docs-content { padding: var(--space-5) var(--gutter); }
+  body:has(.docs-layout) .footer-inner { padding-inline: var(--gutter); }
 }
 
 /* Downloads: Formats and Locations as an accordion, closed by default */
@@ -387,8 +398,10 @@ table code { white-space: nowrap; overflow-wrap: normal; }
 
 /* Reduced motion: the final state shows at once. No content depends on an animation. */
 @media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
   *, *::before, *::after { animation: none !important; transition-duration: 0ms !important; }
 }
 
-/* Documentation pages are wider (two sidebars); the header and footer line up with them */
-body:has(.docs-layout) :is(.header-inner, .footer-inner) { max-width: 90rem; }
+
+/* On documentation pages the header spans the full width, as on the aimock docs */
+body:has(.docs-layout) .header-inner { max-width: none; }

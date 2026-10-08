@@ -22,9 +22,12 @@
 // The page body is inserted into src/layout.html. Placeholders: {{title}},
 // {{description}}, {{canonical_tag}}, {{nav}}, {{content}}, {{year}}, and any key of
 // src/site.json as {{site.<key>}} (also usable inside page bodies). {{page}} is the page name.
+// Every /assets/*.css and /assets/*.js URL in a page gets ?v=<hash of the file>, so a deploy
+// reaches visitors at once even though the host lets browsers cache assets for hours.
 // A page body can inline a file from src/partials/ with {{include <file>}} (used for SVG artwork).
 // Everything else under src/ (except pages/, partials/ and layout.html) is copied as is.
 
+import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync, mkdirSync, rmSync, readdirSync, statSync, copyFileSync } from "node:fs";
 import { join, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -93,6 +96,14 @@ const navPages = pages
   .filter((p) => p.meta.nav && !p.meta.redirect)
   .sort((a, b) => Number(a.meta.order ?? 99) - Number(b.meta.order ?? 99));
 
+const assetHash = new Map();
+function versionAssets(html) {
+  return html.replace(/((?:href|src)=")\/assets\/([\w.-]+\.(?:css|js))"/g, (_, attr, name) => {
+    if (!assetHash.has(name)) assetHash.set(name, createHash("sha256").update(readFileSync(join(src, "assets", name))).digest("hex").slice(0, 10));
+    return `${attr}/assets/${name}?v=${assetHash.get(name)}"`;
+  });
+}
+
 function redirectPage(page) {
   const to = page.meta.redirect;
   const t = JSON.stringify(to);
@@ -122,34 +133,47 @@ const docsHome = pages.find((p) => p.name === "documentation");
 
 const strip = (h) => h.replace(/<[^>]+>/g, "").trim();
 
+// Documentation pages work like the aimock docs (aimock.copilotkit.dev): a left sidebar of every
+// docs page, grouped, fixed under the header and scrolling on its own; the text in a centred
+// column of at most 960px; and a right "On this page" list, only when a page has four or more
+// h2/h3 headings with ids. Below 1200px the right list is hidden; at 768px and below the left
+// sidebar slides in from the left when the header's menu button is pressed. assets/docs.js
+// adds the scroll-spy and the smooth scroll.
 function docsLayout(page) {
   const groups = DOCS_GROUPS.map((g) => {
     const items = docsPages
       .filter((p) => p.meta.docs === g)
       .map((p) => {
-        const current = p.path === page.path ? ' aria-current="page"' : "";
-        return `<li><a href="${p.path}"${current}>${p.meta["docs-label"] ?? p.meta.title}</a></li>`;
+        const current = p.path === page.path ? ' class="active" aria-current="page"' : "";
+        return `<a href="${p.path}"${current}>${p.meta["docs-label"] ?? p.meta.title}</a>`;
       })
-      .join("\n          ");
-    return `        <p class="docs-group">${g}</p>\n        <ul>\n          ${items}\n        </ul>`;
+      .join("\n        ");
+    return `      <div class="sidebar-section">\n        <p class="sidebar-title">${g}</p>\n        ${items}\n      </div>`;
   }).join("\n");
-  const heads = [...page.body.matchAll(/<h([23]) id="([^"]+)"[^>]*>([\s\S]*?)<\/h\1>/g)];
-  const toc = heads.length < 2 ? "" : `
+  // As aimock does: every h2 and h3 gets an id (a slug of its text, made unique), so every
+  // heading can be linked and listed.
+  const used = new Set([...page.body.matchAll(/\sid="([^"]+)"/g)].map((m) => m[1]));
+  const body = page.body.replace(/<h([23])(?![^>]*\sid=)([^>]*)>([\s\S]*?)<\/h\1>/g, (_, lvl, attrs, text) => {
+    const base = strip(text).toLowerCase().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "") || "section";
+    let id = base;
+    for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
+    used.add(id);
+    return `<h${lvl} id="${id}"${attrs}>${text}</h${lvl}>`;
+  });
+  const heads = [...body.matchAll(/<h([23]) id="([^"]+)"[^>]*>([\s\S]*?)<\/h\1>/g)];
+  const toc = heads.length < 4 ? "" : `
   <aside class="page-toc" aria-labelledby="toc-title">
-    <p class="docs-group" id="toc-title">On this page</p>
-    <ul>
-      ${heads.map(([, lvl, id, text]) => `<li class="toc-h${lvl}"><a href="#${id}">${strip(text)}</a></li>`).join("\n      ")}
-    </ul>
+    <p class="page-toc-label" id="toc-title">On this page</p>
+    ${heads.map(([, lvl, id, text]) => `<a href="#${id}"${lvl === "3" ? ' class="toc-h3"' : ""}>${strip(text)}</a>`).join("\n    ")}
   </aside>`;
-  return `<div class="wrap docs-layout${toc ? "" : " no-toc"}">
-  <details class="docs-menu" open>
-    <summary>Documentation menu</summary>
-    <nav class="docs-nav" aria-label="Documentation">
+  return `<div class="docs-layout${toc ? "" : " no-toc"}">
+  <aside class="sidebar" id="docs-sidebar" aria-label="Documentation pages">
+    <nav aria-label="Documentation">
 ${groups}
     </nav>
-  </details>
-  <div class="doc docs-main">
-${page.body.trim()}
+  </aside>
+  <div class="doc docs-content">
+${body.trim()}
   </div>${toc}
 </div>
 <script src="/assets/docs.js" defer></script>`;
@@ -168,16 +192,17 @@ for (const page of pages) {
       return `<li><a href="${p.path}"${current}>${p.meta.nav}</a></li>`;
     })
     .join("\n          ");
-  const html = fillSite(
+  const html = versionAssets(fillSite(
     layout
       .replaceAll("{{content}}", page.meta.layout === "full" ? fillIncludes(page.body.trim()) : page.meta.layout === "docs" ? docsLayout(page) : `<div class="wrap doc">\n${page.body.trim()}\n</div>`)
+      .replaceAll("{{docs_toggle}}", page.meta.layout === "docs" ? '<button class="sidebar-toggle" type="button" aria-label="Documentation menu" aria-controls="docs-sidebar" aria-expanded="false">☰</button>' : "")
       .replaceAll("{{page}}", page.name)
       .replaceAll("{{nav}}", nav)
       .replaceAll("{{title}}", page.name === "index" ? `${site.name}: open tidal harmonic constants` : `${page.meta.title} · ${site.name}`)
       .replaceAll("{{description}}", page.meta.description)
       .replaceAll("{{canonical_tag}}", page.name === "404" ? "<meta name=\"robots\" content=\"noindex\">" : `<link rel="canonical" href="${site.url}${page.path}">`)
       .replaceAll("{{year}}", String(new Date().getUTCFullYear()))
-  );
+  ));
   if (/\{\{[^}]+\}\}/.test(html)) throw new Error(`${page.file}: unfilled placeholder ${html.match(/\{\{[^}]+\}\}/)[0]}`);
   const dest = join(out, page.file);
   mkdirSync(dirname(dest), { recursive: true });
