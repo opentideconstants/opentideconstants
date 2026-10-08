@@ -1,0 +1,25 @@
+---
+title: LINZ tide constituents (New Zealand)
+description: LINZ tide constituents (New Zealand): what it is, what OpenTideConstants takes from it, its licence and attribution, how it is watched, its coverage and how it ranks.
+---
+<h1>LINZ tide constituents (New Zealand)</h1>
+<dl>
+  <dt>What it is</dt>
+  <dd>Harmonic constants (tide constituents) for New Zealand ports and coastal sites, published by LINZ as one zip file of text files.</dd>
+  <dt>Publisher</dt>
+  <dd>Toitū Te Whenua Land Information New Zealand (LINZ).</dd>
+  <dt>What OTC takes</dt>
+  <dd><strong>Official constants</strong>: 28 to 35 constituents per site, each with its frequency, amplitude (in centimetres) and phase. The file headers give <code>TIME ZONE = 180</code>, so the phases appear to be referenced to New Zealand time; OTC checks this against LINZ's own predictions, converts the phases to Greenwich and records the conversion. Some header details are wrong (Nelson's header latitude, for example), so OTC does not trust the header metadata and takes positions from the LINZ station list.</dd>
+  <dt>Licence</dt>
+  <dd>CC BY 4.0, the default licence for LINZ content, as stated on the <a href="https://www.linz.govt.nz/copyright">LINZ copyright page</a>. Attribution must be in text, not a logo.</dd>
+  <dt>Attribution line OTC uses</dt>
+  <dd>“Contains data from Toitū Te Whenua Land Information New Zealand, CC BY 4.0.”</dd>
+  <dt>Access and watching</dt>
+  <dd>Keyless download of the zip file linked from the <a href="https://www.linz.govt.nz/products-services/data/types-linz-data/sea-level-data/tide-constituents">LINZ tide constituents page</a>. The file's address contains its date, so the watcher finds the link on that page and records the file's SHA-256 hash. It also hashes the LINZ copyright page. LINZ updates major ports every year and other sites about every 3 years.</dd>
+  <dt>Coverage</dt>
+  <dd>56 New Zealand sites. About 39 of them are not in GESLA.</dd>
+  <dt>Rank</dt>
+  <dd>Official constants.</dd>
+</dl>
+
+<p><a href="/sources/">All sources and how they rank</a></p>
