@@ -117,7 +117,7 @@ table code { white-space: nowrap; overflow-wrap: normal; }
 /* Running text one step softer than headings; bold run-in labels keep the heading colour */
 .doc p, .doc li, .doc dd { color: var(--color-prose); }
 .doc li, .doc dd { line-height: var(--line-height-prose); }
-.doc :is(p, li, dd) strong { color: var(--color-text); }
+.doc :is(p, li, dd) strong { color: var(--color-text); font-weight: 600; }   /* aimock card titles: 600, not 700 */
 .doc .note p, .doc .note li { color: var(--color-note-text); }
 .doc h2 { margin-top: var(--space-8); letter-spacing: var(--tracking-doc); }
 .doc h1 + h2, .doc .lead + h2 { margin-top: var(--space-6); }
