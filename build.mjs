@@ -11,6 +11,8 @@
 //   order: 2            (optional; navigation order)
 //   layout: full        (optional; the body is inserted as is, for full-width sections.
 //                        Otherwise it goes inside <div class="wrap doc">.)
+//   redirect: /path/#id (optional; the page is only a redirect to that address, for old URLs.
+//                        It is left out of the navigation and the sitemap; its body is ignored.)
 //   ---
 // The page body is inserted into src/layout.html. Placeholders: {{title}},
 // {{description}}, {{canonical_tag}}, {{nav}}, {{content}}, {{year}}, and any key of
@@ -83,10 +85,36 @@ const pages = readdirSync(join(src, "pages"))
   });
 
 const navPages = pages
-  .filter((p) => p.meta.nav)
+  .filter((p) => p.meta.nav && !p.meta.redirect)
   .sort((a, b) => Number(a.meta.order ?? 99) - Number(b.meta.order ?? 99));
 
+function redirectPage(page) {
+  const to = page.meta.redirect;
+  const t = JSON.stringify(to);
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>${page.meta.title} · ${site.name}</title>
+  <meta name="robots" content="noindex">
+  <link rel="canonical" href="${site.url}${to}">
+  <meta http-equiv="refresh" content="0; url=${to}">
+  <script>location.replace(location.hash ? ${t}.split("#")[0] + location.hash : ${t});</script>
+</head>
+<body>
+  <p>${page.meta.title} has moved to <a href="${to}">${to}</a>.</p>
+</body>
+</html>
+`;
+}
+
 for (const page of pages) {
+  if (page.meta.redirect) {
+    const dest = join(out, page.file);
+    mkdirSync(dirname(dest), { recursive: true });
+    writeFileSync(dest, redirectPage(page));
+    continue;
+  }
   const nav = navPages
     .map((p) => {
       const current = p.path === page.path ? ' aria-current="page"' : "";
@@ -110,7 +138,7 @@ for (const page of pages) {
 }
 
 const urls = pages
-  .filter((p) => p.name !== "404")
+  .filter((p) => p.name !== "404" && !p.meta.redirect)
   .sort((a, b) => a.path.localeCompare(b.path))
   .map((p) => `  <url><loc>${site.url}${p.path}</loc></url>`)
   .join("\n");

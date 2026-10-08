@@ -16,7 +16,7 @@ Plain HTML pages, one CSS file plus one token file, and a build script of about 
 build.mjs                 build: src/ -> dist/
 src/site.json             site settings (URLs, format version), usable as {{site.<key>}}
 src/layout.html           shared page layout
-src/pages/*.html          one file per page, with a front-matter block (title, description, nav, order, layout)
+src/pages/*.html          one file per page, with a front-matter block (title, description, nav, order, layout, redirect)
 src/partials/             SVG artwork inlined into pages with {{include <file>}} (generated, see scripts/art/)
 src/assets/tokens.css     design tokens (the theme), with the day and night palettes and @font-face rules
 src/assets/site.css       layout and element styles; uses only tokens
