@@ -64,8 +64,8 @@ order: 5
 
 <h2 id="schema">JSON Schema</h2>
 <ul>
-  <li><a href="/schema/otc-0.2.schema.json">otc-0.2.schema.json</a>: the <strong>draft</strong> JSON Schema (draft 2020-12) for <code>format_version</code> 0.2. Each line of the <code>.jsonl</code> file validates against <code>#/$defs/station</code>, and the <code>.meta.json</code> file against <code>#/$defs/meta</code>.</li>
-  <li><a href="/schema/otc-0.1.schema.json">otc-0.1.schema.json</a>: the earlier draft, for <code>format_version</code> 0.1. Kept for reference.</li>
+  <li><a href="/schema/otc-0.3.schema.json">otc-0.3.schema.json</a>: the <strong>draft</strong> JSON Schema (draft 2020-12) for <code>format_version</code> 0.3. Each line of the <code>.jsonl</code> file validates against <code>#/$defs/station</code>, and the <code>.meta.json</code> file against <code>#/$defs/meta</code>.</li>
+  <li><a href="/schema/otc-0.2.schema.json">otc-0.2.schema.json</a> and <a href="/schema/otc-0.1.schema.json">otc-0.1.schema.json</a>: the earlier drafts, for <code>format_version</code> 0.2 and 0.1. Kept for reference. 0.3 adds alias systems for the gauge and official sources (linz, shom, pegelonline, rws, mi, dmi, smhi, fmi, uhslc).</li>
   <li><a href="/schema/example.json">example.json</a>: a small example document with illustrative values (not data). It has one station with two constant sets and one tombstone.</li>
 </ul>
 <p>The format version is separate from the release date. A new field is a minor change; a removed or renamed field, or a changed unit or convention, is a major change. The schema is a draft and can change.</p>
