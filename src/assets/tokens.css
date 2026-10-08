@@ -87,12 +87,12 @@
     --color-text: oklch(0.86 0.008 250);
     --color-text-muted: oklch(0.68 0.012 250);
     --color-border: oklch(0.3 0.01 250);
-    --color-link: oklch(0.72 0.16 345);
-    --color-link-hover: oklch(0.82 0.11 345);
-    --color-accent: oklch(0.72 0.16 345);
-    --color-focus: oklch(0.72 0.16 345);
+    --color-link: oklch(0.68 0.12 158);
+    --color-link-hover: oklch(0.78 0.09 160);
+    --color-accent: oklch(0.68 0.12 158);
+    --color-focus: oklch(0.68 0.12 158);
     --color-note-bg: oklch(0.15 0.005 250);
-    --color-note-border: oklch(0.72 0.16 345);
+    --color-note-border: oklch(0.68 0.12 158);
     --color-note-text: oklch(0.86 0.008 250);
     --color-code-bg: oklch(0.2 0.008 250);
     --color-code-text: oklch(0.86 0.008 250);
@@ -108,7 +108,7 @@
     --color-panel: oklch(0.15 0.005 250);
     --color-plot-official: oklch(0.86 0.008 250);
     --color-plot-ticon: oklch(0.8 0.1 225);
-    --color-plot-fit: oklch(0.72 0.16 345);
+    --color-plot-fit: oklch(0.68 0.12 158);
     --color-plot-grid: oklch(0.27 0.02 245);
     --color-plot-grid-strong: oklch(0.4 0.03 245);
   }
@@ -121,12 +121,12 @@
   --color-text: oklch(0.86 0.008 250);
   --color-text-muted: oklch(0.68 0.012 250);
   --color-border: oklch(0.3 0.01 250);
-  --color-link: oklch(0.72 0.16 345);
-  --color-link-hover: oklch(0.82 0.11 345);
-  --color-accent: oklch(0.72 0.16 345);
-  --color-focus: oklch(0.72 0.16 345);
+  --color-link: oklch(0.68 0.12 158);
+  --color-link-hover: oklch(0.78 0.09 160);
+  --color-accent: oklch(0.68 0.12 158);
+  --color-focus: oklch(0.68 0.12 158);
   --color-note-bg: oklch(0.15 0.005 250);
-  --color-note-border: oklch(0.72 0.16 345);
+  --color-note-border: oklch(0.68 0.12 158);
   --color-note-text: oklch(0.86 0.008 250);
   --color-code-bg: oklch(0.2 0.008 250);
   --color-code-text: oklch(0.86 0.008 250);
@@ -142,7 +142,7 @@
   --color-panel: oklch(0.15 0.005 250);
   --color-plot-official: oklch(0.86 0.008 250);
   --color-plot-ticon: oklch(0.8 0.1 225);
-  --color-plot-fit: oklch(0.72 0.16 345);
+  --color-plot-fit: oklch(0.68 0.12 158);
   --color-plot-grid: oklch(0.27 0.02 245);
   --color-plot-grid-strong: oklch(0.4 0.03 245);
 }

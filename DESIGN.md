@@ -13,19 +13,20 @@ Strategy: full palette, from the chart symbol set. Each colour has one job.
 | Water (`--color-bg`) | `1 0 0` | `0.15 0.005 250` | page background |
 | Sounding black (`--color-text`) | `0.2 0.02 260` (18.1:1) | `0.86 0.008 250` (12.9:1) | text, neatlines, frames |
 | Muted (`--color-text-muted`) | `0.46 0.03 255` (7.1:1) | `0.68 0.012 250` (6.8:1) | secondary text, captions |
-| Chart magenta (`--color-accent`, `--color-link`) | `0.5 0.21 345` (6.8:1) | `0.72 0.16 345` (7.3:1) | links, the button, cautions, the compass rose, our fit |
+| Accent (`--color-accent`, `--color-link`, `--color-focus`): chart magenta by day, sea-glass green by night | `0.5 0.21 345` (6.8:1) | `0.68 0.12 158`, `#4dae7b` (7.2:1); hover `0.78 0.09 160` (10.2:1) | links, the button, focus ring, cautions, badges, the compass rose and highlight, our fit |
 | Shoal (`--color-shoal`) and shallow (`--color-shallow`) blue | `0.86 0.06 225`, `0.92 0.04 225` | `0.3 0.045 235`, `0.22 0.03 235` | depth bands, source streams |
 | Land buff (`--color-land`) | `0.89 0.075 85` | `0.34 0.04 85` | the island fill only; never a background |
 | Graticule, contour, sounding | `--color-grat`, `--color-contour`, `--color-sounding` | | chart texture |
-| Plot lines | official = text colour, TICON-4 `0.52 0.12 240` / `0.8 0.1 225`, our fit = magenta | | tide-curve plot |
+| Plot lines | official = text colour, TICON-4 `0.52 0.12 240` / `0.8 0.1 225`, our fit = the accent (magenta by day, sea-glass green by night) | | tide-curve plot |
 
-Contrast is checked by `node scripts/check-contrast.mjs` for every pair the site uses, in both palettes. All text pairs are 4.5:1 or more; the lowest text pair is magenta links on the shallow blue, 5.4:1 (day). Colour never carries meaning alone: launch and planned sources, plot lines and status notes all carry words.
+Contrast is checked by `node scripts/check-contrast.mjs` for every pair the site uses, in both palettes. All text pairs are 4.5:1 or more; the lowest text pair is magenta links on the shallow blue, 5.4:1 (day); at night it is green links on the shallow blue, 6.3:1. Colour never carries meaning alone: launch and planned sources, plot lines and status notes all carry words.
 
 ### Night palette
 
 - The night palette applies when the OS asks for dark (`prefers-color-scheme: dark`), unless the reader picked the day palette.
 - The header button ("Night palette" / "Day palette") sets `data-theme` on `<html>` and keeps the choice in `localStorage` (`otc-palette`). Storage access is wrapped in `try`/`catch`; when it is blocked, the choice lasts for the page.
 - Without JavaScript the button stays hidden and the OS setting applies.
+- The night accent is sea-glass green (`0.68 0.12 158`, `#4dae7b`), not magenta. It is 7.2:1 on the night background and is used for links, the button, the focus ring, caution frames, badges, the compass rose and highlight, and our fit line. The day palette keeps chart magenta.
 
 ## Type
 
@@ -44,7 +45,7 @@ Scale: hero `clamp(2.4rem, …, 4.4rem)`, h1 `clamp(2.2rem, …, 3.6rem)`, h2 `c
 
 - **Graduated neatline.** The hero chart sheet has the alternating black-and-white border of a printed chart. Every documentation page title sits on the same neatline.
 - **Cartouche.** The hero title and the release box are framed like a chart's title cartouche: a 1px rule with a double outline.
-- **Caution frame.** Status notes ("no release yet", "not release results") have a 2px magenta frame, as cautions are printed on charts.
+- **Caution frame.** Status notes ("no release yet", "not release results") have a 2px accent frame (magenta by day, sea-glass green by night), as cautions are printed on charts.
 - **Graticule.** The proof section sits on a graticule of the same cell size as the hero chart (`--graticule`).
 - **Diamonds.** Lists of properties use the tidal-diamond mark. A filled diamond marks a launch-set source; a dashed, empty diamond marks a planned source. Both always carry the word.
 
