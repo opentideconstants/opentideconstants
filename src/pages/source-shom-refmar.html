@@ -1,0 +1,25 @@
+---
+title: SHOM REFMAR (France)
+description: SHOM REFMAR (France): what it is, what OpenTideConstants takes from it, its licence and attribution, how it is watched, its coverage and how it ranks.
+---
+<h1>SHOM REFMAR (France)</h1>
+<dl>
+  <dt>What it is</dt>
+  <dd>Sea-level observations from French tide gauges in the REFMAR and RONIM networks, published by SHOM through its REFMAR data service. Hourly records at Brest go back to 1990.</dd>
+  <dt>Publisher</dt>
+  <dd>SHOM (France).</dd>
+  <dt>What OTC takes</dt>
+  <dd><strong>Gauge records that OTC fits. Observations only.</strong> SHOM's own harmonic constants and tide predictions are sold under a paid licence, so OTC does not fetch them, compare with them or publish them. The OTC adapter accepts only the REFMAR observation addresses and refuses any other SHOM address. Because there is no open official prediction to compare with, OTC scores its French fits against a held-out year of REFMAR observations.</dd>
+  <dt>Licence</dt>
+  <dd>Etalab Licence Ouverte 2.0, which is compatible with CC BY, as stated in SHOM's catalogue record for REFMAR. The source must be named as <code>REFMAR. http://dx.doi.org/10.17183/REFMAR#RONIM</code>.</dd>
+  <dt>Attribution line OTC uses</dt>
+  <dd>“Contains data from <code>REFMAR. http://dx.doi.org/10.17183/REFMAR#RONIM</code>, Licence Ouverte 2.0. Changed: OTC fitted harmonic constants from the sea-level records.”</dd>
+  <dt>Access and watching</dt>
+  <dd>Keyless documented REST service. One request returns at most 31 days; longer periods use the asynchronous download. The watcher hashes the gauge list and the licence record, and fetches each new full year of records per gauge.</dd>
+  <dt>Coverage</dt>
+  <dd>176 French gauges. GESLA already carries 106 REFMAR series, so this source mostly adds fresher data at gauges GESLA has.</dd>
+  <dt>Rank</dt>
+  <dd>Gauge fit.</dd>
+</dl>
+
+<p><a href="/sources/">All sources and how they rank</a></p>
