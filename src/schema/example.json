@@ -1,5 +1,5 @@
 {
-  "format_version": "0.1",
+  "format_version": "0.2",
   "release": {
     "datestamp": "20991231",
     "created": "2099-12-31T00:00:00Z",
@@ -40,6 +40,11 @@
       "attribution": "Example attribution text."
     }
   ],
+  "constituents": [
+    { "constituent_table_version": "example", "name": "M2", "doodson": "255 555", "speed_deg_per_hour": 28.9841042, "nodal_formula_id": "M2" },
+    { "constituent_table_version": "example", "name": "K1", "doodson": "165 555", "speed_deg_per_hour": 15.0410686, "nodal_formula_id": "K1" },
+    { "constituent_table_version": "example", "name": "SA", "doodson": "056 555", "speed_deg_per_hour": 0.0410686 }
+  ],
   "stations": [
     {
       "station_id": "OTC-EXAMPLE-0001",
@@ -48,6 +53,7 @@
       "country": "NOR",
       "lat": 60.0,
       "lon": 5.0,
+      "timezone": "Europe/Oslo",
       "type": "reference",
       "aliases": { "kartverket": "EXA", "gesla": ["example-file-id"] },
       "recommended_set_id": "OTC-EXAMPLE-0001/gesla-fit",
@@ -55,6 +61,8 @@
         {
           "set_id": "OTC-EXAMPLE-0001/gesla-fit",
           "source": "gesla-fit",
+          "source_type": "gauge",
+          "quantity": "water_level",
           "source_record_id": "example-file-id",
           "source_version": "4.1",
           "record_span": { "start": "2007-01-01T00:00:00Z", "end": "2026-01-01T00:00:00Z", "good_samples": 160000 },
@@ -78,6 +86,8 @@
         {
           "set_id": "OTC-EXAMPLE-0001/kartverket",
           "source": "kartverket",
+          "source_type": "official",
+          "quantity": "water_level",
           "source_record_id": "EXA",
           "source_version": "20991231",
           "convention_id": "kartverket-utc1-v1",
