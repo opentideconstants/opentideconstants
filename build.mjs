@@ -22,9 +22,12 @@
 // The page body is inserted into src/layout.html. Placeholders: {{title}},
 // {{description}}, {{canonical_tag}}, {{nav}}, {{content}}, {{year}}, and any key of
 // src/site.json as {{site.<key>}} (also usable inside page bodies). {{page}} is the page name.
+// Every /assets/*.css and /assets/*.js URL in a page gets ?v=<hash of the file>, so a deploy
+// reaches visitors at once even though the host lets browsers cache assets for hours.
 // A page body can inline a file from src/partials/ with {{include <file>}} (used for SVG artwork).
 // Everything else under src/ (except pages/, partials/ and layout.html) is copied as is.
 
+import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync, mkdirSync, rmSync, readdirSync, statSync, copyFileSync } from "node:fs";
 import { join, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -92,6 +95,14 @@ const pages = readdirSync(join(src, "pages"))
 const navPages = pages
   .filter((p) => p.meta.nav && !p.meta.redirect)
   .sort((a, b) => Number(a.meta.order ?? 99) - Number(b.meta.order ?? 99));
+
+const assetHash = new Map();
+function versionAssets(html) {
+  return html.replace(/((?:href|src)=")\/assets\/([\w.-]+\.(?:css|js))"/g, (_, attr, name) => {
+    if (!assetHash.has(name)) assetHash.set(name, createHash("sha256").update(readFileSync(join(src, "assets", name))).digest("hex").slice(0, 10));
+    return `${attr}/assets/${name}?v=${assetHash.get(name)}"`;
+  });
+}
 
 function redirectPage(page) {
   const to = page.meta.redirect;
@@ -168,7 +179,7 @@ for (const page of pages) {
       return `<li><a href="${p.path}"${current}>${p.meta.nav}</a></li>`;
     })
     .join("\n          ");
-  const html = fillSite(
+  const html = versionAssets(fillSite(
     layout
       .replaceAll("{{content}}", page.meta.layout === "full" ? fillIncludes(page.body.trim()) : page.meta.layout === "docs" ? docsLayout(page) : `<div class="wrap doc">\n${page.body.trim()}\n</div>`)
       .replaceAll("{{page}}", page.name)
@@ -177,7 +188,7 @@ for (const page of pages) {
       .replaceAll("{{description}}", page.meta.description)
       .replaceAll("{{canonical_tag}}", page.name === "404" ? "<meta name=\"robots\" content=\"noindex\">" : `<link rel="canonical" href="${site.url}${page.path}">`)
       .replaceAll("{{year}}", String(new Date().getUTCFullYear()))
-  );
+  ));
   if (/\{\{[^}]+\}\}/.test(html)) throw new Error(`${page.file}: unfilled placeholder ${html.match(/\{\{[^}]+\}\}/)[0]}`);
   const dest = join(out, page.file);
   mkdirSync(dirname(dest), { recursive: true });
