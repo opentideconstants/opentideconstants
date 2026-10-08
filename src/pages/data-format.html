@@ -1,0 +1,42 @@
+---
+title: Data format
+description: The fields of an OpenTideConstants release, its JSON Schema and the converters.
+layout: docs
+docs: Documentation
+order: 8
+---
+<h1>Data format</h1>
+<p class="lead">The fields of a release, its JSON Schema and the converters. The files and where to download them are on <a href="/downloads/">Downloads</a>.</p>
+<h2 id="fields">Fields</h2>
+<p>The JSON document has six top-level fields: <code>format_version</code>, <code>release</code>, <code>conventions</code>, <code>licences</code>, <code>constituents</code> and <code>stations</code>.</p>
+<dl>
+  <dt>station</dt>
+  <dd>A stable <code>station_id</code> in the OTC namespace (never changed, never reused), name, country, position, IANA time zone, type (<code>reference</code> or <code>subordinate</code>), aliases in other systems (NOAA, GESLA, TICON, XTide, Kartverket, Slackwater), and the <code>recommended_set_id</code>. An alias id belongs to one station only in a release. A removed station stays as a tombstone with its reason.</dd>
+  <dt>constant set</dt>
+  <dd>One per source record: source, source type (<code>official</code>, <code>gauge</code> or <code>model</code>), quantity (<code>water_level</code> or <code>current</code>), record id and version, record span, datum, <code>convention_id</code>, <code>licence_id</code>, QC status and flags, the constituents, and provenance. A station can have several sets; one is recommended by a published rule.</dd>
+  <dt>constituent</dt>
+  <dd>OTC canonical name and the source's own name, Doodson number, speed (°/h), amplitude (m), Greenwich phase (°), uncertainties, and why it was kept. Dropped constituents are listed with the reason. Names are at most 15 characters.</dd>
+  <dt>constituent table</dt>
+  <dd>One row per constituent name and constituent-table version in the release: Doodson number, speed (°/h) and nodal formula id.</dd>
+  <dt>current bin</dt>
+  <dd>Only in a set with quantity <code>current</code>, which has no water-level constituents. One per depth bin: bin number, depth (m) and how it is measured, major-axis azimuth (° true), mean flood and ebb directions, and per constituent the speed (°/h), major- and minor-axis amplitude (m/s) and Greenwich phase (°). The station's <code>default_current_bin</code> names the bin to show first.</dd>
+  <dt>subordinate offsets</dt>
+  <dd>Reference station, time offsets at high and low water (minutes), height offsets, and whether they are ratios or additive, as NOAA gives them. A subordinate current station has <code>current_offsets</code> instead, one per bin: reference station and bin, mean flood and ebb directions, time adjustments for maximum flood, slack before ebb, maximum ebb and slack before flood (minutes), and flood and ebb amplitude ratios.</dd>
+  <dt>convention</dt>
+  <dd>Phase reference, V0 model, nodal handling, constituent-table version, and the result of the per-source check that confirmed it. See <a href="/conventions/">Conventions</a>.</dd>
+  <dt>validation</dt>
+  <dd>Per station and window: time mean absolute error, 95th percentile, bias, height error, range error, missed and extra events, the reference source and its distance, and the same numbers for the previous release. See <a href="/validation/">Validation</a>.</dd>
+  <dt>licence</dt>
+  <dd>SPDX id (or a <code>LicenseRef-</code> id), provider, required citation, and the assembled attribution text. See <a href="/about/#licence">Licence and attribution</a>.</dd>
+</dl>
+
+<h2 id="schema">JSON Schema</h2>
+<ul>
+  <li><a href="/schema/otc-0.4.schema.json">otc-0.4.schema.json</a>: the JSON Schema (draft 2020-12) for <code>format_version</code> 0.4. Each line of the <code>.jsonl</code> file validates against <code>#/$defs/station</code>, and the <code>.meta.json</code> file against <code>#/$defs/meta</code>.</li>
+  <li><a href="/schema/otc-0.3.schema.json">otc-0.3.schema.json</a>, <a href="/schema/otc-0.2.schema.json">otc-0.2.schema.json</a> and <a href="/schema/otc-0.1.schema.json">otc-0.1.schema.json</a>: the earlier versions, for <code>format_version</code> 0.3, 0.2 and 0.1. Kept for reference. 0.3 adds alias systems for the gauge and official sources (linz, shom, pegelonline, rws, mi, dmi, smhi, fmi, uhslc). 0.4 adds tidal-current constants (<code>current_bins</code>), current offsets and <code>default_current_bin</code>.</li>
+  <li><a href="/schema/example.json">example.json</a>: a small example document with illustrative values (not data). It has one tide station with two constant sets, one tombstone, one current station (NOAA ACT1616, with five of its constituents converted from NOAA's published values) and one subordinate current station.</li>
+</ul>
+<p>The format version is separate from the release date. A new field is a minor change; a removed or renamed field, or a changed unit or convention, is a major change.</p>
+
+<h2 id="converters">Converters</h2>
+<p>Converters, in both directions, with a lossless round trip as a release gate: TICON CSV, XTide TCD (through libtcd), and NOAA harmonic-constant JSON. The reference predictor publishes conformance vectors (expected high and low water times and heights at named stations and dates) so that other predictors can check their results.</p>

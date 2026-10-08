@@ -6,6 +6,14 @@
 // short strings), source_versions ({ source: version }) and changelog_url.
 // Everything from the index is written with textContent; links must be http(s).
 (() => {
+  // The Formats and Locations panels start closed; a link to one of them opens it.
+  const openTarget = () => {
+    const d = location.hash && document.getElementById(decodeURIComponent(location.hash.slice(1)));
+    if (d && d.tagName === "DETAILS") d.open = true;
+  };
+  openTarget();
+  addEventListener("hashchange", openTarget);
+
   const box = document.querySelector(".releases[data-index]");
   if (!box) return;
 

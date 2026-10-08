@@ -45,6 +45,10 @@ Scale: hero `clamp(2rem, …, 4.5rem)` at 1.08 line height and -0.03em, h1 `clam
 
 The header is sticky (`--z-sticky`) on a solid background. `assets/header.js` watches a 1px sentinel with an IntersectionObserver and adds `.is-stuck` once the page scrolls, which shows the bottom rule and a faint shadow. The navigation has five links: Home, Why, Documentation, Downloads and About. Below 48rem it becomes one row under the brand that scrolls sideways, with the current page's link scrolled into view. Every element with an `id` has `scroll-margin-top` of the header height (`--header-h`), so anchored headings are not hidden under it.
 
+## Documentation layout
+
+Documentation pages (`layout: docs`) follow the aimock docs: a left sidebar lists every documentation page in two groups (Documentation, then the fifteen Sources), and a right "On this page" list links the page's headings and marks the one being read (`assets/docs.js`). Both sidebars stick under the header. Below 75rem the right list is hidden; below 60rem the left list folds into a "Documentation menu" above the text.
+
 ## Chart idiom
 
 - **Graduated neatline.** The hero chart sheet has the alternating black-and-white border of a printed chart. Every documentation page title sits on the same neatline.

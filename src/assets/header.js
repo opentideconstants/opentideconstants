@@ -10,7 +10,7 @@
     new IntersectionObserver(([e]) => header.classList.toggle("is-stuck", !e.isIntersecting)).observe(sentinel);
   }
   const list = document.querySelector(".nav-list");
-  const current = list && list.querySelector('[aria-current="page"]');
+  const current = list && list.querySelector("[aria-current]");
   if (current && list.scrollWidth > list.clientWidth) {
     const li = current.parentElement;
     list.scrollLeft = li.offsetLeft - (list.clientWidth - li.offsetWidth) / 2;

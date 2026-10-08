@@ -11,6 +11,11 @@
 //   order: 2            (optional; navigation order)
 //   layout: full        (optional; the body is inserted as is, for full-width sections.
 //                        Otherwise it goes inside <div class="wrap doc">.)
+//   layout: docs        (optional; a documentation page: a left sidebar of every docs page,
+//                        grouped by "docs", and a right "On this page" list of the page's
+//                        h2 and h3 headings that have an id)
+//   docs: Sources       (docs pages: the sidebar group; groups appear in DOCS_GROUPS order)
+//   docs-label: GESLA   (docs pages, optional: a shorter sidebar label than the title)
 //   redirect: /path/#id (optional; the page is only a redirect to that address, for old URLs.
 //                        It is left out of the navigation and the sitemap; its body is ignored.)
 //   ---
@@ -108,6 +113,48 @@ function redirectPage(page) {
 `;
 }
 
+const DOCS_GROUPS = ["Documentation", "Sources"];
+const docsPages = pages
+  .filter((p) => p.meta.layout === "docs")
+  .sort((a, b) => DOCS_GROUPS.indexOf(a.meta.docs) - DOCS_GROUPS.indexOf(b.meta.docs) || Number(a.meta.order ?? 99) - Number(b.meta.order ?? 99));
+for (const p of docsPages) if (!DOCS_GROUPS.includes(p.meta.docs)) throw new Error(`${p.name}: unknown docs group "${p.meta.docs}"`);
+const docsHome = pages.find((p) => p.name === "documentation");
+
+const strip = (h) => h.replace(/<[^>]+>/g, "").trim();
+
+function docsLayout(page) {
+  const groups = DOCS_GROUPS.map((g) => {
+    const items = docsPages
+      .filter((p) => p.meta.docs === g)
+      .map((p) => {
+        const current = p.path === page.path ? ' aria-current="page"' : "";
+        return `<li><a href="${p.path}"${current}>${p.meta["docs-label"] ?? p.meta.title}</a></li>`;
+      })
+      .join("\n          ");
+    return `        <p class="docs-group">${g}</p>\n        <ul>\n          ${items}\n        </ul>`;
+  }).join("\n");
+  const heads = [...page.body.matchAll(/<h([23]) id="([^"]+)"[^>]*>([\s\S]*?)<\/h\1>/g)];
+  const toc = heads.length < 2 ? "" : `
+  <aside class="page-toc" aria-labelledby="toc-title">
+    <p class="docs-group" id="toc-title">On this page</p>
+    <ul>
+      ${heads.map(([, lvl, id, text]) => `<li class="toc-h${lvl}"><a href="#${id}">${strip(text)}</a></li>`).join("\n      ")}
+    </ul>
+  </aside>`;
+  return `<div class="wrap docs-layout${toc ? "" : " no-toc"}">
+  <details class="docs-menu" open>
+    <summary>Documentation menu</summary>
+    <nav class="docs-nav" aria-label="Documentation">
+${groups}
+    </nav>
+  </details>
+  <div class="doc docs-main">
+${page.body.trim()}
+  </div>${toc}
+</div>
+<script src="/assets/docs.js" defer></script>`;
+}
+
 for (const page of pages) {
   if (page.meta.redirect) {
     const dest = join(out, page.file);
@@ -117,13 +164,13 @@ for (const page of pages) {
   }
   const nav = navPages
     .map((p) => {
-      const current = p.path === page.path ? ' aria-current="page"' : "";
+      const current = p.path === page.path ? ' aria-current="page"' : p === docsHome && page.meta.layout === "docs" ? ' aria-current="true"' : "";
       return `<li><a href="${p.path}"${current}>${p.meta.nav}</a></li>`;
     })
     .join("\n          ");
   const html = fillSite(
     layout
-      .replaceAll("{{content}}", page.meta.layout === "full" ? fillIncludes(page.body.trim()) : `<div class="wrap doc">\n${page.body.trim()}\n</div>`)
+      .replaceAll("{{content}}", page.meta.layout === "full" ? fillIncludes(page.body.trim()) : page.meta.layout === "docs" ? docsLayout(page) : `<div class="wrap doc">\n${page.body.trim()}\n</div>`)
       .replaceAll("{{page}}", page.name)
       .replaceAll("{{nav}}", nav)
       .replaceAll("{{title}}", page.name === "index" ? `${site.name}: open tidal harmonic constants` : `${page.meta.title} · ${site.name}`)

@@ -13,11 +13,14 @@ order: 4
 </div>
 <p>Each release lists the changes that matter to a user of the data: stations added or removed, stations whose recommended constant set changed, stations whose M2 phase or amplitude moved, the upstream source versions, and any change of <code>format_version</code>. The full per-station list is in the release files.</p>
 
-<h2 id="files">Files in a release</h2>
+<div class="accordion">
+<details id="formats">
+<summary><h2>Formats</h2><span class="acc-hint">The files in every release and what each one holds</span></summary>
+<div class="acc-body">
 <p>Every release has one stem, <code>OTC_{YYYYMMDD}</code>, where the date is the UTC day the release was built. A second release on the same day gets a counter: <code>OTC_{YYYYMMDD}.2</code>.</p>
 <div class="table-wrap">
 <table>
-  <caption>Files in each release</caption>
+  <caption>Files in a release</caption>
   <thead><tr><th scope="col">File</th><th scope="col">Contents</th></tr></thead>
   <tbody>
     <tr><td><code>OTC_{YYYYMMDD}.json</code></td><td><strong>Primary format.</strong> One document with every station, its constant sets, constituents, offsets, conventions, validation and provenance.</td></tr>
@@ -31,8 +34,11 @@ order: 4
   </tbody>
 </table>
 </div>
-
-<h2 id="hosting">Where the files are</h2>
+</div>
+</details>
+<details id="locations">
+<summary><h2>Locations</h2><span class="acc-hint">Where the files are hosted, the latest pointers and the archive</span></summary>
+<div class="acc-body">
 <ul>
   <li><strong>Files:</strong> <code>{{site.dataUrl}}/OTC_{YYYYMMDD}.{ext}</code>, served from Cloudflare R2. Every release stays available, and a dated file is never overwritten.</li>
   <li><strong>Latest pointer:</strong> <code>{{site.dataUrl}}/OTC_latest.json</code> is a small manifest, not a data file. It gives the current release date, its <code>format_version</code>, its DOI, and the URL, size and SHA-256 of each file. It is updated only after every file of a release is uploaded and verified. Read it first, then download the dated files.</li>
@@ -43,4 +49,7 @@ order: 4
 </ul>
 <p>Check a download with:</p>
 <pre><code>sha256sum -c OTC_{YYYYMMDD}.sha256 --ignore-missing</code></pre>
+</div>
+</details>
+</div>
 <script src="/assets/releases.js" defer></script>
