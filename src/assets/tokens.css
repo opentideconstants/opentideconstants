@@ -28,23 +28,30 @@
   --font-size-label: 0.8rem;                      /* mono labels, table heads */
   --font-size-eyebrow: 0.72rem;                   /* mono, uppercase, tracked */
   --font-size-lead: 1.2rem;
+  --font-size-sub: 1.15rem;                       /* section introductions */
   --font-size-display: clamp(2rem, 1rem + 4.2vw, 4.5rem);
   --font-size-h1: clamp(2rem, 1.1rem + 3.4vw, 3.5rem);
   --font-size-h2: clamp(1.6rem, 1.1rem + 2vw, 2.8rem);
   --font-size-h3: 1.05rem;
-  --line-height-body: 1.6;
+  --line-height-body: 1.6;                        /* interface text: navigation, tables, captions */
+  --line-height-prose: 1.7;                       /* running text: paragraphs, list items */
   --line-height-lead: 1.7;
   --line-height-heading: 1.1;
   --font-weight-heading: 700;
-  --tracking-display: -0.03em;
-  --tracking-heading: -0.02em;
+  --tracking-display: -0.03em;                   /* Home hero only, as on the aimock hero */
+  --tracking-title: -0.02em;                      /* page titles, as on the aimock docs */
+  --tracking-heading: -0.02em;                    /* Home section headings, as on the aimock home */
+  --tracking-doc: -0.01em;                        /* headings inside documentation pages (aimock docs: 0) */
   --tracking-eyebrow: 0.14em;
   --measure: 68ch;
+  --measure-lead: 40rem;                          /* lead and section introductions */
 
   /* Spacing */
   --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem; --space-4: 1rem;
   --space-5: 1.5rem; --space-6: 2rem; --space-7: 3.5rem;
   --space-8: clamp(3rem, 2rem + 3vw, 4.5rem);
+  --space-flow: 1.25rem;                          /* between paragraphs */
+  --space-head: clamp(2rem, 1rem + 3vw, 3.5rem);  /* below a section introduction */
   --gutter: clamp(1rem, 0.4rem + 2.6vw, 2rem);
   --content-max: 70rem;
   --header-h: 4rem;                               /* sticky header height, for scroll-margin */
@@ -67,6 +74,9 @@
   --color-surface: oklch(0.955 0.018 230);
   --color-text: oklch(0.2 0.02 260);
   --color-text-muted: oklch(0.46 0.03 255);
+  /* Running text is one step softer than headings, as on aimock. It follows the muted
+     colour in both palettes, so check-contrast.mjs covers it (text-muted pairs). */
+  --color-prose: var(--color-text-muted);
   --color-border: oklch(0.86 0.02 240);
   --color-link: oklch(0.5 0.21 345);
   --color-link-hover: oklch(0.38 0.17 345);
