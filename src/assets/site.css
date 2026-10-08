@@ -169,12 +169,15 @@ table code { white-space: nowrap; overflow-wrap: normal; }
 .sheet-note { grid-area: 1 / 1; align-self: start; justify-self: end; z-index: 1; margin: clamp(1rem, 3vw, 2rem); max-width: 22rem; background: var(--color-panel); border: 2px solid var(--color-accent); padding: var(--space-3) var(--space-4); font-size: var(--font-size-small); }
 .sheet-note .place { color: var(--color-link); font-size: 1.05rem; }
 .lat, .lon { position: absolute; font-family: var(--font-mono); font-size: 0.72rem; color: var(--color-text); background: var(--color-bg); padding: 0 4px; line-height: 1.4; }
-.lat { right: 0; } .lat.l1 { top: 36%; } .lat.l2 { top: 72%; }
-.lon { top: 0; } .lon.o1 { left: 52%; } .lon.o2 { left: 78%; }
+/* Set on graticule lines of the chart: y 110 and 330, x 600 and 960 */
+.lat { right: 0; transform: translateY(-50%); } .lat.l1 { top: 25%; } .lat.l2 { top: 50%; }
+.lon { top: 0; transform: translateX(-50%); } .lon.o1 { left: 50%; } .lon.o2 { left: 80%; }
 .sheet + .wrap .note { margin-top: var(--space-5); margin-bottom: 0; }
 
 /* Chart symbology inside the sheet */
 .sheet-map .water { fill: var(--color-bg); }
+/* The chart features sit in .chart. On wide screens they are scaled toward the right edge so that they stay clear of the title panel. */
+.sheet-map .chart { transform-box: view-box; transform-origin: 1190px 400px; transform: scale(0.95); }
 .sheet-map .grat { stroke: var(--color-grat); stroke-width: 1; fill: none; }
 .sheet-map .fill-shallow { fill: var(--color-shallow); }
 .sheet-map .fill-shoal { fill: var(--color-shoal); }
@@ -283,12 +286,18 @@ table code { white-space: nowrap; overflow-wrap: normal; }
 .glance > p { max-width: var(--measure); }
 .page-index main > .section:last-child { padding-bottom: var(--space-8); }
 
+@media (max-width: 75rem) {
+  .title-block { max-width: min(37rem, 54%); }
+  .sheet-map .chart { transform: scale(0.88); }
+}
 @media (max-width: 60rem) {
   .sheet-frame { grid-template-rows: auto auto auto; }
   .sheet-art { grid-area: 1 / 1; min-height: 0; height: 19rem; }
+  .sheet-map .chart { transform-origin: 935px 415px; transform: translate(-210px, 0) scale(1.35); }
   .title-block { grid-area: 2 / 1; margin: var(--space-4) 0 0; max-width: none; outline: 0; border: 0; padding: var(--space-4) var(--space-2) 0; background: none; }
   .sheet-note { grid-area: 3 / 1; justify-self: stretch; max-width: none; margin: var(--space-5) 0 var(--space-2); }
   .lat.l2, .lon.o1 { display: none; }
+  .lon.o2 { left: 75%; }
   .streams { grid-template-columns: 1fr; gap: var(--space-4); }
   .confluence { display: none; }
   .release { grid-template-columns: 1fr; margin-top: var(--space-6); position: relative; }
