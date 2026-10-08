@@ -19,7 +19,7 @@ Strategy: full palette, from the chart symbol set. Each colour has one job.
 | Graticule, contour, sounding | `--color-grat`, `--color-contour`, `--color-sounding` | | chart texture |
 | Plot lines | official = text colour, TICON-4 `0.52 0.12 240` / `0.8 0.1 225`, our fit = the accent (magenta by day, sea-glass green by night) | | tide-curve plot |
 
-Contrast is checked by `node scripts/check-contrast.mjs` for every pair the site uses, in both palettes. All text pairs are 4.5:1 or more; the lowest text pair is magenta links on the shallow blue, 5.4:1 (day); at night it is green links on the shallow blue, 6.3:1. Colour never carries meaning alone: launch and planned sources, plot lines and status notes all carry words.
+Contrast is checked by `node scripts/check-contrast.mjs` for every pair the site uses, in both palettes. All text pairs are 4.5:1 or more; the lowest text pair is magenta links on the shallow blue, 5.4:1 (day); at night it is green links on the shallow blue, 6.3:1. Colour never carries meaning alone: plot lines and status notes carry words.
 
 ### Night palette
 
@@ -30,16 +30,21 @@ Contrast is checked by `node scripts/check-contrast.mjs` for every pair the site
 
 ## Type
 
+The type system follows aimock.copilotkit.dev: Instrument Sans for prose and headings, JetBrains Mono for everything that reads as a label or a value.
+
 | Token | Family | Use |
 |---|---|---|
-| `--font-body` | Atkinson Hyperlegible Next | body text, tables |
-| `--font-heading`, `--font-display` | Schibsted Grotesk, 700–850 | headings, the brand, the hero title |
-| `--font-label` | Spectral italic 500 | hydrographic names only (Helgoland, German Bight) and the hero's emphasis, as names are set on charts |
-| `--font-mono` | Atkinson Hyperlegible Mono | code, file names, numbers in tables, axis labels |
+| `--font-body`, `--font-heading`, `--font-display` (`--font-sans`) | Instrument Sans, 400–700 | body text, headings (700), card and list headings (600), nav links (500) |
+| `--font-label` | Instrument Sans italic 500 | hydrographic names only (Helgoland, German Bight), as names are set on charts |
+| `--font-mono` | JetBrains Mono, 300–700, italic 400 | the brand, buttons, tags and status labels, table heads, the palette button, code and file names, numbers, coordinates, compass and plot labels, chart soundings (italic) |
 
-Fonts are self-hosted in `src/assets/fonts/` (woff2, latin subset, SIL Open Font License). Every `@font-face` uses `font-display: swap`. The layout preloads the body, heading and label fonts. No third-party font service is used.
+Fonts are self-hosted in `src/assets/fonts/` (woff2, latin subset, SIL Open Font License, licence files beside them). Every `@font-face` uses `font-display: swap`. The layout preloads the upright sans and mono; the two italics load on demand. No third-party font service is used. Code turns off ligatures (`--font-features-mono`).
 
-Scale: hero `clamp(2.4rem, …, 4.4rem)`, h1 `clamp(2.2rem, …, 3.6rem)`, h2 `clamp(1.5rem, …, 2.25rem)`, h3 1.15rem, body 1.0625rem at line height 1.6, measure 68ch.
+Scale: hero `clamp(2rem, …, 4.5rem)` at 1.08 line height and -0.03em, h1 `clamp(2rem, …, 3.5rem)`, h2 `clamp(1.6rem, …, 2.8rem)` at -0.02em, h3 1.05rem / 600, lead 1.2rem at 1.7, body 1rem at 1.6, small 0.875rem, mono labels 0.8rem, measure 68ch. Content max width 70rem; section rhythm 4.5rem.
+
+## Header
+
+The header is sticky (`--z-sticky`) on a solid background. `assets/header.js` watches a 1px sentinel with an IntersectionObserver and adds `.is-stuck` once the page scrolls, which shows the bottom rule and a faint shadow. Below 70rem the navigation becomes one row under the brand that scrolls sideways, with the current page's link scrolled into view. Every element with an `id` has `scroll-margin-top` of the header height (`--header-h`), so anchored headings are not hidden under it.
 
 ## Chart idiom
 
@@ -47,15 +52,15 @@ Scale: hero `clamp(2.4rem, …, 4.4rem)`, h1 `clamp(2.2rem, …, 3.6rem)`, h2 `c
 - **Cartouche.** The hero title and the release box are framed like a chart's title cartouche: a 1px rule with a double outline.
 - **Caution frame.** Status notes ("no release yet", "not release results") have a 2px accent frame (magenta by day, sea-glass green by night), as cautions are printed on charts.
 - **Graticule.** The proof section sits on a graticule of the same cell size as the hero chart (`--graticule`).
-- **Diamonds.** Lists of properties use the tidal-diamond mark. A filled diamond marks a launch-set source; a dashed, empty diamond marks a planned source. Both always carry the word.
+- **Diamonds.** Lists of properties use the tidal-diamond mark.
 
 ## Home
 
 1. **Chart sheet hero.** A chart of Helgoland (depth bands, contours, soundings, a compass rose, a tide-gauge symbol), with the title in a cartouche and a Helgoland note. The chart is decorative (`aria-hidden`); its soundings are illustrative, not survey data. The status note follows directly.
-2. **Three kinds of source, one release.** Official constants, gauge records that OTC fits and model constants run as three streams, with each source labelled "Launch set" or "Planned", into one release box. On narrow screens the streams stack and a single line joins them to the release.
+2. **Three kinds of source, one release.** Official constants, gauge records that OTC fits and model constants run as three streams, into one release box. On narrow screens the streams stack and a single line joins them to the release.
 3. **Proof.** The Helgoland tide-curve plot, labelled "Proof of concept" and "Schematic": the official prediction, TICON-4 shifted by its mean time error (88–90 min) and our fit shifted by its mean time error (6.7 min). There is a wide and a compact version of the plot.
 4. **What is different.** A diamond-marked list; the first item ("one dataset from many open sources") spans the full width.
-5. **Sources at a glance.** The launch-set and planned tables.
+5. **Sources at a glance.** One table of every source, with what OTC takes, its licence and its rank.
 
 The artwork is generated by `node scripts/art/generate.mjs` into `src/partials/` and inlined by the build with `{{include <file>}}`.
 

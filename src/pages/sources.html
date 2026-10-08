@@ -12,12 +12,13 @@ order: 2.5
 <ol>
   <li><strong>Official constants</strong>: harmonic constants published by the agency responsible for the gauge (for example NOAA, Kartverket).</li>
   <li><strong>Gauge fit</strong>: constants OTC fits from a gauge record (GESLA).</li>
-  <li><strong>Model constants</strong>: constants from a global or regional tide model, labelled as model constants. None is in the launch set; EOT20 and FES2022 are <a href="#planned">planned</a>.</li>
+  <li><strong>Model constants</strong>: constants from a global or regional tide model, labelled as model constants. EOT20 and FES2022 are the model sources.</li>
 </ol>
 <p>Every set stays in the release files, not only the recommended one, so you can choose another. A source must also pass the <a href="/method/#source-checks">per-source convention check</a>; a source that fails is not used in that release. The validation table shows how each set scores against official predictions.</p>
 
-<h2 id="launch-set">Launch set</h2>
-<p>These three sources are planned for the first release.</p>
+<h2 id="list">The sources</h2>
+<p>OTC combines thirteen open sources. For each one, the licence was read and the access path was checked on 2026-10-07. The coverage figures below are from those checks; the number of published stations is known only after a full build.</p>
+<p>Most give gauge records, from which OTC fits its own constants. NOAA CO-OPS and Kartverket publish official constants. EOT20 and FES2022 are global tide models: their constants are <strong>model constants</strong>, interpolated to station points, labelled as model constants in every file, and ranked below official constants and gauge fits.</p>
 
 <section aria-labelledby="gesla">
 <h3 id="gesla">GESLA (Global Extreme Sea Level Analysis)</h3>
@@ -79,15 +80,9 @@ order: 2.5
 </dl>
 </section>
 
-<h2 id="planned">Planned sources</h2>
-<p>These sources are planned (verified licence and access). For each one, the licence was read and the access path was checked on 2026-10-07 (FES2022 needs an account, see below). They are not in the first release. The coverage figures below are from those checks; the number of published stations is known only after a full build.</p>
-<p>All but two give gauge records, from which OTC fits its own constants. EOT20 and FES2022 are global tide models: their constants are <strong>model constants</strong>, interpolated to station points, labelled as model constants in every file, and ranked below official constants and gauge fits.</p>
-
 <section aria-labelledby="noaa-currents">
 <h3 id="noaa-currents">NOAA CO-OPS tidal-current constants</h3>
 <dl>
-  <dt>Status</dt>
-  <dd>Planned (verified licence and access).</dd>
   <dt>What it is</dt>
   <dd>Harmonic constants for tidal currents (velocity, not water level) at NOAA current-meter stations, published through NOAA's metadata API.</dd>
   <dt>Publisher</dt>
@@ -110,8 +105,6 @@ order: 2.5
 <section aria-labelledby="pegelonline">
 <h3 id="pegelonline">PEGELONLINE (Germany)</h3>
 <dl>
-  <dt>Status</dt>
-  <dd>Planned (verified licence and access).</dd>
   <dt>What it is</dt>
   <dd>Germany's online water-level service, with 1-minute water levels from coastal, tidal-river and inland gauges.</dd>
   <dt>Publisher</dt>
@@ -134,8 +127,6 @@ order: 2.5
 <section aria-labelledby="rijkswaterstaat">
 <h3 id="rijkswaterstaat">Rijkswaterstaat WaterWebservices (Netherlands)</h3>
 <dl>
-  <dt>Status</dt>
-  <dd>Planned (verified licence and access).</dd>
   <dt>What it is</dt>
   <dd>The Dutch water-data service, with a multi-decade archive of 10-minute water levels.</dd>
   <dt>Publisher</dt>
@@ -158,8 +149,6 @@ order: 2.5
 <section aria-labelledby="marine-institute">
 <h3 id="marine-institute">Marine Institute (Ireland)</h3>
 <dl>
-  <dt>Status</dt>
-  <dd>Planned (verified licence and access).</dd>
   <dt>What it is</dt>
   <dd>The Irish National Tide Gauge Network, published through the Marine Institute's ERDDAP server, with records from 2000.</dd>
   <dt>Publisher</dt>
@@ -182,8 +171,6 @@ order: 2.5
 <section aria-labelledby="dmi">
 <h3 id="dmi">DMI ocean observations (Denmark)</h3>
 <dl>
-  <dt>Status</dt>
-  <dd>Planned (verified licence and access).</dd>
   <dt>What it is</dt>
   <dd>Sea-level observations at 10-minute intervals from Danish stations, with a historical archive, published through DMI's open-data API.</dd>
   <dt>Publisher</dt>
@@ -206,8 +193,6 @@ order: 2.5
 <section aria-labelledby="smhi">
 <h3 id="smhi">SMHI oceanographic observations (Sweden)</h3>
 <dl>
-  <dt>Status</dt>
-  <dd>Planned (verified licence and access).</dd>
   <dt>What it is</dt>
   <dd>Hourly and minute sea levels from Swedish stations, with a corrected hourly archive back to the start of each station.</dd>
   <dt>Publisher</dt>
@@ -230,8 +215,6 @@ order: 2.5
 <section aria-labelledby="fmi">
 <h3 id="fmi">FMI mareographs (Finland)</h3>
 <dl>
-  <dt>Status</dt>
-  <dd>Planned (verified licence and access). Low priority.</dd>
   <dt>What it is</dt>
   <dd>Water levels from Finnish mareographs on the Gulf of Bothnia and the Gulf of Finland, published through FMI's open-data service.</dd>
   <dt>Publisher</dt>
@@ -254,8 +237,6 @@ order: 2.5
 <section aria-labelledby="uhslc-fast">
 <h3 id="uhslc-fast">UHSLC Fast Delivery</h3>
 <dl>
-  <dt>Status</dt>
-  <dd>Planned (verified licence and access).</dd>
   <dt>What it is</dt>
   <dd>Hourly sea levels from tide gauges worldwide, contributed by national agencies and delivered within about one to two months. Fast Delivery data are later replaced by the yearly Research Quality data.</dd>
   <dt>Publisher</dt>
@@ -278,8 +259,6 @@ order: 2.5
 <section aria-labelledby="eot20">
 <h3 id="eot20">EOT20 global ocean tide model</h3>
 <dl>
-  <dt>Status</dt>
-  <dd>Planned (verified licence and access).</dd>
   <dt>What it is</dt>
   <dd>An empirical global ocean tide model derived from satellite altimetry, with ocean-tide and load-tide grids for 17 constituents at 1/8° resolution.</dd>
   <dt>Publisher</dt>
@@ -302,8 +281,6 @@ order: 2.5
 <section aria-labelledby="fes2022">
 <h3 id="fes2022">FES2022 global ocean tide model</h3>
 <dl>
-  <dt>Status</dt>
-  <dd>Planned, needs a free registration. The data are distributed through AVISO+, which needs a free account; OTC has not registered one yet.</dd>
   <dt>What it is</dt>
   <dd>A global ocean tide model with 34 constituents at 1/30° resolution.</dd>
   <dt>Publisher</dt>

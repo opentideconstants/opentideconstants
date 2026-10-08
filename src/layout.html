@@ -8,14 +8,15 @@
   {{canonical_tag}}
   <meta name="color-scheme" content="light dark">
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
-  <link rel="preload" href="/assets/fonts/atkinson-hyperlegible-next-latin-var.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="/assets/fonts/schibsted-grotesk-latin-var.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="preload" href="/assets/fonts/spectral-500-italic-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/assets/fonts/instrument-sans-latin-var.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/assets/fonts/jetbrains-mono-latin-var.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/assets/tokens.css">
   <link rel="stylesheet" href="/assets/site.css">
   <script src="/assets/mode.js"></script>
+  <script src="/assets/header.js" defer></script>
 </head>
 <body class="page-{{page}}">
+  <div class="top-sentinel" aria-hidden="true"></div>
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="site-header">
     <div class="wrap header-inner">
@@ -35,7 +36,7 @@
   </main>
   <footer class="site-footer">
     <div class="wrap footer-inner">
-      <p>Data licence: <a href="/licence/">CC BY 4.0</a> on derived constants, with per-provider attribution. Status: no release yet.</p>
+      <p>Data licence: <a href="/licence/">CC BY 4.0</a> on derived constants, with per-provider attribution. Status: in development. The first release is coming.</p>
       <ul class="footer-links">
         <li><a href="/citation/">How to cite</a></li>
         <li><a href="/changelog/">Changelog</a></li>

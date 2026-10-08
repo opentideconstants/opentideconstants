@@ -1,6 +1,6 @@
 # opentideconstants.org
 
-Source of the OpenTideConstants (OTC) website. OTC combines open tide data (official agency constants and constants fitted from gauge records, with tide-model constants planned) into one consistent, documented dataset of tidal harmonic constants: one format, declared conventions, provenance for every record, and the accuracy of every station against official predictions. It is rebuilt automatically from the latest upstream data. **There is no data release yet**; the site describes the method, the format and the sources, and marks everything that depends on a release as "coming with the first release".
+Source of the OpenTideConstants (OTC) website. OTC combines open tide data (official agency constants, constants fitted from gauge records, and tide-model constants) into one consistent, documented dataset of tidal harmonic constants: one format, declared conventions, provenance for every record, and the accuracy of every station against official predictions. It is rebuilt automatically from the latest upstream data. **There is no data release yet**; the site describes the method, the format and the sources, and marks everything that depends on a release as "coming with the first release".
 
 ## Stack, and why
 

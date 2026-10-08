@@ -4,39 +4,54 @@
   follows prefers-color-scheme: dark, or data-theme="dark" set by the header toggle
   (assets/mode.js); data-theme="light" forces the day palette.
   Fonts are self-hosted (SIL Open Font License; licences in assets/fonts/), latin subset.
+  Type scale and spacing follow aimock.copilotkit.dev.
 */
-@font-face { font-family: "Atkinson Hyperlegible Next"; font-style: normal; font-weight: 200 800; font-display: swap; src: url("/assets/fonts/atkinson-hyperlegible-next-latin-var.woff2") format("woff2"); }
-@font-face { font-family: "Atkinson Hyperlegible Next"; font-style: italic; font-weight: 200 800; font-display: swap; src: url("/assets/fonts/atkinson-hyperlegible-next-italic-latin-var.woff2") format("woff2"); }
-@font-face { font-family: "Atkinson Hyperlegible Mono"; font-style: normal; font-weight: 200 800; font-display: swap; src: url("/assets/fonts/atkinson-hyperlegible-mono-latin-var.woff2") format("woff2"); }
-@font-face { font-family: "Schibsted Grotesk"; font-style: normal; font-weight: 400 900; font-display: swap; src: url("/assets/fonts/schibsted-grotesk-latin-var.woff2") format("woff2"); }
-@font-face { font-family: "Spectral"; font-style: italic; font-weight: 500; font-display: swap; src: url("/assets/fonts/spectral-500-italic-latin.woff2") format("woff2"); }
+@font-face { font-family: "Instrument Sans"; font-style: normal; font-weight: 400 700; font-display: swap; src: url("/assets/fonts/instrument-sans-latin-var.woff2") format("woff2"); }
+@font-face { font-family: "Instrument Sans"; font-style: italic; font-weight: 400 700; font-display: swap; src: url("/assets/fonts/instrument-sans-italic-latin-var.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 300 700; font-display: swap; src: url("/assets/fonts/jetbrains-mono-latin-var.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-style: italic; font-weight: 400; font-display: swap; src: url("/assets/fonts/jetbrains-mono-400-italic-latin.woff2") format("woff2"); }
 
 :root {
   color-scheme: light;
 
-  /* Typography */
-  --font-body: "Atkinson Hyperlegible Next", "Segoe UI", Roboto, sans-serif;
-  --font-heading: "Schibsted Grotesk", "Segoe UI", sans-serif;
-  --font-display: "Schibsted Grotesk", "Segoe UI", sans-serif;
-  --font-label: "Spectral", Georgia, serif;      /* italic only: hydrographic names, as on charts */
-  --font-mono: "Atkinson Hyperlegible Mono", ui-monospace, Menlo, monospace;
-  --font-size-base: 1.0625rem;
-  --font-size-small: 0.9rem;
-  --font-size-display: clamp(2.4rem, 1.4rem + 4vw, 4.4rem);
-  --font-size-h1: clamp(2.2rem, 1.4rem + 3vw, 3.6rem);
-  --font-size-h2: clamp(1.5rem, 1.2rem + 1.3vw, 2.25rem);
-  --font-size-h3: 1.15rem;
+  /* Typography: the type system of aimock.copilotkit.dev. Instrument Sans for prose and
+     headings; JetBrains Mono for the brand, labels, buttons, numbers, coordinates and code. */
+  --font-sans: "Instrument Sans", -apple-system, system-ui, "Segoe UI", sans-serif;
+  --font-body: var(--font-sans);
+  --font-heading: var(--font-sans);
+  --font-display: var(--font-sans);
+  --font-label: var(--font-sans);                 /* italic only: hydrographic names, as on charts */
+  --font-mono: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
+  --font-features-mono: "liga" 0, "calt" 0;
+  --font-size-base: 1rem;
+  --font-size-small: 0.875rem;
+  --font-size-label: 0.8rem;                      /* mono labels, table heads */
+  --font-size-eyebrow: 0.72rem;                   /* mono, uppercase, tracked */
+  --font-size-lead: 1.2rem;
+  --font-size-display: clamp(2rem, 1rem + 4.2vw, 4.5rem);
+  --font-size-h1: clamp(2rem, 1.1rem + 3.4vw, 3.5rem);
+  --font-size-h2: clamp(1.6rem, 1.1rem + 2vw, 2.8rem);
+  --font-size-h3: 1.05rem;
   --line-height-body: 1.6;
+  --line-height-lead: 1.7;
   --line-height-heading: 1.1;
   --font-weight-heading: 700;
+  --tracking-display: -0.03em;
+  --tracking-heading: -0.02em;
+  --tracking-eyebrow: 0.14em;
   --measure: 68ch;
 
   /* Spacing */
   --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem; --space-4: 1rem;
-  --space-5: 1.5rem; --space-6: 2rem; --space-7: 3rem;
-  --space-8: clamp(3.5rem, 2.5rem + 4vw, 6rem);
-  --gutter: clamp(1rem, 0.4rem + 2.6vw, 2.75rem);
-  --content-max: 76rem;
+  --space-5: 1.5rem; --space-6: 2rem; --space-7: 3.5rem;
+  --space-8: clamp(3rem, 2rem + 3vw, 4.5rem);
+  --gutter: clamp(1rem, 0.4rem + 2.6vw, 2rem);
+  --content-max: 70rem;
+  --header-h: 4rem;                               /* sticky header height, for scroll-margin */
+
+  /* Layers */
+  --z-sticky: 20;
+  --z-skip: 30;
 
   /* Shape */
   --radius-sm: 2px; --radius-md: 4px; --border-width: 1px;
@@ -145,6 +160,10 @@
   --color-plot-fit: oklch(0.68 0.12 158);
   --color-plot-grid: oklch(0.27 0.02 245);
   --color-plot-grid-strong: oklch(0.4 0.03 245);
+}
+
+@media (max-width: 70rem) {
+  :root { --header-h: 5.75rem; }                 /* two-row header: brand line + nav row */
 }
 
 @media (prefers-reduced-motion: reduce) {

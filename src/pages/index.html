@@ -1,6 +1,6 @@
 ---
 title: Home
-description: OpenTideConstants combines open tide data (official agency constants and constants fitted from gauge records, with tide-model constants planned) into one consistent dataset with one format, declared conventions, per-record provenance and published accuracy for every station.
+description: OpenTideConstants combines open tide data (official agency constants, constants fitted from gauge records, and tide-model constants) into one consistent dataset with one format, declared conventions, per-record provenance and published accuracy for every station.
 nav: Home
 order: 1
 layout: full
@@ -14,7 +14,7 @@ layout: full
       </div>
       <div class="title-block">
         <h1 id="hero-title">Open tide data, combined into <em>one dataset.</em></h1>
-        <p class="lead">OpenTideConstants (OTC) combines official agency constants and constants that we fit from gauge records, with tide-model constants to follow, into one consistent dataset: one format, declared conventions, provenance for every record, and the accuracy of every station against official predictions. It is rebuilt automatically from the latest upstream data and released under CC BY 4.0, with a DOI for each release.</p>
+        <p class="lead">OpenTideConstants (OTC) combines official agency constants, constants that we fit from gauge records, and tide-model constants into one consistent dataset: one format, declared conventions, provenance for every record, and the accuracy of every station against official predictions. It is rebuilt automatically from the latest upstream data and released under CC BY 4.0, with a DOI for each release.</p>
         <div class="actions">
           <a class="button" href="/data/">Data and downloads <span aria-hidden="true">→</span></a>
           <a class="more" href="/method/">Read the method</a>
@@ -26,7 +26,7 @@ layout: full
 </section>
 <div class="wrap">
   <div class="note" role="note">
-    <p><strong>Status: there is no release yet.</strong> This site describes the method and the format. Downloads, DOIs and release accuracy figures are coming with the first release. The only accuracy numbers on this site come from a proof of concept at 11 stations, and they are labelled as such.</p>
+    <p><strong>Status: in development. The first release is coming.</strong> This site describes the method and the format. Downloads, DOIs and release accuracy figures come with the first release. The only accuracy numbers on this site come from a proof of concept at 11 stations, and they are labelled as such.</p>
   </div>
 </div>
 
@@ -40,31 +40,31 @@ layout: full
       <h3>Official constants</h3>
       <p class="rank">Published by the agency responsible for the gauge. Ranked first.</p>
       <ul>
-        <li><a href="/sources/#noaa">NOAA CO-OPS</a> <span class="status launch">Launch set</span></li>
-        <li><span><a href="/sources/#kartverket">Kartverket</a> <span class="country">Norway</span></span> <span class="status launch">Launch set</span></li>
-        <li><a href="/sources/#noaa-currents">NOAA CO-OPS currents</a> <span class="status planned">Planned</span></li>
+        <li><a href="/sources/#noaa">NOAA CO-OPS</a></li>
+        <li><span><a href="/sources/#kartverket">Kartverket</a> <span class="country">Norway</span></span></li>
+        <li><a href="/sources/#noaa-currents">NOAA CO-OPS currents</a></li>
       </ul>
     </li>
     <li class="stream">
       <h3>Gauge records that OTC fits</h3>
       <p class="rank">Sea-level records, fitted after the time-base checks. Ranked second.</p>
       <ul>
-        <li><a href="/sources/#gesla">GESLA</a> <span class="status launch">Launch set</span></li>
-        <li><span><a href="/sources/#pegelonline">PEGELONLINE</a> <span class="country">Germany</span></span> <span class="status planned">Planned</span></li>
-        <li><span><a href="/sources/#rijkswaterstaat">Rijkswaterstaat</a> <span class="country">Netherlands</span></span> <span class="status planned">Planned</span></li>
-        <li><span><a href="/sources/#marine-institute">Marine Institute</a> <span class="country">Ireland</span></span> <span class="status planned">Planned</span></li>
-        <li><span><a href="/sources/#dmi">DMI</a> <span class="country">Denmark</span></span> <span class="status planned">Planned</span></li>
-        <li><span><a href="/sources/#smhi">SMHI</a> <span class="country">Sweden</span></span> <span class="status planned">Planned</span></li>
-        <li><span><a href="/sources/#fmi">FMI</a> <span class="country">Finland</span></span> <span class="status planned">Planned</span></li>
-        <li><a href="/sources/#uhslc-fast">UHSLC Fast Delivery</a> <span class="status planned">Planned</span></li>
+        <li><a href="/sources/#gesla">GESLA</a></li>
+        <li><span><a href="/sources/#pegelonline">PEGELONLINE</a> <span class="country">Germany</span></span></li>
+        <li><span><a href="/sources/#rijkswaterstaat">Rijkswaterstaat</a> <span class="country">Netherlands</span></span></li>
+        <li><span><a href="/sources/#marine-institute">Marine Institute</a> <span class="country">Ireland</span></span></li>
+        <li><span><a href="/sources/#dmi">DMI</a> <span class="country">Denmark</span></span></li>
+        <li><span><a href="/sources/#smhi">SMHI</a> <span class="country">Sweden</span></span></li>
+        <li><span><a href="/sources/#fmi">FMI</a> <span class="country">Finland</span></span></li>
+        <li><a href="/sources/#uhslc-fast">UHSLC Fast Delivery</a></li>
       </ul>
     </li>
     <li class="stream">
       <h3>Model constants</h3>
       <p class="rank">From global tide models at station points, always labelled as model constants. Ranked third.</p>
       <ul>
-        <li><a href="/sources/#eot20">EOT20</a> <span class="status planned">Planned</span></li>
-        <li><a href="/sources/#fes2022">FES2022</a> <span class="status planned">Planned</span></li>
+        <li><a href="/sources/#eot20">EOT20</a></li>
+        <li><a href="/sources/#fes2022">FES2022</a></li>
       </ul>
     </li>
   </ul>
@@ -77,7 +77,7 @@ layout: full
     <div>
       <h3>One OTC release</h3>
       <p class="stem">OTC_{YYYYMMDD}</p>
-      <p class="pending">No release yet. Coming with the first release.</p>
+      <p class="pending">The first release is coming.</p>
     </div>
     <ul>
       <li><strong>One format.</strong> JSON with a published JSON Schema, plus JSON Lines and CSV.</li>
@@ -88,7 +88,7 @@ layout: full
       <li><strong>SHA-256 checksums</strong> for every file, and a DOI for each release.</li>
     </ul>
   </div>
-  <p class="flow-key"><span class="status launch">Launch set</span>: planned for the first release. <span class="status planned">Planned</span>: licence and access verified, not in the first release. Details for each source are on <a href="/sources/">Sources</a>.</p>
+  <p class="flow-key">Licence, attribution, access and coverage for each source are on <a href="/sources/">Sources</a>.</p>
 </section>
 
 <section class="section proof" aria-labelledby="proof">
@@ -167,21 +167,13 @@ layout: full
   <h2 id="glance">Sources at a glance</h2>
   <div class="table-wrap">
   <table>
-    <caption>Launch set (planned for the first release)</caption>
+    <caption>Every source in an OTC release</caption>
     <thead><tr><th scope="col">Source</th><th scope="col">What OTC takes</th><th scope="col">Licence</th><th scope="col">Rank</th></tr></thead>
     <tbody>
       <tr><th scope="row"><a href="/sources/#noaa">NOAA CO-OPS</a></th><td>Official constants and subordinate-station offsets</td><td>Public domain (US Government)</td><td>Official</td></tr>
       <tr><th scope="row"><a href="/sources/#kartverket">Kartverket</a> (Norway)</th><td>Official constants</td><td>CC BY 4.0</td><td>Official</td></tr>
-      <tr><th scope="row"><a href="/sources/#gesla">GESLA</a></th><td>Gauge records that OTC fits (derived constants only)</td><td>CC BY 4.0 on derived constants, per-provider attribution</td><td>Gauge fit</td></tr>
-    </tbody>
-  </table>
-  </div>
-  <div class="table-wrap">
-  <table>
-    <caption>Planned (verified licence and access), not in the first release</caption>
-    <thead><tr><th scope="col">Source</th><th scope="col">What OTC takes</th><th scope="col">Licence</th><th scope="col">Rank</th></tr></thead>
-    <tbody>
       <tr><th scope="row"><a href="/sources/#noaa-currents">NOAA CO-OPS currents</a></th><td>Official tidal-current constants</td><td>Public domain (US Government)</td><td>Official (currents)</td></tr>
+      <tr><th scope="row"><a href="/sources/#gesla">GESLA</a></th><td>Gauge records that OTC fits (derived constants only)</td><td>CC BY 4.0 on derived constants, per-provider attribution</td><td>Gauge fit</td></tr>
       <tr><th scope="row"><a href="/sources/#pegelonline">PEGELONLINE</a> (Germany)</th><td>Gauge records that OTC fits</td><td>DL-DE-&gt;Zero-2.0</td><td>Gauge fit</td></tr>
       <tr><th scope="row"><a href="/sources/#rijkswaterstaat">Rijkswaterstaat</a> (Netherlands)</th><td>Gauge records that OTC fits</td><td>CC0</td><td>Gauge fit</td></tr>
       <tr><th scope="row"><a href="/sources/#marine-institute">Marine Institute</a> (Ireland)</th><td>Gauge records that OTC fits</td><td>CC BY 4.0</td><td>Gauge fit</td></tr>
@@ -190,7 +182,7 @@ layout: full
       <tr><th scope="row"><a href="/sources/#fmi">FMI</a> (Finland)</th><td>Gauge records that OTC fits</td><td>CC BY 4.0</td><td>Gauge fit</td></tr>
       <tr><th scope="row"><a href="/sources/#uhslc-fast">UHSLC Fast Delivery</a></th><td>Gauge records that OTC fits</td><td>Free use and redistribution, with citation</td><td>Gauge fit</td></tr>
       <tr><th scope="row"><a href="/sources/#eot20">EOT20</a></th><td>Model constants at station points</td><td>CC BY 4.0</td><td>Model</td></tr>
-      <tr><th scope="row"><a href="/sources/#fes2022">FES2022</a></th><td>Model constants at station points (planned, needs a free registration)</td><td>AVISO licence (CC BY 4.0 based)</td><td>Model</td></tr>
+      <tr><th scope="row"><a href="/sources/#fes2022">FES2022</a></th><td>Model constants at station points</td><td>AVISO licence (CC BY 4.0 based)</td><td>Model</td></tr>
     </tbody>
   </table>
   </div>
