@@ -1,0 +1,100 @@
+---
+title: Sources
+description: Every dataset OpenTideConstants incorporates: what it is, who publishes it, what OTC takes from it, its licence and attribution, how it is watched, its coverage and how it ranks.
+nav: Sources
+order: 2.5
+---
+<h1>Sources</h1>
+<p class="lead">This page lists every dataset OTC incorporates, what OTC takes from each, and how each one is credited.</p>
+
+<h2 id="ranking">How sources rank at one location</h2>
+<p>When more than one source covers the same location, the station's recommended set is chosen in this order:</p>
+<ol>
+  <li><strong>Official constants</strong>: harmonic constants published by the agency responsible for the gauge (for example NOAA, Kartverket).</li>
+  <li><strong>Gauge fit</strong>: constants OTC fits from a gauge record (GESLA).</li>
+  <li><strong>Model constants</strong>: constants from a global or regional tide model. None is in the launch set.</li>
+</ol>
+<p>Every set stays in the release files, not only the recommended one, so you can choose another. A source must also pass the <a href="/method/#source-checks">per-source convention check</a>; a source that fails is not used in that release. The validation table shows how each set scores against official predictions.</p>
+
+<h2 id="launch-set">Launch set</h2>
+<p>These three sources are planned for the first release.</p>
+
+<section aria-labelledby="gesla">
+<h3 id="gesla">GESLA (Global Extreme Sea Level Analysis)</h3>
+<dl>
+  <dt>What it is</dt>
+  <dd>A collection of high-frequency sea-level records from tide gauges worldwide, assembled from many national and regional agencies by the <a href="https://gesla787883612.wordpress.com/">GESLA project</a>. OTC uses the latest release (GESLA-4.1, July 2026, today).</dd>
+  <dt>What OTC takes</dt>
+  <dd><strong>Gauge records that OTC fits.</strong> OTC fits its own constants from the records, after the time-base and broken-record checks in <a href="/method/">Method</a>. OTC publishes the derived constants only, never the raw series.</dd>
+  <dt>Licence</dt>
+  <dd>The records are covered by several licences set by their originators; the GESLA licence page lists them. OTC follows TICON-4's practice: derived constants under CC BY 4.0, with per-record provider attribution and the GESLA citations. Every fitted set records its provider and licence class.</dd>
+  <dt>Attribution</dt>
+  <dd>The GESLA downloads page asks: “Any papers or reports that make use of GESLA data should include an acknowledgement to this website and cite the papers by Haigh et al. (2023) and Woodworth et al. (2017)”, and Caldwell et al. (2015) for UHSLC records. Each set also names the agency that provided the record.</dd>
+  <dt>Update cadence and watching</dt>
+  <dd>GESLA-4.0 was released in July 2025 and GESLA-4.1 in July 2026. A weekly watcher checks the version on the downloads page, the SHA-256 of the metadata file, and a hash of the licence page. A new release triggers a full rebuild and a new time-base audit of every provider.</dd>
+  <dt>Coverage</dt>
+  <dd>GESLA-4.1 has 6,682 records worldwide. How many become published stations depends on the checks, and is known only after the first full build.</dd>
+  <dt>Rank</dt>
+  <dd>Gauge fit: used where no official constants exist for the location, or where official constants fail the convention check.</dd>
+</dl>
+</section>
+
+<section aria-labelledby="noaa">
+<h3 id="noaa">NOAA CO-OPS</h3>
+<dl>
+  <dt>What it is</dt>
+  <dd>The Center for Operational Oceanographic Products and Services of the US National Oceanic and Atmospheric Administration, which publishes tide predictions and harmonic constants for US stations through a public API.</dd>
+  <dt>What OTC takes</dt>
+  <dd><strong>Official constants</strong> for reference stations (Greenwich phases), and <strong>subordinate-station offsets</strong> (time and height corrections to a reference station). OTC publishes them unmodified and marks them as NOAA data.</dd>
+  <dt>Licence</dt>
+  <dd>US Government work in the public domain (<code>LicenseRef-PublicDomain-USGov</code>). NOAA's disclaimer says the data “may be used freely by the public” and “shall not be modified in content and then presented as official government material”. OTC never presents its files as an official NOAA product.</dd>
+  <dt>Attribution line OTC uses</dt>
+  <dd>“Contains NOAA CO-OPS data (public domain). Not an official NOAA product.”</dd>
+  <dt>Update cadence and watching</dt>
+  <dd>The API sends no ETag or Last-Modified headers, so a weekly watcher hashes the normalised response for every station and rebuilds only the stations that changed.</dd>
+  <dt>Coverage</dt>
+  <dd>NOAA's tide-prediction station list had 3,502 stations when checked on 2026-10-07: 1,260 reference stations and 2,242 subordinate stations. Mostly the United States and its territories.</dd>
+  <dt>Rank</dt>
+  <dd>Official constants.</dd>
+</dl>
+</section>
+
+<section aria-labelledby="kartverket">
+<h3 id="kartverket">Kartverket (Norway)</h3>
+<dl>
+  <dt>What it is</dt>
+  <dd>The Norwegian Mapping Authority, which operates Norway's permanent tide gauges and publishes their harmonic constants through its tide API.</dd>
+  <dt>What OTC takes</dt>
+  <dd><strong>Official constants</strong>: amplitude, phase, speed, Doodson code and observation span per station. The API gives phases relative to UTC+1 (<code>utcoffset="+01:00"</code>); OTC converts them to Greenwich and records the conversion.</dd>
+  <dt>Licence</dt>
+  <dd>CC BY 4.0, as stated on Kartverket's API page.</dd>
+  <dt>Attribution line OTC uses</dt>
+  <dd>“Contains data from Kartverket (Norwegian Mapping Authority), CC BY 4.0.”</dd>
+  <dt>Update cadence and watching</dt>
+  <dd>A weekly watcher hashes the response for every station and rebuilds only the stations that changed.</dd>
+  <dt>Coverage</dt>
+  <dd>Norway's permanent tide gauges. The station count will be published with the first release.</dd>
+  <dt>Rank</dt>
+  <dd>Official constants.</dd>
+</dl>
+</section>
+
+<h2 id="evaluation">Under evaluation</h2>
+<div class="note" role="note">
+  <p><strong>Not yet incorporated.</strong> These sources are being checked. A source is added only when it publishes constants or records under a licence compatible with CC BY 4.0, and passes the per-source convention check. Nothing is claimed here about their licence, coverage or quality until that check is done.</p>
+</div>
+<ul>
+  <li>FEMAR (Brazil)</li>
+  <li>IOC sea-level station monitoring facility (VLIZ)</li>
+  <li>National open-data APIs of other hydrographic and sea-level agencies</li>
+  <li>EOT20 global tide model (would be model constants)</li>
+  <li>NOAA CO-OPS tidal current predictions (would be currents)</li>
+</ul>
+
+<h2 id="cross-checks">Used only as cross-checks</h2>
+<p>These are compared with OTC on every build but are not published as OTC sources: TICON-4 (constants fitted from GESLA-4.0), the XTide harmonics files, and the Slackwater database.</p>
+
+<h2 id="not-used">Checked and not used</h2>
+<ul>
+  <li><strong>Canadian Hydrographic Service (CHS):</strong> its water-level API has no harmonic-constant endpoint, and its licence does not allow derivative products for commercial purposes. Canadian stations come from GESLA records instead.</li>
+</ul>

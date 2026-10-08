@@ -1,0 +1,34 @@
+---
+title: Licence and attribution
+description: OpenTideConstants derived constants are licensed CC BY 4.0, with attribution to GESLA and to every data provider.
+nav: Licence
+order: 8
+---
+<h1>Licence and attribution</h1>
+
+<h2 id="licence">Licence</h2>
+<ul>
+  <li>The constants OTC derives are published under the <a href="https://creativecommons.org/licenses/by/4.0/">Creative Commons Attribution 4.0 International licence (CC BY 4.0)</a>.</li>
+  <li><strong>Derived constants only.</strong> OTC publishes harmonic constants fitted from sea-level records. It never redistributes the raw sea-level series. To get the raw data, download it from GESLA; OTC will publish a manifest of checksums so you can check your copy against the one the build used.</li>
+  <li>This follows the practice of TICON-4 (<a href="https://doi.org/10.17882/109129">doi:10.17882/109129</a>), which publishes constants derived from GESLA under CC BY 4.0.</li>
+  <li><strong>NOAA</strong> constants and offsets are US Government data in the public domain (<code>LicenseRef-PublicDomain-USGov</code>). OTC publishes them unmodified and marks them as NOAA data. They are not presented as an official NOAA product.</li>
+  <li><strong>Kartverket</strong> constants are published by Kartverket under CC BY 4.0. OTC converts their phases from UTC+1 to Greenwich and records the conversion.</li>
+  <li>Every constant set carries its own <code>licence_id</code> and attribution text in the release files.</li>
+</ul>
+
+<h2 id="attribution">Attribution</h2>
+<p>When you use OTC data, credit OpenTideConstants (see <a href="/citation/">Citation</a>) and the upstream providers of the stations you use:</p>
+<dl>
+  <dt>GESLA</dt>
+  <dd>Constants fitted from GESLA records: acknowledge the <a href="https://gesla787883612.wordpress.com/">GESLA website</a> and cite Haigh et al. (2023) and Woodworth et al. (2017), as the GESLA downloads page asks. For records that come from UHSLC, also cite Caldwell et al. (2015).</dd>
+  <dt>Data providers</dt>
+  <dd>Each GESLA record comes from a national or regional agency, and each fitted set names its provider. The release files carry the full attribution text per set.</dd>
+  <dt>NOAA CO-OPS</dt>
+  <dd>Credit NOAA's Center for Operational Oceanographic Products and Services for NOAA constants and offsets.</dd>
+  <dt>Kartverket</dt>
+  <dd>Credit Kartverket (the Norwegian Mapping Authority) for Kartverket constants.</dd>
+</dl>
+<p class="pending">The complete list of providers, with the citation text each one requires, is generated from the data and published with the first release. A release fails its build if a provider in the data is missing from this list.</p>
+
+<h2 id="thanks">Thanks</h2>
+<p>OTC depends on the work of the agencies that run tide gauges, the GESLA team that assembles their records, and the TICON team, whose constants and methods are the reference this project compares against.</p>

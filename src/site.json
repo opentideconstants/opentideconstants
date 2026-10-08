@@ -1,0 +1,10 @@
+{
+  "name": "OpenTideConstants",
+  "short": "OTC",
+  "url": "https://opentideconstants.org",
+  "dataUrl": "https://data.opentideconstants.org",
+  "repoUrl": "https://github.com/opentideconstants/opentideconstants",
+  "webcaltidesUrl": "https://webcaltides.org",
+  "formatVersion": "0.1",
+  "released": false
+}

@@ -1,0 +1,49 @@
+---
+title: Why
+description: Measured problems in today's tidal-constant sources, and how an automated, open dataset can catch them on every build.
+nav: Why
+order: 2
+---
+<h1>Why this dataset</h1>
+<p class="lead">Today's open tidal constants are valuable work, and this project builds on them. While using them, we measured problems that pass through silently, and that an automated build can catch on every release.</p>
+
+<p>The examples below were measured on 2026-10-07 on the versions named. Each one names the dataset version it was measured on. Where a problem was already fixed upstream, we say so.</p>
+
+<h2>Wrong time stamps pass through silently</h2>
+<ul>
+  <li>The German WSV files in GESLA-4.0 are in German civil time (CET in winter, CEST in summer) but are labelled UTC. Against another record at the same gauge, they are 60 min late in January and 120 min late in July.</li>
+  <li>TICON-4 fitted these files. Its WSV phases are therefore about 95 min late: the median M2 lag is +95.9 min over 19 North Sea gauge pairs.</li>
+  <li>GESLA-4.1 (July 2026) removes the summer-time step. Its WSV values now behave as hourly means stamped at the start of the hour, so they are about 30 min early: median −29.5 min over all 141 comparable files.</li>
+  <li>In both versions, the metadata gives <code>TIME ZONE HOURS</code> = 0 for every WSV file. We found no change log for GESLA-4.1.</li>
+</ul>
+
+<h2>A broken input record reaches the product</h2>
+<p>The Hirtshals (Denmark) record in GESLA-4.0 and GESLA-4.1 contains no tide at any frequency. A correct fit of that record gives an M2 amplitude of 0.16 cm (TICON-4), against 12.99 cm in TICON-3 and about 14 cm at the two neighbouring gauges. The fit is correct for its input; the input is the problem. A broken-record check catches this case automatically.</p>
+
+<h2>Constituent conventions differ between producers</h2>
+<ul>
+  <li>TICON-3 SA phases were +76° off the NOAA (h-referenced) Sa. This is fixed in TICON-4.</li>
+  <li>TICON-4 M1 is coherent with NOAA's M1 but offset by about −105°. The stated definition predicts about 0°.</li>
+  <li>TICON-4 OO1 phases on short records still follow the nodal angle (regression slope −0.94, records under 3 years).</li>
+  <li>Kartverket's API gives phases with <code>utcoffset="+01:00"</code>, not Greenwich. This is declared in the response, so a reader can convert it, but only if it looks.</li>
+</ul>
+<p>None of these is wrong in itself. Each is a different convention. The problem is that a user has to find out which one applies. OTC declares the convention of every set of constants. See <a href="/conventions/">Conventions</a>.</p>
+
+<h2>Documentation does not always match the data</h2>
+<ul>
+  <li>The TICON-4 landing page gives 4,383 gauges; the file and the manual give 4,838.</li>
+  <li>Some constituent names in the TICON-4 manual (SIGMA1, EPS2) differ from the names in the file (SGM, EP2).</li>
+  <li>A <code>datum_information</code> field is cut at a comma, a cut already present in the GESLA metadata. The GESLA-4.1 metadata header is missing one comma.</li>
+</ul>
+
+<h2>No accuracy against official predictions is published</h2>
+<p>The open sources we read publish fit statistics, but no comparison with official predictions. That comparison shows a lot. In our proof of concept at 11 stations, a fit made with the method on this site matched or beat TICON-4 at 10 of them. For example, Helgoland went from 88–90 min to 6.7 min mean time error, and Seattle from 6.8 to 2.5 min. These are proof-of-concept numbers, not release results; see <a href="/validation/">Validation</a>.</p>
+
+<h2>Slow cycles and no public trackers</h2>
+<p>TICON releases have come years apart (TICON-3 in 2022, TICON-4 in 2025). For TICON and GESLA we found no public repository or issue tracker; contact is by e-mail. OTC rebuilds when upstream data changes, and every station's problems can be reported in a <a href="{{site.repoUrl}}/issues">public issue tracker</a>.</p>
+
+<h2>What OTC does about it</h2>
+<p>Each problem above can be caught by a rule that runs automatically on every build: a time-base audit against sibling records and official predictions, a broken-record check, a per-source convention check, and a validation table against official predictions. OTC publishes the results of these rules with every release, so users can see the evidence and not only the constants. See <a href="/method/">Method</a>.</p>
+
+<h2>Related work</h2>
+<p>The <a href="https://github.com/openwatersio/slackwater-database">Slackwater database</a> already combines NOAA and TICON-4 constants as published, with daily dated releases and per-source accuracy checks. OTC differs in four ways: corrected GESLA-derived constants instead of TICON-4 as published, accuracy for every station, a declared convention for every set, and a DOI for every release.</p>

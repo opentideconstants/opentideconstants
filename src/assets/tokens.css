@@ -1,0 +1,78 @@
+/*
+  Design tokens. Replace this file to change the theme.
+  site.css reads only these custom properties; it contains no literal colours,
+  font stacks, sizes, radii or durations of its own.
+  Light values first; dark values in the prefers-color-scheme block below.
+*/
+:root {
+  /* Colour */
+  --color-bg: #ffffff;
+  --color-surface: #f5f6f7;
+  --color-text: #1b1d1f;
+  --color-text-muted: #55595e;
+  --color-border: #d6d9dc;
+  --color-link: #0b57a4;
+  --color-link-hover: #083f77;
+  --color-accent: #0b57a4;
+  --color-focus: #0b57a4;
+  --color-note-bg: #fff6db;
+  --color-note-border: #c79a00;
+  --color-note-text: #3d2f00;
+  --color-code-bg: #eef0f2;
+
+  /* Typography */
+  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-heading: var(--font-body);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --font-size-base: 1.0625rem;
+  --font-size-small: 0.875rem;
+  --font-size-h1: clamp(1.75rem, 1.3rem + 2vw, 2.5rem);
+  --font-size-h2: clamp(1.35rem, 1.15rem + 0.9vw, 1.75rem);
+  --font-size-h3: 1.15rem;
+  --line-height-body: 1.6;
+  --line-height-heading: 1.25;
+  --font-weight-heading: 650;
+  --measure: 70ch;
+
+  /* Spacing */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --gutter: 1rem;
+  --content-max: 72rem;
+
+  /* Shape */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --border-width: 1px;
+
+  /* Motion */
+  --duration-fast: 120ms;
+  --easing: ease-out;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #121416;
+    --color-surface: #1b1e21;
+    --color-text: #e6e8ea;
+    --color-text-muted: #a6acb2;
+    --color-border: #33383d;
+    --color-link: #7db7f0;
+    --color-link-hover: #a9d0f7;
+    --color-accent: #7db7f0;
+    --color-focus: #7db7f0;
+    --color-note-bg: #2b2410;
+    --color-note-border: #b38a00;
+    --color-note-text: #f3e2a8;
+    --color-code-bg: #22262a;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --duration-fast: 0ms; }
+}

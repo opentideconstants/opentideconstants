@@ -1,0 +1,12 @@
+{
+  "name": "opentideconstants-site",
+  "private": true,
+  "description": "Website for opentideconstants.org. No dependencies.",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "node build.mjs",
+    "check": "node build.mjs && node scripts/check-links.mjs",
+    "serve": "node build.mjs && python3 -m http.server 8000 --directory dist"
+  }
+}

@@ -1,0 +1,54 @@
+---
+title: Home
+description: OpenTideConstants is an open dataset of tidal harmonic constants, rebuilt automatically from the latest upstream data, with declared conventions and published accuracy for every station.
+nav: Home
+order: 1
+---
+<h1>Open tidal harmonic constants, rebuilt from the latest data</h1>
+<p class="lead">OpenTideConstants (OTC) is one open dataset of tidal harmonic constants. It is rebuilt automatically from the latest upstream data, checked against official predictions, and released under CC BY 4.0 with a DOI for each release.</p>
+
+<div class="note" role="note">
+  <p><strong>Status: there is no release yet.</strong> This site describes the method and the format. Downloads, DOIs and release accuracy figures are coming with the first release. The only accuracy numbers on this site come from a proof of concept at 11 stations, and they are labelled as such.</p>
+</div>
+
+<h2>What is different</h2>
+<ul class="cards">
+  <li>
+    <h3>Accuracy for every station</h3>
+    <p>Every release publishes, per station, how well the constants reproduce official predictions: time and height errors, missed and extra events, and the same numbers for the previous release.</p>
+  </li>
+  <li>
+    <h3>Declared conventions</h3>
+    <p>Every set of constants states its phase reference, time zone, astronomical-argument model, nodal corrections and constituent definitions. A converter never guesses.</p>
+  </li>
+  <li>
+    <h3>Time bases checked</h3>
+    <p>Every input record is checked for a wrong or undeclared clock before it is used. A record whose time base cannot be explained is not used.</p>
+  </li>
+  <li>
+    <h3>Automatic and current</h3>
+    <p>Weekly watchers detect upstream changes. A build that passes all gates is published with no person in the loop. A build that fails keeps the last good release live.</p>
+  </li>
+  <li>
+    <h3>Open format</h3>
+    <p>JSON first, with a published JSON Schema, plus JSON Lines and CSV. Every file is named <code>OTC_{YYYYMMDD}</code> and comes with SHA-256 checksums.</p>
+  </li>
+  <li>
+    <h3>Open process</h3>
+    <p>The build code, the rules, every automated decision and the issue tracker will be public. Anyone will be able to report a problem with a station.</p>
+  </li>
+</ul>
+
+<h2>Sources at a glance</h2>
+<div class="table-wrap">
+<table>
+  <caption>Launch set (planned for the first release)</caption>
+  <thead><tr><th scope="col">Source</th><th scope="col">What OTC takes</th><th scope="col">Licence</th><th scope="col">Rank</th></tr></thead>
+  <tbody>
+    <tr><th scope="row"><a href="/sources/#noaa">NOAA CO-OPS</a></th><td>Official constants and subordinate-station offsets</td><td>Public domain (US Government)</td><td>Official</td></tr>
+    <tr><th scope="row"><a href="/sources/#kartverket">Kartverket</a> (Norway)</th><td>Official constants</td><td>CC BY 4.0</td><td>Official</td></tr>
+    <tr><th scope="row"><a href="/sources/#gesla">GESLA</a></th><td>Gauge records that OTC fits (derived constants only)</td><td>CC BY 4.0 on derived constants, per-provider attribution</td><td>Gauge fit</td></tr>
+  </tbody>
+</table>
+</div>
+<p>At one location, official constants rank before a gauge fit, and a gauge fit before model constants. More sources are <a href="/sources/#evaluation">under evaluation</a>. See <a href="/sources/">Sources</a> for licences, attribution, update cadence and coverage, <a href="/method/">Method</a> for how each source is processed, and <a href="/why/">Why</a> for the problems this project addresses.</p>
