@@ -28,6 +28,8 @@ jobs:
         run: node build.mjs
       - name: Check internal links
         run: node scripts/check-links.mjs
+      - name: Check colour contrast
+        run: node scripts/check-contrast.mjs
       - name: Validate HTML
         run: npx --yes html-validate@11 "dist/**/*.html"
       - name: Check JSON Schema and example

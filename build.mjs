@@ -9,11 +9,14 @@
 //   description: One sentence for search results.
 //   nav: Why            (optional; label in the main navigation)
 //   order: 2            (optional; navigation order)
+//   layout: full        (optional; the body is inserted as is, for full-width sections.
+//                        Otherwise it goes inside <div class="wrap doc">.)
 //   ---
 // The page body is inserted into src/layout.html. Placeholders: {{title}},
 // {{description}}, {{canonical_tag}}, {{nav}}, {{content}}, {{year}}, and any key of
-// src/site.json as {{site.<key>}} (also usable inside page bodies).
-// Everything else under src/ (except pages/ and layout.html) is copied as is.
+// src/site.json as {{site.<key>}} (also usable inside page bodies). {{page}} is the page name.
+// A page body can inline a file from src/partials/ with {{include <file>}} (used for SVG artwork).
+// Everything else under src/ (except pages/, partials/ and layout.html) is copied as is.
 
 import { readFileSync, writeFileSync, mkdirSync, rmSync, readdirSync, statSync, copyFileSync } from "node:fs";
 import { join, dirname, relative } from "node:path";
@@ -47,9 +50,13 @@ function fillSite(text) {
   });
 }
 
+function fillIncludes(text) {
+  return text.replace(/\{\{include ([\w.-]+)\}\}/g, (_, name) => readFileSync(join(src, "partials", name), "utf8").trim());
+}
+
 function copyTree(from, to) {
   for (const name of readdirSync(from)) {
-    if (from === src && (name === "pages" || name === "layout.html" || name === "site.json")) continue;
+    if (from === src && (name === "pages" || name === "partials" || name === "layout.html" || name === "site.json")) continue;
     const a = join(from, name);
     const b = join(to, name);
     if (statSync(a).isDirectory()) {
@@ -88,7 +95,8 @@ for (const page of pages) {
     .join("\n          ");
   const html = fillSite(
     layout
-      .replaceAll("{{content}}", page.body.trim())
+      .replaceAll("{{content}}", page.meta.layout === "full" ? fillIncludes(page.body.trim()) : `<div class="wrap doc">\n${page.body.trim()}\n</div>`)
+      .replaceAll("{{page}}", page.name)
       .replaceAll("{{nav}}", nav)
       .replaceAll("{{title}}", page.name === "index" ? `${site.name}: open tidal harmonic constants` : `${page.meta.title} · ${site.name}`)
       .replaceAll("{{description}}", page.meta.description)

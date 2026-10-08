@@ -8,22 +8,29 @@
   {{canonical_tag}}
   <meta name="color-scheme" content="light dark">
   <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="/assets/fonts/atkinson-hyperlegible-next-latin-var.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/assets/fonts/schibsted-grotesk-latin-var.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/assets/fonts/spectral-500-italic-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="/assets/tokens.css">
   <link rel="stylesheet" href="/assets/site.css">
+  <script src="/assets/mode.js"></script>
 </head>
-<body>
+<body class="page-{{page}}">
   <a class="skip-link" href="#main">Skip to content</a>
   <header class="site-header">
     <div class="wrap header-inner">
-      <a class="brand" href="/">{{site.name}}</a>
-      <nav aria-label="Main">
-        <ul class="nav-list">
+      <a class="brand" href="/"><svg viewBox="0 0 22 22" aria-hidden="true"><path d="M11 1 L21 11 L11 21 L1 11 Z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M11 1 L21 11 L11 11 Z M11 21 L1 11 L11 11 Z" fill="var(--color-accent)"/></svg><span>{{site.name}}</span></a>
+      <div class="nav-wrap">
+        <nav aria-label="Main">
+          <ul class="nav-list">
           {{nav}}
-        </ul>
-      </nav>
+          </ul>
+        </nav>
+        <button class="mode" type="button" hidden>Night palette</button>
+      </div>
     </div>
   </header>
-  <main id="main" class="wrap">
+  <main id="main">
 {{content}}
   </main>
   <footer class="site-footer">

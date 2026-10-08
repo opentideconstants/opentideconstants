@@ -1,76 +1,150 @@
 /*
-  Design tokens. Replace this file to change the theme.
-  site.css reads only these custom properties; it contains no literal colours,
-  font stacks, sizes, radii or durations of its own.
-  Light values first; dark values in the prefers-color-scheme block below.
+  Design tokens: theme B2 "Contour" (Chart Datum as cartographic texture).
+  site.css reads only these custom properties. Day palette by default. The night palette
+  follows prefers-color-scheme: dark, or data-theme="dark" set by the header toggle
+  (assets/mode.js); data-theme="light" forces the day palette.
+  Fonts are self-hosted (SIL Open Font License; licences in assets/fonts/), latin subset.
 */
+@font-face { font-family: "Atkinson Hyperlegible Next"; font-style: normal; font-weight: 200 800; font-display: swap; src: url("/assets/fonts/atkinson-hyperlegible-next-latin-var.woff2") format("woff2"); }
+@font-face { font-family: "Atkinson Hyperlegible Next"; font-style: italic; font-weight: 200 800; font-display: swap; src: url("/assets/fonts/atkinson-hyperlegible-next-italic-latin-var.woff2") format("woff2"); }
+@font-face { font-family: "Atkinson Hyperlegible Mono"; font-style: normal; font-weight: 200 800; font-display: swap; src: url("/assets/fonts/atkinson-hyperlegible-mono-latin-var.woff2") format("woff2"); }
+@font-face { font-family: "Schibsted Grotesk"; font-style: normal; font-weight: 400 900; font-display: swap; src: url("/assets/fonts/schibsted-grotesk-latin-var.woff2") format("woff2"); }
+@font-face { font-family: "Spectral"; font-style: italic; font-weight: 500; font-display: swap; src: url("/assets/fonts/spectral-500-italic-latin.woff2") format("woff2"); }
+
 :root {
-  /* Colour */
-  --color-bg: #ffffff;
-  --color-surface: #f5f6f7;
-  --color-text: #1b1d1f;
-  --color-text-muted: #55595e;
-  --color-border: #d6d9dc;
-  --color-link: #0b57a4;
-  --color-link-hover: #083f77;
-  --color-accent: #0b57a4;
-  --color-focus: #0b57a4;
-  --color-note-bg: #fff6db;
-  --color-note-border: #c79a00;
-  --color-note-text: #3d2f00;
-  --color-code-bg: #eef0f2;
+  color-scheme: light;
 
   /* Typography */
-  --font-body: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-heading: var(--font-body);
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --font-body: "Atkinson Hyperlegible Next", "Segoe UI", Roboto, sans-serif;
+  --font-heading: "Schibsted Grotesk", "Segoe UI", sans-serif;
+  --font-display: "Schibsted Grotesk", "Segoe UI", sans-serif;
+  --font-label: "Spectral", Georgia, serif;      /* italic only: hydrographic names, as on charts */
+  --font-mono: "Atkinson Hyperlegible Mono", ui-monospace, Menlo, monospace;
   --font-size-base: 1.0625rem;
-  --font-size-small: 0.875rem;
-  --font-size-h1: clamp(1.75rem, 1.3rem + 2vw, 2.5rem);
-  --font-size-h2: clamp(1.35rem, 1.15rem + 0.9vw, 1.75rem);
+  --font-size-small: 0.9rem;
+  --font-size-display: clamp(2.4rem, 1.4rem + 4vw, 4.4rem);
+  --font-size-h1: clamp(2.2rem, 1.4rem + 3vw, 3.6rem);
+  --font-size-h2: clamp(1.5rem, 1.2rem + 1.3vw, 2.25rem);
   --font-size-h3: 1.15rem;
   --line-height-body: 1.6;
-  --line-height-heading: 1.25;
-  --font-weight-heading: 650;
-  --measure: 70ch;
+  --line-height-heading: 1.1;
+  --font-weight-heading: 700;
+  --measure: 68ch;
 
   /* Spacing */
-  --space-1: 0.25rem;
-  --space-2: 0.5rem;
-  --space-3: 0.75rem;
-  --space-4: 1rem;
-  --space-5: 1.5rem;
-  --space-6: 2rem;
-  --space-7: 3rem;
-  --gutter: 1rem;
-  --content-max: 72rem;
+  --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem; --space-4: 1rem;
+  --space-5: 1.5rem; --space-6: 2rem; --space-7: 3rem;
+  --space-8: clamp(3.5rem, 2.5rem + 4vw, 6rem);
+  --gutter: clamp(1rem, 0.4rem + 2.6vw, 2.75rem);
+  --content-max: 76rem;
 
   /* Shape */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --border-width: 1px;
+  --radius-sm: 2px; --radius-md: 4px; --border-width: 1px;
+  --graticule: 120px 110px;  /* graticule cell, as in the hero chart */
 
   /* Motion */
-  --duration-fast: 120ms;
-  --easing: ease-out;
+  --duration-fast: 160ms;
+  --easing: cubic-bezier(0.22, 1, 0.36, 1);      /* ease-out-quint */
+  --easing-expo: cubic-bezier(0.16, 1, 0.3, 1);  /* ease-out-expo */
+
+  /* Colour: day */
+  --color-bg: oklch(1 0 0);
+  --color-surface: oklch(0.955 0.018 230);
+  --color-text: oklch(0.2 0.02 260);
+  --color-text-muted: oklch(0.46 0.03 255);
+  --color-border: oklch(0.86 0.02 240);
+  --color-link: oklch(0.5 0.21 345);
+  --color-link-hover: oklch(0.38 0.17 345);
+  --color-accent: oklch(0.5 0.21 345);
+  --color-focus: oklch(0.5 0.21 345);
+  --color-note-bg: oklch(1 0 0);
+  --color-note-border: oklch(0.5 0.21 345);
+  --color-note-text: oklch(0.2 0.02 260);
+  --color-code-bg: oklch(0.955 0.018 230);
+  --color-code-text: oklch(0.2 0.02 260);
+  --color-shoal: oklch(0.86 0.06 225);
+  --color-shallow: oklch(0.92 0.04 225);
+  --color-land: oklch(0.89 0.075 85);
+  --color-coast: oklch(0.2 0.02 260);
+  --color-on-accent: oklch(1 0 0);
+  --color-grat: oklch(0.83 0.035 235);
+  --color-contour: oklch(0.55 0.07 235);
+  --color-sounding: oklch(0.42 0.04 250);
+  --color-d10: oklch(0.95 0.025 225);
+  --color-panel: oklch(1 0 0);
+  --color-plot-official: oklch(0.2 0.02 260);
+  --color-plot-ticon: oklch(0.52 0.12 240);
+  --color-plot-fit: oklch(0.5 0.21 345);
+  --color-plot-grid: oklch(0.9 0.02 235);
+  --color-plot-grid-strong: oklch(0.78 0.03 240);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --color-bg: #121416;
-    --color-surface: #1b1e21;
-    --color-text: #e6e8ea;
-    --color-text-muted: #a6acb2;
-    --color-border: #33383d;
-    --color-link: #7db7f0;
-    --color-link-hover: #a9d0f7;
-    --color-accent: #7db7f0;
-    --color-focus: #7db7f0;
-    --color-note-bg: #2b2410;
-    --color-note-border: #b38a00;
-    --color-note-text: #f3e2a8;
-    --color-code-bg: #22262a;
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --color-bg: oklch(0.15 0.005 250);
+    --color-surface: oklch(0.2 0.008 250);
+    --color-text: oklch(0.86 0.008 250);
+    --color-text-muted: oklch(0.68 0.012 250);
+    --color-border: oklch(0.3 0.01 250);
+    --color-link: oklch(0.72 0.16 345);
+    --color-link-hover: oklch(0.82 0.11 345);
+    --color-accent: oklch(0.72 0.16 345);
+    --color-focus: oklch(0.72 0.16 345);
+    --color-note-bg: oklch(0.15 0.005 250);
+    --color-note-border: oklch(0.72 0.16 345);
+    --color-note-text: oklch(0.86 0.008 250);
+    --color-code-bg: oklch(0.2 0.008 250);
+    --color-code-text: oklch(0.86 0.008 250);
+    --color-shoal: oklch(0.3 0.045 235);
+    --color-shallow: oklch(0.22 0.03 235);
+    --color-land: oklch(0.34 0.04 85);
+    --color-coast: oklch(0.66 0.012 250);
+    --color-on-accent: oklch(0.15 0.005 250);
+    --color-grat: oklch(0.27 0.02 245);
+    --color-contour: oklch(0.5 0.05 235);
+    --color-sounding: oklch(0.68 0.02 245);
+    --color-d10: oklch(0.18 0.018 240);
+    --color-panel: oklch(0.15 0.005 250);
+    --color-plot-official: oklch(0.86 0.008 250);
+    --color-plot-ticon: oklch(0.8 0.1 225);
+    --color-plot-fit: oklch(0.72 0.16 345);
+    --color-plot-grid: oklch(0.27 0.02 245);
+    --color-plot-grid-strong: oklch(0.4 0.03 245);
   }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: oklch(0.15 0.005 250);
+  --color-surface: oklch(0.2 0.008 250);
+  --color-text: oklch(0.86 0.008 250);
+  --color-text-muted: oklch(0.68 0.012 250);
+  --color-border: oklch(0.3 0.01 250);
+  --color-link: oklch(0.72 0.16 345);
+  --color-link-hover: oklch(0.82 0.11 345);
+  --color-accent: oklch(0.72 0.16 345);
+  --color-focus: oklch(0.72 0.16 345);
+  --color-note-bg: oklch(0.15 0.005 250);
+  --color-note-border: oklch(0.72 0.16 345);
+  --color-note-text: oklch(0.86 0.008 250);
+  --color-code-bg: oklch(0.2 0.008 250);
+  --color-code-text: oklch(0.86 0.008 250);
+  --color-shoal: oklch(0.3 0.045 235);
+  --color-shallow: oklch(0.22 0.03 235);
+  --color-land: oklch(0.34 0.04 85);
+  --color-coast: oklch(0.66 0.012 250);
+  --color-on-accent: oklch(0.15 0.005 250);
+  --color-grat: oklch(0.27 0.02 245);
+  --color-contour: oklch(0.5 0.05 235);
+  --color-sounding: oklch(0.68 0.02 245);
+  --color-d10: oklch(0.18 0.018 240);
+  --color-panel: oklch(0.15 0.005 250);
+  --color-plot-official: oklch(0.86 0.008 250);
+  --color-plot-ticon: oklch(0.8 0.1 225);
+  --color-plot-fit: oklch(0.72 0.16 345);
+  --color-plot-grid: oklch(0.27 0.02 245);
+  --color-plot-grid-strong: oklch(0.4 0.03 245);
 }
 
 @media (prefers-reduced-motion: reduce) {
