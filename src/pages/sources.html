@@ -12,7 +12,7 @@ order: 2.5
 <ol>
   <li><strong>Official constants</strong>: harmonic constants published by the agency responsible for the gauge (for example NOAA, Kartverket).</li>
   <li><strong>Gauge fit</strong>: constants OTC fits from a gauge record (GESLA).</li>
-  <li><strong>Model constants</strong>: constants from a global or regional tide model. None is in the launch set.</li>
+  <li><strong>Model constants</strong>: constants from a global or regional tide model, labelled as model constants. None is in the launch set; EOT20 and FES2022 are <a href="#planned">planned</a>.</li>
 </ol>
 <p>Every set stays in the release files, not only the recommended one, so you can choose another. A source must also pass the <a href="/method/#source-checks">per-source convention check</a>; a source that fails is not used in that release. The validation table shows how each set scores against official predictions.</p>
 
@@ -79,22 +79,264 @@ order: 2.5
 </dl>
 </section>
 
-<h2 id="evaluation">Under evaluation</h2>
-<div class="note" role="note">
-  <p><strong>Not yet incorporated.</strong> These sources are being checked. A source is added only when it publishes constants or records under a licence compatible with CC BY 4.0, and passes the per-source convention check. Nothing is claimed here about their licence, coverage or quality until that check is done.</p>
-</div>
-<ul>
-  <li>FEMAR (Brazil)</li>
-  <li>IOC sea-level station monitoring facility (VLIZ)</li>
-  <li>National open-data APIs of other hydrographic and sea-level agencies</li>
-  <li>EOT20 global tide model (would be model constants)</li>
-  <li>NOAA CO-OPS tidal current predictions (would be currents)</li>
-</ul>
+<h2 id="planned">Planned sources</h2>
+<p>These sources are planned (verified licence and access). For each one, the licence was read and the access path was checked on 2026-10-07 (FES2022 needs an account, see below). They are not in the first release. The coverage figures below are from those checks; the number of published stations is known only after a full build.</p>
+<p>All but two give gauge records, from which OTC fits its own constants. EOT20 and FES2022 are global tide models: their constants are <strong>model constants</strong>, interpolated to station points, labelled as model constants in every file, and ranked below official constants and gauge fits.</p>
+
+<section aria-labelledby="noaa-currents">
+<h3 id="noaa-currents">NOAA CO-OPS tidal-current constants</h3>
+<dl>
+  <dt>Status</dt>
+  <dd>Planned (verified licence and access).</dd>
+  <dt>What it is</dt>
+  <dd>Harmonic constants for tidal currents (velocity, not water level) at NOAA current-meter stations, published through NOAA's metadata API.</dd>
+  <dt>Publisher</dt>
+  <dd>NOAA CO-OPS (US National Oceanic and Atmospheric Administration).</dd>
+  <dt>What OTC takes</dt>
+  <dd><strong>Official current constants</strong>: per depth bin, the major and minor axis amplitude and phase, and the azimuth of the current ellipse. These need their own record type (quantity “current”), separate from water-level constants. Subordinate current stations publish offsets only, with no constants.</dd>
+  <dt>Licence</dt>
+  <dd>US Government work in the public domain (17 U.S.C. §105). <a href="https://tidesandcurrents.noaa.gov/disclaimers.html">NOAA's disclaimer</a> says the information “may be used freely by the public”.</dd>
+  <dt>Attribution line OTC uses</dt>
+  <dd>“Contains NOAA CO-OPS data (public domain). Not an official NOAA product.”</dd>
+  <dt>Access and watching</dt>
+  <dd>Keyless JSON API: a station list, then one constants request per station. The constants are static and change only when NOAA re-analyses a station, so a weekly watcher hashes each station's response, as for the NOAA water-level constants.</dd>
+  <dt>Coverage</dt>
+  <dd>US coasts and estuaries. NOAA's current-prediction list had 4,439 stations when checked on 2026-10-07, of which 2,221 are harmonic stations and the rest subordinate.</dd>
+  <dt>Rank</dt>
+  <dd>Official constants (currents). They are ranked only against other current constants.</dd>
+</dl>
+</section>
+
+<section aria-labelledby="pegelonline">
+<h3 id="pegelonline">PEGELONLINE (Germany)</h3>
+<dl>
+  <dt>Status</dt>
+  <dd>Planned (verified licence and access).</dd>
+  <dt>What it is</dt>
+  <dd>Germany's online water-level service, with 1-minute water levels from coastal, tidal-river and inland gauges.</dd>
+  <dt>Publisher</dt>
+  <dd>Wasserstraßen- und Schifffahrtsverwaltung des Bundes (WSV).</dd>
+  <dt>What OTC takes</dt>
+  <dd><strong>Gauge records that OTC fits.</strong> PEGELONLINE publishes no harmonic constants. It keeps only about 31 days of history, so OTC will harvest the records into its own archive and fit constants when enough data has accumulated: at least 30 days for a minimal fit, one year for a full fit.</dd>
+  <dt>Licence</dt>
+  <dd>Data licence Germany – Zero – Version 2.0 (DL-DE->Zero-2.0), with no conditions, as stated in the <a href="https://www.pegelonline.wsv.de/gast/nutzungsbedingungen">PEGELONLINE terms of use</a>.</dd>
+  <dt>Attribution line OTC uses</dt>
+  <dd>“Contains data from PEGELONLINE (WSV), DL-DE->Zero-2.0.” The licence does not require it; OTC credits the source anyway.</dd>
+  <dt>Access and watching</dt>
+  <dd>Keyless REST API (version 2). A daily harvest, because older records are not kept upstream.</dd>
+  <dt>Coverage</dt>
+  <dd>The German North Sea and Baltic coasts and the tidal rivers (Elbe, Weser, Ems), plus inland gauges.</dd>
+  <dt>Rank</dt>
+  <dd>Gauge fit.</dd>
+</dl>
+</section>
+
+<section aria-labelledby="rijkswaterstaat">
+<h3 id="rijkswaterstaat">Rijkswaterstaat WaterWebservices (Netherlands)</h3>
+<dl>
+  <dt>Status</dt>
+  <dd>Planned (verified licence and access).</dd>
+  <dt>What it is</dt>
+  <dd>The Dutch water-data service, with a multi-decade archive of 10-minute water levels.</dd>
+  <dt>Publisher</dt>
+  <dd>Rijkswaterstaat.</dd>
+  <dt>What OTC takes</dt>
+  <dd><strong>Gauge records that OTC fits.</strong> No harmonic constants are published. OTC fits constants from the long observed records. Rijkswaterstaat also publishes an astronomical (predicted) water level, which OTC can use to cross-check its fit.</dd>
+  <dt>Licence</dt>
+  <dd>CC0 (Creative Commons Zero), as stated on the <a href="https://rijkswaterstaatdata.nl/waterdata/">Rijkswaterstaat water-data page</a>.</dd>
+  <dt>Attribution line OTC uses</dt>
+  <dd>“Contains data from Rijkswaterstaat (CC0).” The licence does not require it; OTC credits the source anyway.</dd>
+  <dt>Access and watching</dt>
+  <dd>Keyless JSON web services (DDAPI 2.0), requested in pages by period. A weekly fetch of new records.</dd>
+  <dt>Coverage</dt>
+  <dd>The Dutch coast, the Wadden Sea and the estuaries. Full-year records are available for backfill.</dd>
+  <dt>Rank</dt>
+  <dd>Gauge fit.</dd>
+</dl>
+</section>
+
+<section aria-labelledby="marine-institute">
+<h3 id="marine-institute">Marine Institute (Ireland)</h3>
+<dl>
+  <dt>Status</dt>
+  <dd>Planned (verified licence and access).</dd>
+  <dt>What it is</dt>
+  <dd>The Irish National Tide Gauge Network, published through the Marine Institute's ERDDAP server, with records from 2000.</dd>
+  <dt>Publisher</dt>
+  <dd>Marine Institute, Ireland.</dd>
+  <dt>What OTC takes</dt>
+  <dd><strong>Gauge records that OTC fits</strong>, using the published quality flags. No harmonic constants are published. The Marine Institute's tide predictions can serve as a cross-check.</dd>
+  <dt>Licence</dt>
+  <dd><a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>, as stated in the <a href="https://erddap.marine.ie/erddap/info/IrishNationalTideGaugeNetwork/index.html">dataset metadata</a>.</dd>
+  <dt>Attribution line OTC uses</dt>
+  <dd>“Contains data from the Marine Institute (Ireland), CC BY 4.0.”</dd>
+  <dt>Access and watching</dt>
+  <dd>Keyless ERDDAP queries (CSV), near real time. A weekly fetch of new records.</dd>
+  <dt>Coverage</dt>
+  <dd>About 20 or more Irish coastal ports.</dd>
+  <dt>Rank</dt>
+  <dd>Gauge fit.</dd>
+</dl>
+</section>
+
+<section aria-labelledby="dmi">
+<h3 id="dmi">DMI ocean observations (Denmark)</h3>
+<dl>
+  <dt>Status</dt>
+  <dd>Planned (verified licence and access).</dd>
+  <dt>What it is</dt>
+  <dd>Sea-level observations at 10-minute intervals from Danish stations, with a historical archive, published through DMI's open-data API.</dd>
+  <dt>Publisher</dt>
+  <dd>DMI (Danish Meteorological Institute).</dd>
+  <dt>What OTC takes</dt>
+  <dd><strong>Gauge records that OTC fits.</strong> No harmonic constants are published. DMI's own tide predictions can serve as a cross-check. Inner Danish waters have very small tides, so the fits are most useful on the North Sea and Wadden Sea coast.</dd>
+  <dt>Licence</dt>
+  <dd><a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>, as stated in <a href="https://www.dmi.dk/friedata/guides-til-frie-data/vilkar-for-brug-af-data">DMI's terms for its free data</a>.</dd>
+  <dt>Attribution line OTC uses</dt>
+  <dd>“Contains data from DMI (Danish Meteorological Institute), CC BY 4.0.”</dd>
+  <dt>Access and watching</dt>
+  <dd>Keyless OGC API Features (version 2). DMI limits requests per IP address. A weekly fetch of new records.</dd>
+  <dt>Coverage</dt>
+  <dd>The station list returned 201 stations: the Danish coast, and some in Greenland and the Faroe Islands.</dd>
+  <dt>Rank</dt>
+  <dd>Gauge fit.</dd>
+</dl>
+</section>
+
+<section aria-labelledby="smhi">
+<h3 id="smhi">SMHI oceanographic observations (Sweden)</h3>
+<dl>
+  <dt>Status</dt>
+  <dd>Planned (verified licence and access).</dd>
+  <dt>What it is</dt>
+  <dd>Hourly and minute sea levels from Swedish stations, with a corrected hourly archive back to the start of each station.</dd>
+  <dt>Publisher</dt>
+  <dd>SMHI (Swedish Meteorological and Hydrological Institute).</dd>
+  <dt>What OTC takes</dt>
+  <dd><strong>Gauge records that OTC fits.</strong> No harmonic constants are published. Tides are small except in the Skagerrak and Kattegat, so these sets mainly add completeness and Baltic datums.</dd>
+  <dt>Licence</dt>
+  <dd>Creative Commons Attribution 4.0 SE (CC BY 4.0 SE), as stated in <a href="https://www.smhi.se/data/om-smhis-data/villkor-for-anvandning">SMHI's terms of use</a>. Commercial use is allowed. Users must name SMHI as the source and say whether the material was changed.</dd>
+  <dt>Attribution line OTC uses</dt>
+  <dd>“Contains data from SMHI, CC BY 4.0 SE. Changed: OTC fitted harmonic constants from the sea-level records.”</dd>
+  <dt>Access and watching</dt>
+  <dd>Keyless REST API (CSV). SMHI asks users to avoid mass downloads and repeated fetches, so OTC fetches the corrected archive once and then only new records, weekly.</dd>
+  <dt>Coverage</dt>
+  <dd>71 Swedish sea-level stations.</dd>
+  <dt>Rank</dt>
+  <dd>Gauge fit.</dd>
+</dl>
+</section>
+
+<section aria-labelledby="fmi">
+<h3 id="fmi">FMI mareographs (Finland)</h3>
+<dl>
+  <dt>Status</dt>
+  <dd>Planned (verified licence and access). Low priority.</dd>
+  <dt>What it is</dt>
+  <dd>Water levels from Finnish mareographs on the Gulf of Bothnia and the Gulf of Finland, published through FMI's open-data service.</dd>
+  <dt>Publisher</dt>
+  <dd>FMI (Finnish Meteorological Institute).</dd>
+  <dt>What OTC takes</dt>
+  <dd><strong>Gauge records that OTC fits.</strong> No harmonic constants are published. The tidal signal here is a few millimetres, so these sets will have low confidence scores and are mainly useful for datum and seiche context.</dd>
+  <dt>Licence</dt>
+  <dd>CC BY 4.0, as stated in the <a href="https://en.ilmatieteenlaitos.fi/open-data-licence">FMI open-data licence</a>.</dd>
+  <dt>Attribution line OTC uses</dt>
+  <dd>“Contains data from the Finnish Meteorological Institute (FMI), CC BY 4.0.”</dd>
+  <dt>Access and watching</dt>
+  <dd>Keyless WFS 2.0 queries, paged by week. FMI sets request quotas per IP address. A weekly fetch of new records.</dd>
+  <dt>Coverage</dt>
+  <dd>About 14 Finnish mareographs.</dd>
+  <dt>Rank</dt>
+  <dd>Gauge fit.</dd>
+</dl>
+</section>
+
+<section aria-labelledby="uhslc-fast">
+<h3 id="uhslc-fast">UHSLC Fast Delivery</h3>
+<dl>
+  <dt>Status</dt>
+  <dd>Planned (verified licence and access).</dd>
+  <dt>What it is</dt>
+  <dd>Hourly sea levels from tide gauges worldwide, contributed by national agencies and delivered within about one to two months. Fast Delivery data are later replaced by the yearly Research Quality data.</dd>
+  <dt>Publisher</dt>
+  <dd>University of Hawaii Sea Level Center (UHSLC).</dd>
+  <dt>What OTC takes</dt>
+  <dd><strong>Gauge records that OTC fits.</strong> Stations that GESLA already supplies are matched, so that each gauge is fitted once. Each set records the agency that provided the record.</dd>
+  <dt>Licence</dt>
+  <dd>The <a href="https://uhslc.soest.hawaii.edu/erddap/info/global_hourly_fast/index.html">dataset licence</a> says the data “may be used and redistributed for free”, with no warranty and not for legal use. <a href="https://uhslc.soest.hawaii.edu/datainfo/">UHSLC asks users to cite the dataset</a>.</dd>
+  <dt>Attribution line OTC uses</dt>
+  <dd>“Contains UHSLC Fast Delivery data”, with the UHSLC dataset citation and the name of the agency that provided each record.</dd>
+  <dt>Access and watching</dt>
+  <dd>Keyless static CSV and NetCDF files, one per station. A weekly check for new data.</dd>
+  <dt>Coverage</dt>
+  <dd>Global, about 300 or more stations, many in places with no other open source: Pacific islands, the Indian Ocean, Africa and South America.</dd>
+  <dt>Rank</dt>
+  <dd>Gauge fit.</dd>
+</dl>
+</section>
+
+<section aria-labelledby="eot20">
+<h3 id="eot20">EOT20 global ocean tide model</h3>
+<dl>
+  <dt>Status</dt>
+  <dd>Planned (verified licence and access).</dd>
+  <dt>What it is</dt>
+  <dd>An empirical global ocean tide model derived from satellite altimetry, with ocean-tide and load-tide grids for 17 constituents at 1/8° resolution.</dd>
+  <dt>Publisher</dt>
+  <dd>DGFI-TUM, published on SEANOE.</dd>
+  <dt>What OTC takes</dt>
+  <dd><strong>Model constants</strong>: amplitude and phase interpolated from the grids to station points. Every such set is labelled as model constants and scored like every other set. OTC does not re-host the grids.</dd>
+  <dt>Licence</dt>
+  <dd><a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>, as stated on the <a href="https://www.seanoe.org/data/00683/79489/">SEANOE dataset page</a>.</dd>
+  <dt>Attribution line OTC uses</dt>
+  <dd>“Contains model constants from EOT20 (DGFI-TUM), CC BY 4.0. Hart-Davis et al. (2021), doi:10.17882/79489.”</dd>
+  <dt>Access and watching</dt>
+  <dd>One keyless download (about 2 GB of NetCDF). The release is static, so a watcher checks the file checksum.</dd>
+  <dt>Coverage</dt>
+  <dd>The global ocean.</dd>
+  <dt>Rank</dt>
+  <dd>Model constants: used only where no official constants or gauge fit exist for the location.</dd>
+</dl>
+</section>
+
+<section aria-labelledby="fes2022">
+<h3 id="fes2022">FES2022 global ocean tide model</h3>
+<dl>
+  <dt>Status</dt>
+  <dd>Planned, needs a free registration. The data are distributed through AVISO+, which needs a free account; OTC has not registered one yet.</dd>
+  <dt>What it is</dt>
+  <dd>A global ocean tide model with 34 constituents at 1/30° resolution.</dd>
+  <dt>Publisher</dt>
+  <dd>CNES, LEGOS, Noveltis and CLS, distributed through AVISO+.</dd>
+  <dt>What OTC takes</dt>
+  <dd><strong>Model constants</strong>: elevation amplitude and phase interpolated from the grids to station points. Every such set is labelled as model constants. OTC never re-hosts the grids and does not use the FES2022 currents.</dd>
+  <dt>Licence</dt>
+  <dd>The <a href="https://www.aviso.altimetry.fr/fileadmin/documents/data/License_Aviso.pdf">AVISO License Agreement (Issue 20)</a>, based on CC BY 4.0. It allows derived products, such as constants at station points, but not the onward distribution of the original grids without written authorization from CNES. The FES currents are for non-commercial use only.</dd>
+  <dt>Attribution line OTC uses</dt>
+  <dd>“Contains model constants derived from FES2022 (Cnes/Legos/Noveltis/CLS), doi:10.24400/527896/a01-2024.004.”</dd>
+  <dt>Access and watching</dt>
+  <dd>Download with free AVISO+ account credentials (about 2.2 GB of elevation grids). The release is static, so a watcher checks the file checksum.</dd>
+  <dt>Coverage</dt>
+  <dd>The global ocean.</dd>
+  <dt>Rank</dt>
+  <dd>Model constants: used only where no official constants or gauge fit exist for the location.</dd>
+</dl>
+</section>
 
 <h2 id="cross-checks">Used only as cross-checks</h2>
 <p>These are compared with OTC on every build but are not published as OTC sources: TICON-4 (constants fitted from GESLA-4.0), the XTide harmonics files, and the Slackwater database.</p>
 
-<h2 id="not-used">Checked and not used</h2>
+<h2 id="not-used">Considered, not added</h2>
+<p>These sources were checked and are not added for now. Some of their gauges reach OTC through other sources, such as GESLA or UHSLC.</p>
 <ul>
-  <li><strong>Canadian Hydrographic Service (CHS):</strong> its water-level API has no harmonic-constant endpoint, and its licence does not allow derivative products for commercial purposes. Canadian stations come from GESLA records instead.</li>
+  <li><strong>Canadian Hydrographic Service (CHS):</strong> no harmonic-constant endpoint; licence does not allow derivative products for commercial purposes.</li>
+  <li><strong>IOC Sea Level Station Monitoring Facility (VLIZ):</strong> terms do not allow commercial use; each data provider sets its own terms.</li>
+  <li><strong>TPXO10 (Oregon State University):</strong> non-commercial licence; access by registration only.</li>
+  <li><strong>FEMAR catalogue (Brazil):</strong> no open licence found; no automated access.</li>
+  <li><strong>SHOA (Chile):</strong> no licence statement found; the website does not allow automated access.</li>
+  <li><strong>SHN (Argentina):</strong> all rights reserved; tide tables only, with no API.</li>
+  <li><strong>SANHO (South Africa):</strong> copyright requires written permission to reproduce; no API.</li>
+  <li><strong>Puertos del Estado, REDMAR (Spain):</strong> terms require contact before commercial use.</li>
+  <li><strong>Instituto Hidrográfico (Portugal):</strong> no open licence found; data are released by request form.</li>
+  <li><strong>Bureau of Meteorology (Australia):</strong> default terms allow personal or internal use only; no published constants dataset.</li>
 </ul>
