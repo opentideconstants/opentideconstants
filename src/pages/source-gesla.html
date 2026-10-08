@@ -1,0 +1,23 @@
+---
+title: GESLA (Global Extreme Sea Level Analysis)
+description: GESLA (Global Extreme Sea Level Analysis): what it is, what OpenTideConstants takes from it, its licence and attribution, how it is watched, its coverage and how it ranks.
+---
+<h1>GESLA (Global Extreme Sea Level Analysis)</h1>
+<dl>
+  <dt>What it is</dt>
+  <dd>A collection of high-frequency sea-level records from tide gauges worldwide, assembled from many national and regional agencies by the <a href="https://gesla787883612.wordpress.com/">GESLA project</a>. OTC uses the latest release (GESLA-4.1, July 2026, today).</dd>
+  <dt>What OTC takes</dt>
+  <dd><strong>Gauge records that OTC fits.</strong> OTC fits its own constants from the records, after the time-base and broken-record checks in <a href="/method/">Method</a>. OTC publishes the derived constants only, never the raw series.</dd>
+  <dt>Licence</dt>
+  <dd>The records are covered by several licences set by their originators; the GESLA licence page lists them. OTC follows TICON-4's practice: derived constants under CC BY 4.0, with per-record provider attribution and the GESLA citations. Every fitted set records its provider and licence class.</dd>
+  <dt>Attribution</dt>
+  <dd>The GESLA downloads page asks: “Any papers or reports that make use of GESLA data should include an acknowledgement to this website and cite the papers by Haigh et al. (2023) and Woodworth et al. (2017)”, and Caldwell et al. (2015) for UHSLC records. Each set also names the agency that provided the record.</dd>
+  <dt>Update cadence and watching</dt>
+  <dd>GESLA-4.0 was released in July 2025 and GESLA-4.1 in July 2026. A weekly watcher checks the version on the downloads page, the SHA-256 of the metadata file, and a hash of the licence page. A new release triggers a full rebuild and a new time-base audit of every provider.</dd>
+  <dt>Coverage</dt>
+  <dd>GESLA-4.1 has 6,682 records worldwide. How many become published stations depends on the checks, and is known only after the first full build.</dd>
+  <dt>Rank</dt>
+  <dd>Gauge fit: used where no official constants exist for the location, or where official constants fail the convention check.</dd>
+</dl>
+
+<p><a href="/sources/">All sources and how they rank</a></p>
