@@ -1,7 +1,5 @@
 # Product
 
-Status: best-effort draft, written from the publication plan and the build plan (2026-10-07) without an interview. The owner confirms or corrects it when it moves into the repo.
-
 ## Register
 
 brand
@@ -36,7 +34,7 @@ The tidal constants you can check: every station's accuracy, every constant's co
 - Secondary CTA: Read the method (QC rules, time-base audit, gates).
 - The line a visitor remembers after 10 seconds: "Open tidal constants, with the accuracy of every station published."
 - Belief ladder: (1) today's constants are silently wrong in places, and nobody publishes how wrong; (2) OTC checks every input record and publishes the evidence; (3) the format is clean, versioned and verifiable; (4) it will stay current without a person in the loop; (5) it is safe to depend on (DOI, immutable dated files, stable station ids).
-- Proof on hand: the measured problems in publication plan §1.1 (TICON-4 WSV phases about 95 min late; GESLA-4.1 WSV files about 30 min early; Hirtshals record with no tide; undeclared conventions). Proof-of-concept results at 11 stations (our fit matches or beats TICON-4 at 10; Helgoland 88-90 to 6.7 min, Seattle 6.8 to 2.5 min, Leeville 29 to 13 min). These are labelled as proof of concept everywhere. No testimonials, logos or press yet.
+- Proof on hand: measured problems in today's data (TICON-4 WSV phases about 95 min late; GESLA-4.1 WSV files about 30 min early; Hirtshals record with no tide; undeclared conventions). Proof-of-concept results at 11 stations (our fit matches or beats TICON-4 at 10; Helgoland 88-90 to 6.7 min, Seattle 6.8 to 2.5 min, Leeville 29 to 13 min). These are labelled as proof of concept everywhere. No testimonials, logos or press yet.
 
 ## Brand Personality
 
