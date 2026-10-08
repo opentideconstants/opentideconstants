@@ -1,5 +1,62 @@
 ---
 title: Validation
-description: Validation has moved to /documentation/#validation.
-redirect: /documentation/#validation
+description: How OpenTideConstants measures accuracy against official predictions, with results at 11 stations.
+layout: docs
+docs: Documentation
+order: 7
 ---
+<h1>Validation</h1>
+<p class="lead">Every release publishes, for every station with an official reference, how well its constants reproduce the official predictions.</p>
+
+<h2 id="how">How accuracy is measured</h2>
+<ol>
+  <li>The constants are run through the reference predictor (the webcaltides engine, which uses the XTide/NOAA Schureman conventions) to produce high and low water events.</li>
+  <li>The events are matched with the official predicted events of a reference source near the station (for example NOAA, BSH, Kartverket).</li>
+  <li>For each station and each time window, the build reports:
+    <ul>
+      <li><strong>time error:</strong> mean absolute error of matched event times (minutes), 95th percentile and bias;</li>
+      <li><strong>height error:</strong> mean absolute error of event heights after removing the mean offset, and the tidal range error;</li>
+      <li><strong>missed and extra events</strong> against the reference;</li>
+      <li>the reference source and its distance from the station;</li>
+      <li>the same numbers for the previous release.</li>
+    </ul>
+  </li>
+  <li><strong>Control:</strong> the predictor run on NOAA's own constants must reproduce NOAA's predictions. It does so at 0.25–0.27 min mean time error at NOAA reference stations. This is the floor the predictor itself sets.</li>
+</ol>
+<h2 id="results">Results at 11 stations</h2>
+<p>Measured on 2026-10-07. The 11 stations include the known problem cases: the German WSV gauges and the short Gulf of Mexico records. Mean of three test windows. Each cell is time error in minutes / height error in cm (bias removed). Lower is better.</p>
+<ul>
+  <li><strong>TICON-3</strong>: the constants webcaltides served before OTC (TICON-3, 9 constituents).</li>
+  <li><strong>TICON-4</strong>: TICON-4 constants for the same GESLA record, all usable constituents.</li>
+  <li><strong>OTC method</strong>: our fit of the same record with the method on this site, all constituents that pass the selection rules.</li>
+</ul>
+<div class="table-wrap">
+<table>
+  <caption>11 stations, 2026-10-07: time error (min) / height error (cm)</caption>
+  <thead>
+    <tr><th scope="col">Station (reference)</th><th scope="col">Record fitted</th><th scope="col" class="num">TICON-3</th><th scope="col" class="num">TICON-4</th><th scope="col" class="num">OTC method</th><th scope="col">Against TICON-4</th></tr>
+  </thead>
+  <tbody>
+    <tr><th scope="row">Helgoland (BSH)</th><td>WSV, GESLA-4.1, time base corrected</td><td class="num">52.9 / 12.3</td><td class="num">90.2 / 10.4</td><td class="num">6.7 / 7.6</td><td>better</td></tr>
+    <tr><th scope="row">Bremerhaven (BSH)</th><td>WSV, GESLA-4.1, time base corrected</td><td class="num">56.4 / 24.1</td><td class="num">92.8 / 19.2</td><td class="num">8.6 / 14.0</td><td>better</td></tr>
+    <tr><th scope="row">Leeville (NOAA)</th><td>NOAA 1989–91</td><td class="num">29.2 / 3.1</td><td class="num">27.5 / 2.0</td><td class="num">12.7 / 1.6</td><td>better</td></tr>
+    <tr><th scope="row">Woodlawn (NOAA)</th><td>NOAA 1984–86</td><td class="num">26.7 / 3.4</td><td class="num">24.9 / 2.5</td><td class="num">28.6 / 1.9</td><td>mixed: time worse, height better</td></tr>
+    <tr><th scope="row">Blue Angels (NOAA)</th><td>NOAA 2008–11</td><td class="num">33.2 / 1.4</td><td class="num">33.2 / 3.9</td><td class="num">30.9 / 4.0</td><td>slightly better on time</td></tr>
+    <tr><th scope="row">Boston (NOAA)</th><td>NOAA, last 19 years</td><td class="num">6.9 / 6.7</td><td class="num">2.6 / 1.6</td><td class="num">1.9 / 1.5</td><td>better</td></tr>
+    <tr><th scope="row">Seattle (NOAA)</th><td>NOAA, last 19 years</td><td class="num">11.0 / 7.5</td><td class="num">6.8 / 3.7</td><td class="num">2.5 / 1.6</td><td>better</td></tr>
+    <tr><th scope="row">San Francisco (NOAA)</th><td>NOAA, last 19 years</td><td class="num">8.9 / 3.8</td><td class="num">6.7 / 2.2</td><td class="num">3.2 / 1.0</td><td>better</td></tr>
+    <tr><th scope="row">Key West (NOAA)</th><td>NOAA, last 19 years</td><td class="num">10.7 / 2.9</td><td class="num">6.1 / 0.8</td><td class="num">3.5 / 0.7</td><td>better</td></tr>
+    <tr><th scope="row">Trondheim (Kartverket)</th><td>NHS, GESLA-4.1, last 19 years</td><td class="num">57.2 / 4.2</td><td class="num">3.9 / 1.7</td><td class="num">2.8 / 1.3</td><td>better (small)</td></tr>
+    <tr><th scope="row">Bergen (Kartverket)</th><td>NHS, GESLA-4.1, last 19 years</td><td class="num">7.5 / 3.1</td><td class="num">2.9 / 1.6</td><td class="num">2.5 / 0.9</td><td>better (small)</td></tr>
+  </tbody>
+</table>
+</div>
+<p>A twelfth station, Hirtshals, could not be fitted by any method: its GESLA-4.1 record contains no tide. It is not scored.</p>
+
+<h3>What the results show</h3>
+<ul>
+  <li>With the same 9 constituents and a correct time base, our constants and TICON-4's predict equally well. The gains come from three things: correct time bases (Germany), the full constituent set in the predictor's own convention, and fitting the last 19 years instead of the whole record.</li>
+  <li>Fitting the whole record instead of the last 19 years lost most of the gain: San Francisco 3.2 → 8.1 min, Key West 3.5 → 5.7 min.</li>
+  <li>Short records stay weak whatever the method: the Gulf of Mexico stations, with 1.5–2.5-year records, remain at 12–31 min.</li>
+  <li>Missed plus extra events, summed over the three windows, were no higher than TICON-4's at every station; Leeville went from 14 to 2.</li>
+</ul>
