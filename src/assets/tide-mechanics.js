@@ -21,7 +21,7 @@ const C = {
   O1:{speed:13.9430356, doodson:'145.555', what:'Principal lunar diurnal', H:0.11, g:215, col:'--c-o1', p:1},
   P1:{speed:14.9589314, doodson:'163.555', what:'Principal solar diurnal', H:0.05, g:198, col:'--muted', p:1},
   M4:{speed:57.9682084, doodson:'455.555', what:'Shallow-water overtide of M2', H:0.03, g:140, col:'--c-m4', p:4},
-  Sa:{speed:0.0410686,  doodson:'056.554', what:'Solar annual (seasonal)', H:0.06, g:150, col:'--muted', p:0},
+  Sa:{speed:0.0410686,  doodson:'056.555', what:'Solar annual (seasonal)', H:0.06, g:150, col:'--muted', p:0},
 };
 const NODE_SPEED = 0.0022064; // deg/hour, lunar node regression
 
@@ -135,6 +135,92 @@ reg(function drawMonth(){
 });
 
 // ---------- Section 2 ----------
+// The 37 constituents NOAA CO-OPS publishes for every station (harcon.json, e.g. Boston 8443970).
+// a: Doodson arguments, the multiples of tau, s, h, p, N' and p1. The speed is computed from them
+// (doodsonSpeed), never typed in. B: Boston (8443970) amplitude in metres as NOAA publishes it.
+// --- NOAA37 start ---
+const NOAA37 = [
+  {id:'SA',   name:'Sa',   a:[0,0,1,0,0,0],   B:0.049, what:'Solar annual: the seasonal swing, mostly weather and water temperature'},
+  {id:'SSA',  name:'Ssa',  a:[0,0,2,0,0,0],   B:0.022, what:'Solar semiannual'},
+  {id:'MM',   name:'Mm',   a:[0,1,0,-1,0,0],  B:0.000, what:'Lunar monthly: the Moon’s elliptical orbit (27.55 d)'},
+  {id:'MSF',  name:'MSf',  a:[0,2,-2,0,0,0],  B:0.000, what:'Lunisolar synodic fortnightly: the spring–neap cycle in mean level'},
+  {id:'MF',   name:'Mf',   a:[0,2,0,0,0,0],   B:0.000, what:'Lunisolar fortnightly: the Moon’s declination (13.66 d)'},
+  {id:'2Q1',  name:'2Q1',  a:[1,-3,0,2,0,0],  B:0.002, what:'Second-order lunar elliptic diurnal'},
+  {id:'Q1',   name:'Q1',   a:[1,-2,0,1,0,0],  B:0.019, what:'Larger lunar elliptic diurnal'},
+  {id:'RHO',  name:'ρ1', a:[1,-2,2,-1,0,0], B:0.005, what:'Larger lunar evectional diurnal'},
+  {id:'O1',   name:'O1',   a:[1,-1,0,0,0,0],  B:0.116, what:'Principal lunar diurnal: the Moon’s declination'},
+  {id:'M1',   name:'M1',   a:[1,0,0,1,0,0],   B:0.005, what:'Smaller lunar elliptic diurnal'},
+  {id:'P1',   name:'P1',   a:[1,1,-2,0,0,0],  B:0.047, what:'Principal solar diurnal: the Sun’s declination'},
+  {id:'S1',   name:'S1',   a:[1,1,-1,0,0,0],  B:0.005, what:'Solar diurnal: mostly daily heating and wind'},
+  {id:'K1',   name:'K1',   a:[1,1,0,0,0,0],   B:0.143, what:'Lunisolar diurnal: Moon and Sun declination'},
+  {id:'J1',   name:'J1',   a:[1,2,0,-1,0,0],  B:0.010, what:'Smaller lunar elliptic diurnal'},
+  {id:'OO1',  name:'OO1',  a:[1,3,0,0,0,0],   B:0.004, what:'Second-order lunar declination diurnal'},
+  {id:'2N2',  name:'2N2',  a:[2,-2,0,2,0,0],  B:0.041, what:'Second-order lunar elliptic semidiurnal'},
+  {id:'MU2',  name:'μ2', a:[2,-2,2,0,0,0], B:0.010, what:'Variational: the Sun distorts the Moon’s orbit'},
+  {id:'N2',   name:'N2',   a:[2,-1,0,1,0,0],  B:0.305, what:'Larger lunar elliptic: the Moon’s distance (perigee)'},
+  {id:'NU2',  name:'ν2', a:[2,-1,2,-1,0,0], B:0.066, what:'Larger lunar evectional'},
+  {id:'M2',   name:'M2',   a:[2,0,0,0,0,0],   B:1.371, what:'Principal lunar semidiurnal'},
+  {id:'LAM2', name:'λ2', a:[2,1,-2,1,0,0], B:0.020, what:'Smaller lunar evectional'},
+  {id:'L2',   name:'L2',   a:[2,1,0,-1,0,0],  B:0.068, what:'Smaller lunar elliptic semidiurnal'},
+  {id:'T2',   name:'T2',   a:[2,2,-3,0,0,1],  B:0.018, what:'Larger solar elliptic: the Earth’s orbit'},
+  {id:'S2',   name:'S2',   a:[2,2,-2,0,0,0],  B:0.208, what:'Principal solar semidiurnal'},
+  {id:'R2',   name:'R2',   a:[2,2,-1,0,0,-1], B:0.004, what:'Smaller solar elliptic'},
+  {id:'K2',   name:'K2',   a:[2,2,0,0,0,0],   B:0.059, what:'Lunisolar semidiurnal: Moon and Sun declination'},
+  {id:'2SM2', name:'2SM2', a:[2,4,-4,0,0,0],  B:0.003, what:'Shallow water: 2×S2 − M2'},
+  {id:'2MK3', name:'2MK3', a:[3,-1,0,0,0,0],  B:0.007, what:'Shallow water: 2×M2 − K1'},
+  {id:'M3',   name:'M3',   a:[3,0,0,0,0,0],   B:0.002, what:'Lunar terdiurnal: the third-degree tide potential'},
+  {id:'MK3',  name:'MK3',  a:[3,1,0,0,0,0],   B:0.006, what:'Shallow water: M2 + K1'},
+  {id:'MN4',  name:'MN4',  a:[4,-1,0,1,0,0],  B:0.011, what:'Shallow water: M2 + N2'},
+  {id:'M4',   name:'M4',   a:[4,0,0,0,0,0],   B:0.023, what:'Shallow-water overtide of M2'},
+  {id:'MS4',  name:'MS4',  a:[4,2,-2,0,0,0],  B:0.009, what:'Shallow water: M2 + S2'},
+  {id:'S4',   name:'S4',   a:[4,4,-4,0,0,0],  B:0.002, what:'Shallow-water overtide of S2'},
+  {id:'M6',   name:'M6',   a:[6,0,0,0,0,0],   B:0.029, what:'Shallow-water overtide of M2'},
+  {id:'S6',   name:'S6',   a:[6,6,-6,0,0,0],  B:0.002, what:'Shallow-water overtide of S2'},
+  {id:'M8',   name:'M8',   a:[8,0,0,0,0,0],   B:0.006, what:'Shallow-water overtide of M2'},
+];
+// Rates of the astronomical arguments in deg/hour, from the mean-longitude rates per Julian
+// century (Meeus): s Moon, h Sun, p lunar perigee, N' = -N lunar node, p1 solar perigee.
+// tau, the lunar day angle, is 15 - s + h.
+const RATE_S = 481267.88123421/876600, RATE_H = 36000.76983/876600, RATE_P = 4069.0137287/876600;
+const RATE_NP = 1934.1362891/876600, RATE_P1 = 1.71946/876600;
+const DOODSON_RATES = [15 - RATE_S + RATE_H, RATE_S, RATE_H, RATE_P, RATE_NP, RATE_P1];
+function doodsonSpeed(a){ return a.reduce((s,k,i)=> s + k*DOODSON_RATES[i], 0); }
+// Doodson number with the +5 offset on arguments 2-6 (Z0 is 055.555). An argument outside
+// -5..+4 has no single digit; such a constituent shows its arguments instead.
+function doodsonNumber(a){
+  const d = a.map((k,i)=> i ? k+5 : k);
+  return d.every(x => x>=0 && x<=9) ? `${d[0]}${d[1]}${d[2]}.${d[3]}${d[4]}${d[5]}` : null;
+}
+const SPECIES = {0:'long-period',1:'diurnal',2:'semidiurnal',3:'terdiurnal',4:'quarter-diurnal',6:'sixth-diurnal',8:'eighth-diurnal'};
+NOAA37.forEach(c=>{
+  c.speed = doodsonSpeed(c.a); c.doodson = doodsonNumber(c.a); c.species = c.a[0];
+  // figure amplitude: the illustrative Boston-like value where the page has one, else NOAA's Boston value
+  const k = c.name === 'Sa' ? 'Sa' : c.id;
+  c.fig = S1K.includes(k); c.H = C[k] ? C[k].H : c.B; c.col = C[k] ? C[k].col : '--muted';
+});
+// --- NOAA37 end ---
+(function buildS2Full(){
+  const tb = document.querySelector('#s2-full tbody');
+  if (!tb) return;
+  NOAA37.slice().sort((x,y)=> x.speed-y.speed).forEach(c=>{
+    const per = 360/c.speed;
+    const perS = per > 48 ? (per/24).toFixed(2)+' d' : per.toFixed(2)+' h';
+    const dn = c.doodson || `(${c.a.map(k=> String(k).replace('-','−')).join(', ')})`;
+    const tr = document.createElement('tr');
+    if (c.fig) tr.className = 'fig-row';
+    tr.innerHTML = `<td>${c.fig ? `<span class="sw" style="background:var(${c.col})"></span> ` : ''}${c.name}${c.fig ? ' <span class="pill figmark" title="Shown in the figures">fig</span>' : ''}</td>`+
+      `<td>${c.speed.toFixed(7)}</td><td>${perS}</td><td>${dn}</td><td class="sp">${SPECIES[c.species]}</td><td class="what">${c.what}</td>`;
+    tb.appendChild(tr);
+  });
+  const det = document.getElementById('s2-full-det');
+  if (det && window.matchMedia('(min-width: 720px)').matches) det.open = true;
+  // share of the tide's variance (sum of H^2/2) the big eight carry, from the figure's amplitudes
+  const v = c => c.H*c.H/2, tot = NOAA37.reduce((s,c)=> s+v(c), 0);
+  const big = ['M2','S2','N2','K2','K1','O1','P1','Q1'];
+  const share = NOAA37.filter(c=> big.includes(c.id)).reduce((s,c)=> s+v(c), 0)/tot;
+  const out = document.getElementById('s2-share');
+  if (out) out.textContent = (100*share).toFixed(1) + '%';
+})();
 (function buildS2(){
   const tb = document.querySelector('#s2-table tbody');
   ['M2','S2','N2','K2','K1','O1','P1','M4','Sa'].forEach(k=>{
@@ -147,45 +233,70 @@ reg(function drawMonth(){
 })();
 reg(function drawSpec(){
   const cv = document.getElementById('s2-spec');
-  const {ctx,w,h} = prep(cv, w => w < 560 ? 420 : 330);
-  const narrow = w < 560;
-  const topH = narrow ? 150 : 140;
-  const A = {x0:44, x1:w-12, y0:22, y1:topH};
-  const maxH = 1.4;
-  function panel(P, s0, s1, keys, labels, title){
-    const X = s => P.x0 + (P.x1-P.x0)*(s-s0)/(s1-s0);
-    const Y = a => P.y1 - (P.y1-P.y0)*a/maxH;
-    gridH(ctx, P.y1, P.x0, P.x1, cssv('--rule'));
-    if (title) text(ctx, title, P.x0, P.y0-8, cssv('--ink-2'), 10);
-    return {X,Y};
-  }
-  // top
-  const top = panel(A, 0, 62, null, null, 'amplitude (m) vs speed (°/h)');
-  [[13,16,'diurnal'],[27.5,31,'semidiurnal'],[57,59,'quarter-diurnal']].forEach(([a,b,n])=>{
-    ctx.fillStyle = cssv('--shoal'); ctx.fillRect(top.X(a), A.y0, top.X(b)-top.X(a), A.y1-A.y0);
-    const cxl=(top.X(a)+top.X(b))/2; text(ctx, n, Math.min(cxl, A.x1-2), A.y0+10, cssv('--ink-2'), 10, cxl>A.x1-40?'right':'center');
+  const narrow = cv.parentElement.clientWidth < 560;
+  const topY0 = 24, topH = narrow ? 140 : 150, zt = topY0 + topH + 50, zPlot = narrow ? 104 : 130, zBlock = 58 + zPlot + 30;
+  const {ctx,w,h} = prep(cv, narrow ? zt + 2*zBlock : zt + zBlock);
+  const A = {x0:44, x1:w-12, y0:topY0, y1:topY0+topH};
+  const maxH = 1.75, s1 = 120;
+  const X = s => A.x0 + (A.x1-A.x0)*s/s1, Y = a => A.y1 - (A.y1-A.y0)*a/maxH;
+  text(ctx, 'amplitude (m) vs speed (°/h), all 37', A.x0, 14, cssv('--ink-2'), 10);
+  // species bands, shaded from the slowest to the fastest member, labelled with their count
+  const sp = [0,1,2,3,4,6,8];
+  sp.forEach((p,i)=>{
+    const m = NOAA37.filter(c=> c.species===p), lo = Math.min(...m.map(c=>c.speed)), hi = Math.max(...m.map(c=>c.speed));
+    const xa = X(Math.max(0, lo-0.8)), xb = X(hi+0.8);
+    ctx.fillStyle = cssv('--shoal'); ctx.fillRect(xa, A.y0, Math.max(3, xb-xa), A.y1-A.y0);
+    const lbl = narrow ? (p ? p+'/d' : 'long') + ' ' + m.length : SPECIES[p] + ' ' + m.length;
+    const cx = (xa+xb)/2, row = i%2;
+    const al = cx < A.x0+30 ? 'left' : (cx > A.x1-40 ? 'right' : 'center');
+    text(ctx, lbl, al==='left' ? xa : (al==='right' ? xb : cx), A.y0+11+row*12, cssv('--ink-2'), 10, al);
   });
-  for (let s=0;s<=60;s+=15){ text(ctx, s+'°/h', top.X(s), A.y1+14, cssv('--ink-2'), 10, 'center'); }
-  [0.5,1.0].forEach(a=>{ text(ctx, a.toFixed(1), A.x0-6, top.Y(a)+3, cssv('--ink-2'), 9, 'right'); gridH(ctx, top.Y(a), A.x0, A.x1); });
-  Object.keys(C).forEach(k=>{ const c=C[k]; line(ctx, [[top.X(c.speed), A.y1],[top.X(c.speed), top.Y(c.H)]], cssv(c.col), 2.5); });
-  text(ctx, 'Sa', top.X(C.Sa.speed)+4, top.Y(C.Sa.H)-2, cssv('--ink-2'), 10);
-  text(ctx, 'M4', top.X(C.M4.speed)+4, top.Y(C.M4.H)-2, cssv('--ink-2'), 10);
-  // zooms
-  const zy0 = topH + 52, zy1 = h - 26;
+  [0.5,1.0].forEach(a=>{ text(ctx, a.toFixed(1), A.x0-6, Y(a)+3, cssv('--ink-2'), 9, 'right'); gridH(ctx, Y(a), A.x0, A.x1); });
+  gridH(ctx, A.y1, A.x0, A.x1, cssv('--rule'));
+  for (let s=0;s<=s1;s+=narrow?30:15) text(ctx, s+'°/h', X(s), A.y1+26, cssv('--ink-2'), 10, s===0?'left':(s===s1?'right':'center'));
+  // stems at true height, then a tick under the axis for every constituent, however small
+  NOAA37.forEach(c=>{
+    const col = c.fig ? cssv(c.col) : cssv('--ink-2');
+    if (c.H > 0) line(ctx, [[X(c.speed), A.y1],[X(c.speed), Y(c.H)]], col, c.fig ? 2.5 : 1.5);
+    line(ctx, [[X(c.speed), A.y1+3],[X(c.speed), A.y1+10]], c.fig ? col : cssv('--muted'), 1);
+  });
+  text(ctx, 'M2', X(C.M2.speed)+5, Y(C.M2.H)+4, cssv(C.M2.col), 11, 'left', '500');
+  // zooms into the two crowded clusters, every member drawn and labelled where room allows
   let Z1, Z2;
-  if (narrow){ const mid = (zy0+zy1)/2; Z1 = {x0:44,x1:w-12,y0:zy0,y1:mid-22}; Z2 = {x0:44,x1:w-12,y0:mid+30,y1:zy1}; }
-  else { Z1 = {x0:44,x1:w/2-14,y0:zy0,y1:zy1}; Z2 = {x0:w/2+30,x1:w-12,y0:zy0,y1:zy1}; }
-  function zoom(P, s0, s1, keys, title, step, dx){
-    const X = s => P.x0 + (P.x1-P.x0)*(s-s0)/(s1-s0);
-    const zmax = Math.max(...keys.map(k=>C[k].H))*1.15;
-    const Y = a => P.y1 - (P.y1-P.y0)*a/zmax;
-    gridH(ctx, P.y1, P.x0, P.x1, cssv('--rule'));
-    text(ctx, title, P.x0, P.y0-10, cssv('--ink'), 11, 'left', '500');
-    for (let s=Math.ceil(s0/step)*step; s<=s1; s+=step) text(ctx, s.toFixed(1), X(s), P.y1+13, cssv('--ink-2'), 9, 'center');
-    keys.forEach(k=>{ const c=C[k]; const x=X(c.speed), y=Y(c.H); line(ctx, [[x,P.y1],[x,y]], cssv(c.col), 3); const d=dx[k]||0; text(ctx, k, x+d, y-5, cssv(c.col), 11, d<0?'right':(d>0?'left':'center'), '500'); });
+  if (narrow){ Z1 = {x0:44,x1:w-12,top:zt}; Z2 = {x0:44,x1:w-12,top:zt+zBlock}; }
+  else { Z1 = {x0:44,x1:w/2-14,top:zt}; Z2 = {x0:w/2+30,x1:w-12,top:zt}; }
+  function zoom(P, s0, s1z, species, title){
+    const keys = NOAA37.filter(c=> c.species===species);
+    const y0 = P.top + 58, y1 = y0 + zPlot;
+    const Xz = s => P.x0 + (P.x1-P.x0)*(s-s0)/(s1z-s0);
+    const zmax = Math.max(...keys.map(c=>c.H))*1.08;
+    const Yz = a => y1 - (y1-y0)*a/zmax;
+    text(ctx, title + ' (' + keys.length + ')', P.x0, P.top, cssv('--ink'), 11, 'left', '500');
+    gridH(ctx, y1, P.x0, P.x1, cssv('--rule'));
+    for (let s=Math.ceil(s0*2)/2; s<=s1z; s+=0.5) text(ctx, s.toFixed(1), Xz(s), y1+13, cssv('--ink-2'), 9, 'center');
+    // label rows above the plot: the larger constituents claim a slot first
+    font(ctx, 10, '500');
+    const rows = [[],[],[],[]], placed = [];
+    keys.slice().sort((a,b)=> b.H-a.H).forEach(c=>{
+      const x = Xz(c.speed), half = ctx.measureText(c.name).width/2 + 2;
+      const r = rows.findIndex(row=> row.every(([a,b])=> x+half < a || x-half > b));
+      if (r < 0) return;
+      rows[r].push([x-half, x+half]); placed.push([c, x, r]);
+    });
+    keys.forEach(c=>{
+      const x = Xz(c.speed), col = c.fig ? cssv(c.col) : cssv('--ink-2');
+      const yt = Math.min(y1-2, Yz(c.H));
+      line(ctx, [[x,y1],[x,yt]], col, c.fig ? 3 : 1.5);
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, yt, c.fig ? 2.5 : 2, 0, 7); ctx.fill();
+    });
+    placed.forEach(([c,x,r])=>{
+      const ly = P.top + 16 + r*12, col = c.fig ? cssv(c.col) : cssv('--ink-2');
+      line(ctx, [[x, ly+3],[x, Math.min(y1-2, Yz(c.H))-4]], cssv('--grid'), 1);
+      text(ctx, c.name, x, ly, col, 10, 'center', c.fig ? '600' : '400');
+    });
   }
-  zoom(Z1, 13.5, 15.5, ['O1','P1','K1'], 'Diurnal cluster', 0.5, {P1:-3,K1:3});
-  zoom(Z2, 28.2, 30.3, ['N2','M2','S2','K2'], 'Semidiurnal cluster', 0.5, {S2:-3,K2:3});
+  zoom(Z1, 12.6, 16.4, 1, 'Diurnal cluster');
+  zoom(Z2, 27.6, 31.3, 2, 'Semidiurnal cluster');
 });
 
 // ---------- Section 3 ----------
