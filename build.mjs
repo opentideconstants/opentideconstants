@@ -16,6 +16,8 @@
 //                        h2 and h3 headings that have an id)
 //   docs: Sources       (docs pages: the sidebar group; groups appear in DOCS_GROUPS order)
 //   docs-label: GESLA   (docs pages, optional: a shorter sidebar label than the title)
+//   sidebar: hidden     (docs pages, optional: the page is built but left out of the sidebar,
+//                        e.g. a source not in the current release)
 //   redirect: /path/#id (optional; the page is only a redirect to that address, for old URLs.
 //                        It is left out of the navigation and the sitemap; its body is ignored.)
 //   ---
@@ -182,7 +184,7 @@ const strip = (h) => h.replace(/<[^>]+>/g, "").trim();
 function docsLayout(page) {
   const groups = DOCS_GROUPS.map((g) => {
     const items = docsPages
-      .filter((p) => p.meta.docs === g)
+      .filter((p) => p.meta.docs === g && p.meta.sidebar !== "hidden")
       .map((p) => {
         const current = p.path === page.path ? ' class="active" aria-current="page"' : "";
         return `<a href="${p.path}"${current}>${p.meta["docs-label"] ?? p.meta.title}</a>`;
