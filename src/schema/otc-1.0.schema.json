@@ -745,8 +745,9 @@
           ]
         },
         "build": {
-          "description": "Build-only fields. Every set has this object. They change on every rebuild, so the release content digest (content_sha256) leaves this whole object out.",
+          "description": "Build-only fields. Every set has this object, with its build_commit. They change on every rebuild, so the release content digest (content_sha256) leaves this whole object out.",
           "type": "object",
+          "required": ["build_commit"],
           "additionalProperties": false,
           "properties": {
             "build_commit": { "type": "string", "pattern": "^[0-9a-f]{7,40}$(?![\\s\\S])" },

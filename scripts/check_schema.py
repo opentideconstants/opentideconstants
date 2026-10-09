@@ -601,10 +601,11 @@ must_fail("LINZ position with an extra key",
 must_fail("LINZ position from the station list without replaced_because",
           lambda d: [as_source("linz", real_linz)(d), jma(d)["position"].pop("replaced_because")])
 must_fail("list_distance_km at the top of provenance", lambda d: jma(d).__setitem__("list_distance_km", 0.4))
-must_fail("provenance.build with an extra key", lambda d: jma(d).__setitem__("build", {"status": "excluded"}))
+must_fail("provenance.build without build_commit", lambda d: jma(d)["build"].pop("build_commit"))
+must_fail("provenance.build with an extra key", lambda d: jma(d).__setitem__("build", {"build_commit": "0123abc", "status": "excluded"}))
 must_fail("tool_versions smuggling a status",
-          lambda d: jma(d).__setitem__("build", {"tool_versions": {"excluded": "true", "qc_status": "removed"}}))
-must_fail("tool_versions with an upper-case name", lambda d: jma(d).__setitem__("build", {"tool_versions": {"Python": "3.12"}}))
+          lambda d: jma(d).__setitem__("build", {"build_commit": "0123abc", "tool_versions": {"excluded": "true", "qc_status": "removed"}}))
+must_fail("tool_versions with an upper-case name", lambda d: jma(d).__setitem__("build", {"build_commit": "0123abc", "tool_versions": {"Python": "3.12"}}))
 must_fail("provenance.build_commit that is not hex", lambda d: jma(d).__setitem__("build_commit", "not a commit"))
 must_fail("both build_commit and build.build_commit",
           lambda d: jma(d).update(build_commit="aaaaaaa", build={"build_commit": "bbbbbbb"}))
@@ -617,7 +618,7 @@ must_fail("LINZ header latitude null, from the header",
           lambda d: [as_source("linz", real_linz)(d),
                      jma(d).__setitem__("position", {"header_lat": None, "header_lon": 174.0, "from": "header"})])
 for name in ("excluded", "removed", "status", "qc_status", "state", "suppressed", "withheld"):
-    must_fail(f"tool_versions name {name}", lambda d, n=name: jma(d).__setitem__("build", {"tool_versions": {n: "1"}}))
+    must_fail(f"tool_versions name {name}", lambda d, n=name: jma(d).__setitem__("build", {"build_commit": "0123abc", "tool_versions": {n: "1"}}))
 for name in ("excluded", "Removed", "STATUS", "qc_status", "state", "suppressed", "withheld"):
     must_fail(f"qc_flags values key {name}",
               lambda d, n=name: fjord(d, "b")["qc_flags"][0].__setitem__("values", {n: True}))
@@ -629,4 +630,4 @@ must_pass("ordinary values keys (step_m, lag_min, days)",
           lambda d: [fjord(d, "b")["qc_flags"][0].__setitem__("values", {"lag_min": -29.6, "days": 39.2}),
                      fjord(d, "b")["record_issues"][0]["values"].__setitem__("step_m", -0.31)])
 must_pass("tool_versions with ordinary names (python, uv, numpy)",
-          lambda d: jma(d).__setitem__("build", {"tool_versions": {"python": "3.12.7", "uv": "0.4.18", "numpy": "2.1.2"}}))
+          lambda d: jma(d).__setitem__("build", {"build_commit": "0123abc", "tool_versions": {"python": "3.12.7", "uv": "0.4.18", "numpy": "2.1.2"}}))
