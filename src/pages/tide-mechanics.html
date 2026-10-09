@@ -153,8 +153,8 @@ layout: full
   <h2><span class="n">8</span>From source to SDK</h2>
   <p>The OTC pipeline, top to bottom. Every record survives to the end; the audit adds labels and never deletes.</p>
   <ol class="flow">
-    <li><span class="dot">in</span><div><h3>Sources</h3><p>Water-level records and official constants from 15 sources, GESLA among them.</p>
-      <div class="chips"><span class="chip">GESLA</span><span class="chip">NOAA</span><span class="chip">Kartverket</span><span class="chip">LINZ</span><span class="chip">+ 11 more</span></div></div></li>
+    <li><span class="dot">in</span><div><h3>Sources</h3><p>Water-level records and official constants from 16 sources, GESLA among them.</p>
+      <div class="chips"><span class="chip">GESLA</span><span class="chip">NOAA</span><span class="chip">Kartverket</span><span class="chip">LINZ</span><span class="chip">+ 12 more</span></div></div></li>
     <li><span class="dot">Δt</span><div><h3>Per-record time-base audit</h3><p>Checks each record's clock and meridian convention against section 4's fingerprints, then annotates it. No record is dropped.</p>
       <div class="chips"><span class="chip v">verified</span><span class="chip c">corrected</span><span class="chip u">unverified</span><span class="chip d">disputed</span></div></div></li>
     <li><span class="dot">fit</span><div><h3>Harmonic fit</h3><p>Least squares over the hours present. Record length decides how many constituents enter (section 6).</p></div></li>

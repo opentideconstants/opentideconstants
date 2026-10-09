@@ -1,0 +1,29 @@
+---
+title: Japan Meteorological Agency (JMA)
+description: Japan Meteorological Agency (JMA): what it is, what OpenTideConstants takes from it, its licence and attribution, how it is watched, its coverage and how it ranks.
+layout: docs
+docs: Sources
+order: 5
+docs-label: JMA
+---
+<h1>Japan Meteorological Agency (JMA)</h1>
+<dl>
+  <dt>What it is</dt>
+  <dd>JMA's tide-table station list: harmonic constants for the 239 tide stations of Japan's tide tables. For the stations JMA runs itself, JMA also publishes a list of 60 constituents per station.</dd>
+  <dt>Publisher</dt>
+  <dd>Japan Meteorological Agency (気象庁).</dd>
+  <dt>What OTC takes</dt>
+  <dd><strong>Official constants</strong> for the 70 stations that JMA owns: 60 constituents per station, each with its amplitude (in centimetres) and phase lag. JMA states that its phase lags are referred to the local meridian of each station, so OTC converts them to Greenwich with the station's longitude and records the conversion. OTC checks this against its own fits of the same gauges and against JMA's hourly predictions. The other 169 stations of the table belong to other agencies, such as the Japan Coast Guard and the Geospatial Information Authority of Japan (GSI). OTC uses their constants only to check its own fits and does not publish them.</dd>
+  <dt>Licence</dt>
+  <dd>Public Data License (Version 1.0), as stated on the <a href="https://www.jma.go.jp/jma/en/copyright.html">JMA copyright page</a>. JMA states that these terms are compatible with CC BY 4.0. The user must cite the source, and edited content must say that it was edited.</dd>
+  <dt>Attribution line OTC uses</dt>
+  <dd>“Source: Japan Meteorological Agency (気象庁) website, tide tables (<code>https://www.data.jma.go.jp/kaiyou/db/tide/suisan/</code>). Edited by OpenTideConstants (units converted to metres, phase lags converted to Greenwich).”</dd>
+  <dt>Access and watching</dt>
+  <dd>Keyless download of the station list and the per-station constituent lists from the <a href="https://www.data.jma.go.jp/kaiyou/db/tide/suisan/">JMA tide-table pages</a>. The build records the SHA-256 hash of each file. JMA publishes the list for each year. The parser refuses a constituent list that no longer states the local-meridian reference.</dd>
+  <dt>Coverage</dt>
+  <dd>70 JMA stations in Japan.</dd>
+  <dt>Rank</dt>
+  <dd>Official constants.</dd>
+</dl>
+
+<p><a href="/sources/">All sources and how they rank</a></p>

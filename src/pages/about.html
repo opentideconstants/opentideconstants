@@ -26,6 +26,7 @@ order: 5
   <li><strong>NOAA</strong> constants and offsets are US Government data in the public domain (<code>LicenseRef-PublicDomain-USGov</code>). OTC publishes them unmodified and marks them as NOAA data. They are not presented as an official NOAA product.</li>
   <li><strong>Kartverket</strong> constants are published by Kartverket under CC BY 4.0. OTC converts their phases from UTC+1 to Greenwich and records the conversion.</li>
   <li><strong>LINZ</strong> constants are published by Toitū Te Whenua Land Information New Zealand under CC BY 4.0. OTC converts their phases to Greenwich and records the conversion.</li>
+  <li><strong>JMA</strong> constants are published by the Japan Meteorological Agency under the Public Data License (Version 1.0), which JMA states is compatible with CC BY 4.0. OTC publishes only the stations JMA owns, converts their phases from the local meridian to Greenwich and records the conversion.</li>
   <li>Every constant set carries its own <code>licence_id</code> and attribution text in the release files.</li>
 </ul>
 
@@ -42,6 +43,8 @@ order: 5
   <dd>Credit Kartverket (the Norwegian Mapping Authority) for Kartverket constants.</dd>
   <dt>LINZ</dt>
   <dd>Credit Toitū Te Whenua Land Information New Zealand, in text, for LINZ constants.</dd>
+  <dt>JMA</dt>
+  <dd>Cite the source, as the <a href="https://www.jma.go.jp/jma/en/copyright.html">JMA terms</a> require, and say that the content was edited: “Source: Japan Meteorological Agency (気象庁) website, tide tables (<code>https://www.data.jma.go.jp/kaiyou/db/tide/suisan/</code>). Edited by OpenTideConstants (units converted to metres, phase lags converted to Greenwich).”</dd>
 </dl>
 <p>The complete list of providers, with the citation text each one requires, is generated from the data by the release build. A release fails its build if a provider in the data is missing from this list.</p>
 
