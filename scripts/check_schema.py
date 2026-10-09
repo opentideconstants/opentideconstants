@@ -1019,7 +1019,7 @@ datum_must_fail("kind published with method harmonic_extremes",
                 edit(noaa_on_first, "mllw", lambda b: b.__setitem__("method", "harmonic_extremes")))
 datum_must_fail("kind published with data_span",
                 edit(noaa_on_first, "mllw", lambda b: b.__setitem__("data_span", {"start": "1983-01-01", "end": "2001-12-31", "months": 228})))
-datum_must_fail("kind published with flag truncated_lows", edit(noaa_on_first, "mllw", set_flags("truncated_lows")))
+datum_must_fail("kind published with flag truncated_lows (on mhhw, a high-water level)", edit(noaa_on_first, "mhhw", set_flags("truncated_lows")))
 datum_must_fail("kind computed with method source", edit(noaa_on_first, "otc_lat", lambda b: b.__setitem__("method", "source")))
 datum_must_fail("kind computed with control",
                 edit(noaa_on_first, "otc_lat", lambda b: b.__setitem__("control", {"source_id": "8443970"})))
@@ -1148,6 +1148,8 @@ datum_must_fail("a subordinate station's lat by harmonic_extremes",
                 on_subordinate("lat", lambda b: b.__setitem__("method", "harmonic_extremes")))
 datum_must_fail("a subordinate station's level of kind observed (first_reduction over the OTC epoch)",
                 on_subordinate("mhhw", lambda b: [b.clear(), b.update(copy.deepcopy(OBSERVED_228))]))
+datum_must_fail("a subordinate station's level of kind observed by subordinate_offsets",
+                on_subordinate("mhhw", lambda b: [b.clear(), b.update(copy.deepcopy(OBSERVED_228), method="subordinate_offsets")]))
 datum_must_fail("a constant set's otc_lat by subordinate_offsets",
                 edit(noaa_on_first, "otc_lat", lambda b: b.__setitem__("method", "subordinate_offsets")))
 # A-F4: an otc_ key is never published.
@@ -1176,7 +1178,8 @@ datum_must_fail("a comparison control with set_id and source_id but no station_i
 for bad in ("2020-13-01", "2020-01-32", "2020-00-10", "2020-01-00", "20201-01-01", "x2020-01-01", "2020-1-01"):
     datum_must_fail(f"a data_span date {bad}", edit(observed_on_a, "msl", lambda b, v=bad: b["data_span"].__setitem__("start", v)))
 datum_must_fail("kind estimated", edit(observed_on_a, "msl", lambda b: b.__setitem__("kind", "estimated")))
-datum_must_fail("kind computed with method first_reduction", edit(noaa_on_first, "otc_lat", lambda b: b.__setitem__("method", "first_reduction")))
+datum_must_fail("kind computed with method first_reduction (on the OTC epoch)",
+                edit(noaa_on_first, "otc_lat", lambda b: b.update(method="first_reduction", epoch=dict(OTC_EPOCH))))
 datum_must_fail("kind computed with method modified_range_ratio",
                 edit(noaa_on_first, "otc_lat", lambda b: b.__setitem__("method", "modified_range_ratio")))
 datum_must_fail("kind observed with method source",
@@ -1196,6 +1199,8 @@ datum_must_fail("uncertainty_m as a string", edit(observed_on_a, "msl", lambda b
 datum_must_fail("data_span months 12.5", edit(observed_on_a, "msl", lambda b: b["data_span"].__setitem__("months", 12.5)))
 datum_must_fail("a repeated flag", edit(observed_on_a, "msl", set_flags("gaps", "gaps")))
 datum_must_fail("flags as a string", edit(observed_on_a, "msl", lambda b: b.__setitem__("flags", "gaps")))
+datum_must_fail("flags as a string on a 19-year determination of mhw",
+                lambda d: [put(first_set, PRIMARY_DATUM)(d), first_set(d)["datum"]["basis"]["mhw"].__setitem__("flags", "gaps")])
 datum_must_fail("kind published with flag short_record", edit(noaa_on_first, "mllw", set_flags("short_record")))
 datum_must_fail("kind computed with flag provisional", edit(noaa_on_first, "otc_lat", set_flags("provisional")))
 datum_must_fail("kind computed with flag truncated_lows", edit(noaa_on_first, "otc_lat", set_flags("truncated_lows")))
