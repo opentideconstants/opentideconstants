@@ -94,12 +94,12 @@
 .tm tr.yes td{color:var(--ink)} .tm tr.no td{color:var(--muted)}
 .tm .pill{display:inline-block;font-family:var(--f-body);font-size:.72rem;font-weight:600;padding:1px 7px;border-radius:9px;letter-spacing:.02em}
 .tm .pill.ok{background:var(--ok);color:var(--paper)} .tm .pill.no{border:1px solid var(--muted);color:var(--muted)}
-.tm .pill.pub{background:var(--c-m2);color:var(--paper)} .tm .pill.sdk{background:var(--accent);color:var(--paper)} .tm .pill.fix{border:1px solid var(--ink-2);color:var(--ink-2)}
+.tm .pill.pub{background:var(--c-m2);color:var(--paper)} .tm .pill.pred{background:var(--accent);color:var(--paper)} .tm .pill.fix{border:1px solid var(--ink-2);color:var(--ink-2)}
 /* formula */
 .tm .formula{font-family:var(--f-display);font-size:clamp(1.15rem,3.6vw,1.9rem);padding:16px 10px;text-align:center;background:var(--paper);border:1px solid var(--rule);border-radius:3px;line-height:1.9}
 .tm .formula button.t{font:inherit;background:none;border:0;border-bottom:3px solid transparent;padding:0 .08em;border-radius:0;color:var(--ink);cursor:pointer}
 .tm .formula button.t[data-owner="pub"]{border-bottom-color:var(--c-m2)}
-.tm .formula button.t[data-owner="sdk"]{border-bottom-color:var(--accent)}
+.tm .formula button.t[data-owner="pred"]{border-bottom-color:var(--accent)}
 .tm .formula button.t[data-owner="fix"]{border-bottom-color:var(--muted)}
 .tm .formula button.t[aria-pressed="true"]{background:var(--accent-soft)}
 .tm .terms{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:10px 22px;margin:14px 0;padding:0;list-style:none}

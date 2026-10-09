@@ -42,30 +42,32 @@ Zenodo archives one version a month and one for each material change, all under 
 
 ## SDKs
 
-Client libraries for Python, Ruby, TypeScript and C are developed in [opentideconstants/sdk](https://github.com/opentideconstants/sdk). They read a release, check its SHA-256 checksums, cache it, and give typed access to stations, constant sets, conventions, provenance, validation and licences.
+Client libraries for Python, Ruby, TypeScript and C are in [opentideconstants/sdk](https://github.com/opentideconstants/sdk). They read a release, check its SHA-256 checksums, cache it, and give typed access to stations, constant sets, constituents, conventions, provenance, validation and licences. All four pass one shared conformance suite.
 
-The packages on PyPI, RubyGems and npm are `0.0.0` placeholders that reserve the name. They contain no SDK code. The [SDK repository](https://github.com/opentideconstants/sdk) shows the current status.
+The SDKs are not published to the package registries. The `opentideconstants` packages on [PyPI](https://pypi.org/project/opentideconstants/), [RubyGems](https://rubygems.org/gems/opentideconstants) and [npm](https://www.npmjs.com/package/opentideconstants) are `0.0.0` placeholders that reserve the name and contain no SDK code. The SDKs read release format 0.x; reading format 1.0 is a condition for publishing them. The [SDK repository](https://github.com/opentideconstants/sdk) shows the current status.
 
-| Language | Package | Install command |
-|---|---|---|
-| Python | [`opentideconstants`](https://pypi.org/project/opentideconstants/) on PyPI | `pip install opentideconstants` |
-| Ruby | [`opentideconstants`](https://rubygems.org/gems/opentideconstants) on RubyGems | `gem install opentideconstants` |
-| TypeScript / JavaScript | [`opentideconstants`](https://www.npmjs.com/package/opentideconstants) on npm | `npm install opentideconstants` |
-| C | `libopentideconstants`, built from the SDK repository with CMake, or copied in as one `.c` and one `.h` file | — |
+| Language | Package | Install command | Requires |
+|---|---|---|---|
+| Python | `opentideconstants` | `pip install opentideconstants` | Python 3.10 or later |
+| Ruby | `opentideconstants` | `gem install opentideconstants` | Ruby 3.0 or later |
+| TypeScript / JavaScript | `opentideconstants` | `npm install opentideconstants` | Node 22.12 or later |
+| C | `libopentideconstants` | build `c/` in the SDK repository with CMake, or copy in the single-file amalgamation (`opentideconstants.c` and `.h`) | a C99 compiler |
 
-The snippets below show the API from the SDK design. Each one opens the latest release, finds the stations near a point, and reads the M2 constituent of the recommended constant set.
+Each snippet below opens the latest release, finds the reference stations within 25 km of a point, prints the M2 constituent of each station's recommended constant set, and prints the attribution text for those stations. The snippets were run against the SDK's conformance fixtures.
+
+The SDKs do not predict tides. They give you the constants; a tide predictor turns them into heights and times. [Tide Mechanics](https://opentideconstants.org/tide-mechanics/) shows how.
 
 **Python**
 
 ```python
 from opentideconstants import OpenTideConstants
 
-otc = OpenTideConstants()  # the latest release, cached
-hits = otc.near(lat=47.60, lon=-122.34, radius_km=25, limit=3)
-for hit in hits:
-    m2 = hit.station.recommended_set.constituent("M2")
-    print(hit.station.name, round(hit.distance_km, 1), m2.amplitude_m, m2.phase_deg)
-print(otc.attribution([hit.station for hit in hits]))  # CC BY 4.0 credit for what you show
+with OpenTideConstants() as otc:                  # the latest release, cached on disk
+    hits = otc.near(lat=37.8, lon=-122.4, radius_km=25, limit=3, type="reference")
+    for hit in hits:
+        m2 = hit.station.recommended_set.constituent("M2")
+        print(hit.station.name, round(hit.distance_km, 1), "km", m2.amplitude_m, "m", m2.phase_deg, "deg")
+    print(otc.attribution([hit.station for hit in hits]))   # CC BY 4.0 credit for what you show
 ```
 
 **Ruby**
@@ -73,11 +75,13 @@ print(otc.attribution([hit.station for hit in hits]))  # CC BY 4.0 credit for wh
 ```ruby
 require "opentideconstants"
 
-otc = OpenTideConstants.new # the latest release, cached
-otc.near(lat: 47.60, lon: -122.34, radius_km: 25, limit: 3).each do |hit|
+otc  = OpenTideConstants.new                      # the latest release, cached on disk
+hits = otc.near(lat: 37.8, lon: -122.4, radius_km: 25, limit: 3, type: "reference")
+hits.each do |hit|
     m2 = hit.station.recommended_set.constituent("M2")
-    puts [hit.station.name, hit.distance_km.round(1), m2.amplitude_m, m2.phase_deg].join(" ")
+    puts "#{hit.station.name} #{hit.distance_km.round(1)} km: M2 #{m2.amplitude_m} m, #{m2.phase_deg}°"
 end
+puts otc.attribution(hits.map(&:station))         # CC BY 4.0 credit for what you show
 ```
 
 **TypeScript**
@@ -85,46 +89,55 @@ end
 ```ts
 import { OpenTideConstants } from "opentideconstants";
 
-const otc = await OpenTideConstants.open(); // the latest release, cached
-for (const hit of otc.near({ lat: 47.6, lon: -122.34, radiusKm: 25, limit: 3 })) {
-  const m2 = hit.station.recommendedSet?.constituent("M2");
-  console.log(hit.station.name, hit.distance_km.toFixed(1), m2?.amplitude_m, m2?.phase_deg);
+const otc = await OpenTideConstants.open();       // the latest release, cached on disk
+const hits = otc.near({ lat: 37.8, lon: -122.4, radiusKm: 25, limit: 3, type: "reference" });
+for (const hit of hits) {
+    const m2 = hit.station.recommendedSet?.constituent("M2");
+    console.log(`${hit.station.name} ${hit.distance_km.toFixed(1)} km: M2 ${m2?.amplitude_m} m, ${m2?.phase_deg}°`);
 }
+console.log(otc.attribution(hits.map((hit) => hit.station)));   // CC BY 4.0 credit for what you show
+otc.close();
 ```
 
 **C**
 
+The C library opens a release file that the application provides. An optional module, built with libcurl, downloads it.
+
 ```c
+#include <stdio.h>
 #include <opentideconstants.h>
 
-otc_open_options opts = { 0 }; /* defaults */
-otc_release *rel;
-otc_open_file("OTC_{YYYYMMDD}.jsonl", &opts, &rel); /* also reads the .meta.json next to it */
+int main(void)
+{
+    otc_open_options opts;
+    otc_open_options_init(&opts);
+    otc_release *rel = NULL;
+    if (otc_open_file("OTC_20261008.jsonl", &opts, &rel) != OTC_OK)   /* reads the .meta.json and checks the .sha256 next to it */
+        return 1;
 
-otc_filter filter;
-otc_filter_init(&filter);
-otc_nearby hits[3];
-size_t count;
-otc_near(rel, 47.60, -122.34, 25.0, &filter, 3, hits, 3, &count);
-/* hits[i].id and hits[i].distance_km; open a station with otc_station(rel, hits[i].id, &st) */
-otc_close(rel);
+    otc_filter filter;
+    otc_filter_init(&filter);
+    filter.type = "reference";
+    otc_nearby hits[3];
+    size_t count = 0;
+    otc_near(rel, 37.8, -122.4, 25.0, &filter, 3, hits, 3, &count);
+
+    for (size_t i = 0; i < count; i++) {
+        otc_station_t *st = NULL;
+        const otc_set *set = NULL;
+        const otc_constituent_t *m2 = NULL;
+        char name[128];
+        if (otc_station(rel, hits[i].id, &st) != OTC_OK)
+            continue;
+        otc_station_name(st, name, sizeof name, NULL);
+        if (otc_station_recommended_set(st, &set) == OTC_OK && otc_set_constituent(set, "M2", &m2) == OTC_OK)
+            printf("%s %.1f km: M2 %g m, %g deg\n", name, hits[i].distance_km, m2->amplitude_m, m2->phase_deg);
+        otc_station_free(st);
+    }
+    otc_close(rel);
+    return 0;
+}
 ```
-
-The C library reads a release file that the application provides. An optional module, built with libcurl, downloads it.
-
-Tide prediction (heights, and high and low water times) is an optional `predict` module in the same design, which must match conformance vectors from the reference predictor. In Python:
-
-```python
-from datetime import datetime, timezone
-import opentideconstants.predict
-
-station = otc.nearest(lat=47.60, lon=-122.34).station
-for event in otc.extremes(station, from_=datetime(2026, 10, 8, tzinfo=timezone.utc),
-                          to=datetime(2026, 10, 9, tzinfo=timezone.utc)):
-    print(event)
-```
-
-The other SDKs use the same name: `otc.extremes(station, from:, to:)` in Ruby, `otc.extremes(station, { from, to })` in TypeScript and `otc_extremes()` in C.
 
 ## Licence and citation
 
@@ -147,8 +160,10 @@ Every release publishes, for every station with an official reference, how well 
 
 ## Contributing and issues
 
+Contributions are welcome from anyone. [CONTRIBUTING.md](CONTRIBUTING.md) lists the ways to help.
+
 Report a problem with a station, the data or the site in the [issue tracker](https://github.com/opentideconstants/opentideconstants/issues). For a station, include its `station_id`, the release date, and what you compared it with. Issues about the SDKs go to the [SDK issue tracker](https://github.com/opentideconstants/sdk/issues).
 
 ## Working on this repository
 
-This repository holds the source of the opentideconstants.org site (plain HTML and a small Node build script with no dependencies) and the PEGELONLINE harvest pipeline. [CONTRIBUTING.md](CONTRIBUTING.md) describes the layout, the build and check commands, the theme and the hosting.
+This repository holds the source of the opentideconstants.org site (plain HTML and a small Node build script with no dependencies) and the PEGELONLINE harvest pipeline. [Working on this repository](CONTRIBUTING.md#working-on-this-repository) in CONTRIBUTING.md gives the setup, the build and check commands, and the layout.
