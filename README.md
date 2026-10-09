@@ -44,7 +44,7 @@ Zenodo archives one version a month and one for each material change, all under 
 
 Client libraries for Python, Ruby, TypeScript and C are in [opentideconstants/sdk](https://github.com/opentideconstants/sdk). They read a release, check its SHA-256 checksums, cache it, and give typed access to stations, constant sets, constituents, conventions, provenance, validation and licences. All four pass one shared conformance suite.
 
-The SDKs are not published to the package registries. The `opentideconstants` packages on [PyPI](https://pypi.org/project/opentideconstants/), [RubyGems](https://rubygems.org/gems/opentideconstants) and [npm](https://www.npmjs.com/package/opentideconstants) are `0.0.0` placeholders that reserve the name and contain no SDK code. The SDKs read release format 0.x; reading format 1.0 is a condition for publishing them. The [SDK repository](https://github.com/opentideconstants/sdk) shows the current status.
+The SDKs are published as `opentideconstants` on [PyPI](https://pypi.org/project/opentideconstants/), [RubyGems](https://rubygems.org/gems/opentideconstants) and [npm](https://www.npmjs.com/package/opentideconstants), and they read release format 1.0.
 
 | Language | Package | Install command | Requires |
 |---|---|---|---|
