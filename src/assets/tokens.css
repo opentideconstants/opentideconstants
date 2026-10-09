@@ -43,7 +43,7 @@
   --tracking-doc: -0.01em;                        /* headings inside documentation pages (aimock docs: 0) */
   --tracking-eyebrow: 0.14em;
   --measure: 68ch;
-  --measure-lead: 40rem;                          /* lead and section introductions */
+  --measure-page: 52rem;                          /* text column of a stand-alone page; a docs page's content is the same */
 
   /* Spacing */
   --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem; --space-4: 1rem;

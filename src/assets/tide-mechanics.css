@@ -34,8 +34,8 @@
 .tm h2{font-size:clamp(1.5rem,3.6vw,2.1rem);display:flex;gap:.6em;align-items:baseline}
 .tm h2 .n{font-family:var(--f-mono);font-weight:500;font-size:.55em;color:var(--accent);border:1.5px solid var(--accent);border-radius:50%;width:2.1em;height:2.1em;display:inline-grid;place-items:center;flex:none;transform:translateY(-.15em)}
 .tm h3{font-size:1.15rem}
-.tm p{margin:.6em 0;max-width:65ch;line-height:1.55}
-.tm .lede{font-size:1.1rem;color:var(--ink-2);max-width:60ch}
+.tm p{margin:.6em 0;line-height:1.55}
+.tm .lede{font-size:1.1rem;color:var(--ink-2)}
 .tm .top{border-bottom:2px solid var(--ink);padding-bottom:22px;margin-bottom:12px;position:relative}
 .tm .top .kicker{font-family:var(--f-mono);font-size:.8rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
 .tm .toc{display:flex;flex-wrap:wrap;gap:6px 14px;font-family:var(--f-mono);font-size:.82rem;margin-top:14px;padding:0;list-style:none}
@@ -66,7 +66,7 @@
   #s3-wave{height:270px}
   #s5-plot{height:300px}
 }
-.tm .cap{font-size:.92rem;color:var(--ink-2);max-width:65ch;margin:.5em 0}
+.tm .cap{font-size:.92rem;color:var(--ink-2);margin:.5em 0}
 .tm .cap b{color:var(--ink)}
 .tm .mono{font-family:var(--f-mono)}
 .tm .controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:8px 18px;margin:14px 0;padding:12px 14px;background:var(--shoal);border-radius:3px}
@@ -122,6 +122,6 @@
 .tm .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .tm .chip{font-family:var(--f-mono);font-size:.75rem;padding:2px 8px;border:1px solid var(--rule);border-radius:2px;background:var(--paper)}
 .tm .chip.v{border-color:var(--ok);color:var(--ok)} .tm .chip.c{border-color:var(--c-m2);color:var(--c-m2)} .tm .chip.u{border-color:var(--muted);color:var(--muted)} .tm .chip.d{border-color:var(--bad);color:var(--bad)}
-.tm .tm-note{font-size:.9rem;border-top:1px solid var(--accent);border-bottom:1px solid var(--accent);padding:8px 0;margin:16px 0;max-width:65ch}
+.tm .tm-note{font-size:.9rem;border-top:1px solid var(--accent);border-bottom:1px solid var(--accent);padding:8px 0;margin:16px 0}
 .tm .tm-foot{margin-top:50px;font-size:.82rem;color:var(--muted);border-top:1px solid var(--rule);padding-top:14px;max-width:none}
 @media (prefers-reduced-motion: reduce){.tm *{scroll-behavior:auto!important;transition:none!important}}
