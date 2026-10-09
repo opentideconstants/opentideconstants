@@ -5,10 +5,8 @@ A daily archive of water-level measurements from tidal coastal and estuary gauge
 Waterways and Shipping Administration (WSV).
 
 PEGELONLINE serves only about the last 31 days of measurements. This harvester keeps them,
-so that OpenTideConstants can fit tidal harmonic constants to longer records. It was
-moved here from the `opentideconstants/pegelonline-archive` repository (now archived),
-because GitHub stops scheduled workflows in a public repository that gets no commits for
-60 days, and that repository never got commits.
+so that OpenTideConstants can fit tidal harmonic constants to longer records. The
+harvester lives here, and its archive is in the R2 work bucket under `archive/pegelonline/`.
 
 ## Layout
 
