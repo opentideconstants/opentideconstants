@@ -426,11 +426,6 @@ must_fail("reference station with no constant sets",
 must_pass("D9 a set carried over from the previous release", lambda d: carried(fjord(d, "a")))
 must_pass("D9 a gate fallback carried over", lambda d: [carried(fjord(d, "a")), fjord(d, "a")["provenance"].__setitem__(
     "decision", {"tier": "fallback", "outcome": "fallback", "reason": "the source failed its convention check"})])
-must_pass("a source's own provenance keys (JMA analysis_years, LINZ list_distance_km)",
-          lambda d: d["stations"][0]["constant_sets"][1]["provenance"].update(
-              analysis_years={"long_period": "2011-20", "short_period": "2011-20"}, list_distance_km=0.4,
-              source_constituents_not_published=[{"source_name": "OQ2", "speed_deg_per_hour": 27.3416964,
-                                                  "amplitude_m": 0.002, "reason": "no OTC name"}]))
 must_pass("a duplicate tombstone", lambda d: station(d, "OTC-EXAMPLE-0002").__setitem__("removed_reason", "duplicate"))
 must_pass("an official set without record_span", lambda d: d["stations"][0]["constant_sets"][1].pop("record_span", None))
 must_pass("a reference station whose only sets have no constants (no recommended set)",
@@ -530,3 +525,41 @@ if problems(doc):
     print("FAIL: good_hours above the span should be left to the build check")
     sys.exit(1)
 print("ok: left to the build check: good_hours above the record span")
+
+
+# --- provenance written by the real adapters ----------------------------------------------------
+# scripts/fixtures/adapter-sets.json holds the provenance of real sets from every adapter that
+# writes sets (one per distinct shape). 0.6 provenance is a closed list, so it must accept each.
+
+prov_validator = sub_validator("provenance")
+real = json.loads((root / "scripts/fixtures/adapter-sets.json").read_text())["sets"]
+bad = [(r["adapter"], r["source_record_id"], e.message[:120]) for r in real for e in prov_validator.iter_errors(r["provenance"])]
+if bad:
+    for b in bad:
+        print("FAIL: real provenance rejected:", *b)
+    sys.exit(1)
+print(f"ok: accepted the provenance of {len(real)} real sets from "
+      f"{', '.join(sorted({r['adapter'] for r in real}))}")
+
+
+def jma(d):
+    return d["stations"][0]["constant_sets"][1]["provenance"]
+
+
+real_jma = next(r["provenance"] for r in real if r["adapter"] == "A-JMA-a")
+real_linz = next(r["provenance"] for r in real if r["adapter"] == "A-LINZ" and r["provenance"]["position"]["from"] == "station_list")
+must_pass("the real JMA provenance on a set", lambda d: d["stations"][0]["constant_sets"][1].__setitem__("provenance", copy.deepcopy(real_jma)))
+must_pass("the real LINZ provenance (position from the station list) on a set",
+          lambda d: d["stations"][0]["constant_sets"][1].__setitem__("provenance", copy.deepcopy(real_linz)))
+must_pass("build-only fields in provenance.build",
+          lambda d: jma(d).__setitem__("build", {"build_commit": "0123abc", "built_at": "2099-12-31T00:00:00Z",
+                                                 "fetched_at": "2099-12-30T00:00:00Z", "run_id": "123456",
+                                                 "tool_versions": {"python": "3.12.7"}}))
+must_fail("JMA owner outside its enum", lambda d: jma(d).update(copy.deepcopy(real_jma), owner="anyone"))
+must_fail("JMA redistribution outside its enum", lambda d: jma(d).update(copy.deepcopy(real_jma), redistribution="excluded"))
+must_fail("LINZ position with an extra key",
+          lambda d: jma(d).update(position=dict(copy.deepcopy(real_linz["position"]), status="excluded")))
+must_fail("LINZ position from the station list without replaced_because",
+          lambda d: jma(d).update(position={k: v for k, v in real_linz["position"].items() if k != "replaced_because"}))
+must_fail("list_distance_km at the top of provenance", lambda d: jma(d).__setitem__("list_distance_km", 0.4))
+must_fail("provenance.build with an extra key", lambda d: jma(d).__setitem__("build", {"status": "excluded"}))

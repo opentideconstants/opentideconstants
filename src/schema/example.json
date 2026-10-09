@@ -105,7 +105,7 @@
             "evidence": [{ "comparator_kind": "official_predictions", "comparator_id": "kartverket:EXA", "distance_km": 0.0, "lag_min": 0.4 }]
           },
           "provenance": {
-            "build_commit": "0000000",
+            "build": { "build_commit": "0000000" },
             "selection_reason": "only eligible record",
             "decision": { "tier": "rule", "outcome": "accept" }
           }
@@ -259,7 +259,7 @@
             { "name": "K1", "speed_deg_per_hour": 15.0410686, "amplitude_m": 0.06, "phase_deg": 210.0 },
             { "name": "O1", "speed_deg_per_hour": 13.9430356, "amplitude_m": 0.04, "phase_deg": 190.0 }
           ],
-          "provenance": { "build_commit": "0000000", "selection_reason": "longest good record at the gauge", "decision": { "tier": "rule", "outcome": "accept" } }
+          "provenance": { "build": { "build_commit": "0000000" }, "selection_reason": "longest good record at the gauge", "decision": { "tier": "rule", "outcome": "accept" } }
         },
         {
           "set_id": "OTC-EXAMPLE-0005/gesla-fit-b",
@@ -300,7 +300,7 @@
             { "name": "K1", "speed_deg_per_hour": 15.0410686, "amplitude_m": 0.06, "phase_deg": 209.0 },
             { "name": "O1", "speed_deg_per_hour": 13.9430356, "amplitude_m": 0.04, "phase_deg": 191.0 }
           ],
-          "provenance": { "build_commit": "0000000" }
+          "provenance": { "build": { "build_commit": "0000000" } }
         },
         {
           "set_id": "OTC-EXAMPLE-0005/gesla-fit-c",
@@ -347,7 +347,7 @@
             "time_mae_min": 9.0,
             "height_mae_m": 0.05
           },
-          "provenance": { "build_commit": "0000000" }
+          "provenance": { "build": { "build_commit": "0000000" } }
         },
         {
           "set_id": "OTC-EXAMPLE-0005/gesla-fit-d",
@@ -373,7 +373,7 @@
             "decided_in": "20991231"
           },
           "constituents": [],
-          "provenance": { "build_commit": "0000000" }
+          "provenance": { "build": { "build_commit": "0000000" } }
         },
         {
           "set_id": "OTC-EXAMPLE-0005/gesla-fit-e",
@@ -402,7 +402,7 @@
             "decided_in": "20991231"
           },
           "constituents": [],
-          "provenance": { "build_commit": "0000000" }
+          "provenance": { "build": { "build_commit": "0000000" } }
         }
       ]
     }

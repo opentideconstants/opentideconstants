@@ -688,7 +688,7 @@
       }
     },
     "provenance": {
-      "description": "Where the set came from and what was done to it. A closed list of keys: qc_status is the only status of a set, so no provenance key can carry one. A new source-specific key is added here first.",
+      "description": "Where the set came from and what was done to it. A closed list of keys: qc_status is the only status of a set, so no provenance key can carry one. A new source-specific key is added here first. Keys for every set: adapter_version, input_sha256, tcd_sha256, selection_reason, decision, carried_from_release, build (the build-only fields), and the deprecated time_base and build_commit. JMA: owner, redistribution, phase_reference_longitude_deg, jma_station_code, analysis_years, source_constituents_not_published. LINZ: member, position, header_dropped.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -698,7 +698,50 @@
           "additionalProperties": false,
           "properties": { "long_period": { "type": ["string", "null"] }, "short_period": { "type": ["string", "null"] } }
         },
-        "list_distance_km": { "description": "LINZ: distance from the file's header position to the LINZ port list position.", "type": "number", "minimum": 0 },
+        "owner": {
+          "description": "JMA: who owns the station. Only jma stations may be redistributed under JMA's terms; jcg_or_gsi and third_party stations are used only as comparators.",
+          "enum": ["jma", "jcg_or_gsi", "third_party"]
+        },
+        "redistribution": {
+          "description": "JMA: redistribute (owner jma) or comparator_only (any other owner). A comparator_only set is not published as data.",
+          "enum": ["redistribute", "comparator_only"]
+        },
+        "phase_reference_longitude_deg": { "description": "JMA: the longitude whose local meridian the source phases refer to.", "type": "number", "minimum": -180, "maximum": 180 },
+        "jma_station_code": { "description": "JMA tide-table station code, e.g. TK.", "type": "string", "pattern": "^[A-Z0-9]{1,4}$(?![\\s\\S])" },
+        "member": { "description": "LINZ: the *_Harm_* file in the LINZ zip that the set comes from.", "type": "string", "pattern": "\\S" },
+        "header_dropped": { "description": "LINZ: which header fields were not used, and why.", "type": "string", "pattern": "\\S" },
+        "position": {
+          "description": "LINZ: where the station position comes from. from header: the file header; from station_list: the LINZ port list, because the header failed a check (replaced_because). checked false means the check was not run.",
+          "type": "object",
+          "required": ["header_lat", "header_lon", "from"],
+          "additionalProperties": false,
+          "properties": {
+            "header_lat": { "type": "number", "minimum": -90, "maximum": 90 },
+            "header_lon": { "type": "number", "minimum": -180, "maximum": 180 },
+            "list_port": { "description": "LINZ port number on the station list.", "type": "integer", "minimum": 0 },
+            "list_lat": { "type": "number", "minimum": -90, "maximum": 90 },
+            "list_lon": { "type": "number", "minimum": -180, "maximum": 180 },
+            "list_distance_km": { "description": "Distance from the header position to the station-list position.", "type": "number", "minimum": 0 },
+            "from": { "enum": ["header", "station_list"] },
+            "checked": { "type": "boolean" },
+            "replaced_because": { "type": "string", "pattern": "\\S" }
+          },
+          "if": { "properties": { "from": { "const": "station_list" } } },
+          "then": { "required": ["replaced_because", "list_lat", "list_lon"] },
+          "else": { "not": { "required": ["replaced_because"] } }
+        },
+        "build": {
+          "description": "Build-only fields. They change on every rebuild, so the release content digest (content_sha256) leaves this whole object out.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "build_commit": { "type": "string", "pattern": "^[0-9a-f]{7,40}$(?![\\s\\S])" },
+            "built_at": { "type": "string", "format": "date-time" },
+            "fetched_at": { "description": "When the inputs were fetched.", "type": "string", "format": "date-time" },
+            "run_id": { "description": "The CI run that built the set.", "type": "string", "pattern": "\\S" },
+            "tool_versions": { "description": "{name: version} of the tools used, e.g. {\"utide\": \"0.3.0\"}.", "type": "object", "additionalProperties": { "type": "string", "pattern": "\\S" } }
+          }
+        },
         "source_constituents_not_published": {
           "description": "JMA: source constituents that have no OTC name, so they are not in the set.",
           "type": "array",
@@ -719,7 +762,7 @@
           "$ref": "#/$defs/datestamp"
         },
         "tcd_sha256": { "$ref": "#/$defs/sha256" },
-        "build_commit": { "type": "string" },
+        "build_commit": { "description": "Deprecated in 0.6: use build.build_commit, which the content digest leaves out.", "type": "string" },
         "adapter_version": { "type": "string" },
         "input_sha256": { "type": "array", "items": { "$ref": "#/$defs/sha256" } },
         "time_base": {
