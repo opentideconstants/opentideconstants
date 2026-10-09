@@ -621,11 +621,19 @@ for name in ("excluded", "removed", "status", "qc_status", "state", "suppressed"
     must_fail(f"tool_versions name {name}", lambda d, n=name: jma(d).__setitem__("build", {"build_commit": "0123abc", "tool_versions": {n: "1"}}))
 for name in ("excluded", "Removed", "STATUS", "qc_status", "state", "suppressed", "withheld"):
     must_fail(f"qc_flags values key {name}",
-              lambda d, n=name: fjord(d, "b")["qc_flags"][0].__setitem__("values", {n: True}))
+              lambda d, n=name: fjord(d, "b")["qc_flags"][0].__setitem__("values", {n: 1}))
     must_fail(f"record_issues values key {name}",
-              lambda d, n=name: fjord(d, "b")["record_issues"][0]["values"].__setitem__(n, True))
+              lambda d, n=name: fjord(d, "b")["record_issues"][0]["values"].__setitem__(n, 1))
 must_fail("qc_flags values {excluded: true, status: removed}",
           lambda d: fjord(d, "b")["qc_flags"][0].__setitem__("values", {"excluded": True, "status": "removed"}))
+for where, target in (("qc_flags", lambda d: fjord(d, "b")["qc_flags"][0].setdefault("values", {})),
+                      ("record_issues", lambda d: fjord(d, "b")["record_issues"][0]["values"])):
+    must_fail(f"{where} values with a nested status object",
+              lambda d, t=target: t(d).__setitem__("gate", {"status": "excluded"}))
+    must_fail(f"{where} values with a string", lambda d, t=target: t(d).__setitem__("note", "removed"))
+    must_fail(f"{where} values with an array", lambda d, t=target: t(d).__setitem__("months", [1, 2]))
+    must_fail(f"{where} values with a boolean", lambda d, t=target: t(d).__setitem__("ok", True))
+must_pass("a null in values", lambda d: fjord(d, "b")["record_issues"][0]["values"].__setitem__("lag_min", None))
 must_pass("ordinary values keys (step_m, lag_min, days)",
           lambda d: [fjord(d, "b")["qc_flags"][0].__setitem__("values", {"lag_min": -29.6, "days": 39.2}),
                      fjord(d, "b")["record_issues"][0]["values"].__setitem__("step_m", -0.31)])

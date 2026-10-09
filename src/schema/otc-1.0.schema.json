@@ -578,7 +578,7 @@
         "start": { "type": "string", "format": "date-time" },
         "end": { "type": "string", "format": "date-time" },
         "reason": { "type": "string", "pattern": "\\S" },
-        "values": { "description": "The numbers behind the issue, e.g. {\"step_m\": -0.31}. No key may name a status.", "type": "object", "propertyNames": { "not": { "$ref": "#/$defs/status_like_name" } } }
+        "values": { "description": "The numbers behind the issue, e.g. {\"step_m\": -0.31}: each value a number or null. No key may name a status.", "type": "object", "propertyNames": { "not": { "$ref": "#/$defs/status_like_name" } }, "additionalProperties": { "type": ["number", "null"] } }
       }
     },
     "expected_accuracy": {
@@ -690,7 +690,7 @@
       "properties": {
         "flag": { "enum": ["time_base", "broken_record", "microtidal", "non_tidal_signal", "short_record", "sibling_disagreement", "carried_over"] },
         "reason": { "description": "One line for people, not blank.", "type": "string", "pattern": "\\S" },
-        "values": { "description": "The numbers behind the flag. No key may name a status.", "type": "object", "propertyNames": { "not": { "$ref": "#/$defs/status_like_name" } } }
+        "values": { "description": "The numbers behind the flag: each value a number or null. No key may name a status.", "type": "object", "propertyNames": { "not": { "$ref": "#/$defs/status_like_name" } }, "additionalProperties": { "type": ["number", "null"] } }
       }
     },
     "provenance": {
