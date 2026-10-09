@@ -167,16 +167,20 @@ layout: full
 <!-- 8 -->
 <section id="s8">
   <h2><span class="n">8</span>From source to SDK</h2>
-  <p>The OTC pipeline, top to bottom. Every record survives to the end; the audit adds labels and never deletes.</p>
+  <p>The OTC pipeline, top to bottom. Every record survives to the end; the checks add labels and never delete. The rules are on <a href="/method/">Method</a>, and every field is on <a href="/data-format/">Data format</a>.</p>
   <ol class="flow">
     <li><span class="dot">in</span><div><h3>Sources</h3><p>Water-level records and official constants from 14 sources, GESLA among them.</p>
       <div class="chips"><span class="chip">GESLA</span><span class="chip">NOAA</span><span class="chip">Kartverket</span><span class="chip">LINZ</span><span class="chip">+ 10 more</span></div></div></li>
     <li><span class="dot">Δt</span><div><h3>Per-record time-base audit</h3><p>Checks each record's clock and meridian convention against section 4's fingerprints, then annotates it. No record is dropped.</p>
       <div class="chips"><span class="chip v">verified</span><span class="chip c">corrected</span><span class="chip u">unverified</span><span class="chip d">disputed</span></div></div></li>
-    <li><span class="dot">fit</span><div><h3>Harmonic fit</h3><p>Least squares over the hours present. Record length decides how many constituents enter (section 6).</p></div></li>
+    <li><span class="dot">qc</span><div><h3>Broken and short records</h3><p>Looks for datum steps, flatlines, spikes, gaps and clock steps. A broken record stays listed. When part of it is usable, the constants are fitted to that segment, and the set names it. With less than about 15 days of good data (<code>release.fit_min_good_hours</code>), no constants are fitted, and the record is still listed. See <a href="/method/#broken-records">Broken-record checks</a> and <a href="/method/#short-records">Short records</a>.</p>
+      <div class="chips"><span class="chip">broken_record</span><span class="chip">short_record</span></div></div></li>
+    <li><span class="dot">fit</span><div><h3>Harmonic fit</h3><p>Least squares over the hours of good data. Record length decides how many constituents enter (section 6).</p></div></li>
     <li><span class="dot">✓</span><div><h3>Canary check</h3><p>Compares fitted H and g with official constants at overlapping stations to catch systematic errors.</p></div></li>
-    <li><span class="dot">db</span><div><h3>Combined dataset</h3><p>Z<sub>0</sub>, and H and g per constituent, per station, with the audit labels attached.</p></div></li>
-    <li><span class="dot">h(t)</span><div><h3>SDKs</h3><p>Python, Ruby, TypeScript and C read the dataset, compute V<sub>0</sub>, f and u for the requested time, and sum the formula.</p>
+    <li><span class="dot">db</span><div><h3>Combined dataset</h3><p>Z<sub>0</sub>, and H and g per constituent, per station. Every constant set carries a <code>qc_status</code>, its <code>time_base</code> annotation and its <code>provenance</code>. A short record never outranks a set with more hours of good data at the same station. When a source fails its checks, its sets are carried over from an earlier release and flagged <code>carried_over</code>. JMA stations that JMA does not own are used only to check fits. They are never in the release files.</p>
+      <div class="chips"><span class="chip v">ok</span><span class="chip c">flagged</span><span class="chip u">no_constants</span></div></div></li>
+    <li><span class="dot">rel</span><div><h3>Release</h3><p>Dated release files (<code>OTC_{YYYYMMDD}</code>) on <code>data.opentideconstants.org</code>. The pointer <code>OTC_latest-f1.json</code> names the newest release in format 1. Cite a release by the concept DOI and its datestamp (<a href="/about/#cite">How to cite</a>).</p></div></li>
+    <li><span class="dot">h(t)</span><div><h3>SDKs</h3><p>Python, Ruby, TypeScript and C read the dataset, compute V<sub>0</sub>, f and u for the requested time, and sum the formula. An SDK refuses a release it is too old to read (<code>min_reader_version</code>). It skips <code>no_constants</code> sets by default.</p>
       <div class="chips"><span class="chip">Python</span><span class="chip">Ruby</span><span class="chip">TypeScript</span><span class="chip">C</span></div></div></li>
   </ol>
 </section>
