@@ -18,14 +18,15 @@ order: 4
 <p>Every set stays in the release files, not only the recommended one, so you can choose another. A source must also pass the <a href="/method/#source-checks">per-source convention check</a>; a source that fails is not used in that release. The validation table shows how each set scores against official predictions.</p>
 
 <h2 id="source-list">The sources</h2>
-<p>OTC combines fifteen open sources. For each one, the licence was read and the access path was checked on 2026-10-07 (LINZ and SHOM REFMAR on 2026-10-08). The coverage figures on each source's page are from those checks.</p>
-<p>Most give gauge records, from which OTC fits its own constants. NOAA CO-OPS, Kartverket and LINZ publish official constants. EOT20 and FES2022 are global tide models: their constants are <strong>model constants</strong>, interpolated to station points, labelled as model constants in every file, and ranked below official constants and gauge fits.</p>
+<p>OTC combines sixteen open sources. For each one, the licence was read and the access path was checked on 2026-10-07 (LINZ, SHOM REFMAR and JMA on 2026-10-08). The coverage figures on each source's page are from those checks.</p>
+<p>Most give gauge records, from which OTC fits its own constants. NOAA CO-OPS, Kartverket, LINZ and JMA publish official constants. EOT20 and FES2022 are global tide models: their constants are <strong>model constants</strong>, interpolated to station points, labelled as model constants in every file, and ranked below official constants and gauge fits.</p>
 
 <ul>
   <li id="gesla"><a href="/source-gesla/">GESLA (Global Extreme Sea Level Analysis)</a>: gauge fit.</li>
   <li id="noaa"><a href="/source-noaa/">NOAA CO-OPS</a>: official constants.</li>
   <li id="kartverket"><a href="/source-kartverket/">Kartverket (Norway)</a>: official constants.</li>
   <li id="linz"><a href="/source-linz/">LINZ tide constituents (New Zealand)</a>: official constants.</li>
+  <li id="jma"><a href="/source-jma/">Japan Meteorological Agency (JMA)</a>: official constants.</li>
   <li id="noaa-currents"><a href="/source-noaa-currents/">NOAA CO-OPS tidal-current constants</a>: official constants (currents).</li>
   <li id="pegelonline"><a href="/source-pegelonline/">PEGELONLINE (Germany)</a>: gauge fit.</li>
   <li id="rijkswaterstaat"><a href="/source-rijkswaterstaat/">Rijkswaterstaat WaterWebservices (Netherlands)</a>: gauge fit.</li>
@@ -55,5 +56,7 @@ order: 4
   <li><strong>Puertos del Estado, REDMAR (Spain):</strong> terms require contact before commercial use.</li>
   <li><strong>Instituto Hidrográfico (Portugal):</strong> no open licence found; data are released by request form.</li>
   <li><strong>SHOM harmonic constants and tide predictions (France):</strong> paid licence; no open SHOM constants dataset. SHOM's open REFMAR observations are used instead.</li>
-  <li><strong>Bureau of Meteorology (Australia):</strong> default terms allow personal or internal use only; no published constants dataset.</li>
+  <li><strong>Bureau of Meteorology (Australia):</strong> terms do not allow redistribution; no published constants dataset.</li>
+  <li><strong>ISPRA (Italy):</strong> no open licence found for tide predictions or constants.</li>
+  <li><strong>UNAM and CICESE (Mexico):</strong> no open licence found.</li>
 </ul>

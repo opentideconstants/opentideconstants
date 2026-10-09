@@ -47,7 +47,7 @@ The header is sticky (`--z-sticky`) on a solid background. `assets/header.js` wa
 
 ## Documentation layout
 
-Documentation pages (`layout: docs`) follow the aimock docs: a left sidebar lists every documentation page in two groups (Documentation, then the fifteen Sources), and a right "On this page" list links the page's headings and marks the one being read (`assets/docs.js`). Both sidebars stick under the header. Below 75rem the right list is hidden; below 60rem the left list folds into a "Documentation menu" above the text.
+Documentation pages (`layout: docs`) follow the aimock docs: a left sidebar lists every documentation page in two groups (Documentation, then the sixteen Sources), and a right "On this page" list links the page's headings and marks the one being read (`assets/docs.js`). Both sidebars stick under the header. Below 75rem the right list is hidden; below 60rem the left list folds into a "Documentation menu" above the text.
 
 ## Chart idiom
 
