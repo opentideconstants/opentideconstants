@@ -314,7 +314,7 @@ body:has(.docs-layout) .footer-inner { padding-inline: 4rem; max-width: none; }
   background-size: var(--graticule); background-position: -1px -1px; border-block: var(--border-width) solid var(--color-text); }
 .proof .section-head { background: var(--color-panel); padding: var(--space-4) var(--space-5); border: var(--border-width) solid var(--color-text); }
 .proof .section-head p { color: var(--color-prose); }
-.proof .section-head p + p { margin-top: var(--space-3); }
+.section-head p + p { margin-top: var(--space-3); }
 .plot { background: var(--color-panel); border: var(--border-width) solid var(--color-text); padding: var(--space-4) var(--space-5) var(--space-5); }
 .plot-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-5); margin-bottom: var(--space-2); }
 .plot-head p { margin: 0; color: var(--color-text-muted); font-size: var(--font-size-small); }
