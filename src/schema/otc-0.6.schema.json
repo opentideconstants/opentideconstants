@@ -2,12 +2,12 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://opentideconstants.org/schema/otc-0.6.schema.json",
   "title": "OpenTideConstants release document",
-  "description": "DRAFT, format_version 0.6. Schema for OTC_{YYYYMMDD}.json. Each line of OTC_{YYYYMMDD}.jsonl (and of the optional OTC_{YYYYMMDD}.jsonl.gz) is one station document, valid against #/$defs/station. OTC_{YYYYMMDD}.meta.json is the same document without `stations`, valid against #/$defs/meta, so a .jsonl reader can get the conventions, licences, constituent table and release metadata. Units: metres, metres per second (current amplitudes), degrees, degrees per hour, UTC. Every pattern ends with $(?![\\s\\S]) so that a validator whose $ also matches before a final newline (Python re) still rejects one. Cross-references (convention_id, licence_id, recommended_set_id, constituent names, default_current_bin, current_offsets reference_station_id and reference_bin) must resolve inside the same release, alias ids must be unique within each alias system across the release, and bin numbers must be unique within a set's current_bins and within a station's current_offsets. JSON Schema cannot express these, so the release build checks them separately. The build also checks: (1) a no_constants set with too_short has fewer than the minimum hours of good data (about 15 days, 360 hours; the exact value is published with each release), and every set with constants fitted from a record has at least that many; (2) a station's recommended set is never a no_constants set, never a short_record set when the station has a set of the same quantity with constants and more good_hours, and always has the quantity of the station's kind; (3) a time_base correction has from different from to, its from equals declared and its to equals published, and an unverified or disputed time_base has published equal to declared; (4) a tombstone's merged_into names an active station whose aliases include every alias id the removed station had; (5) provenance.carried_from_release is earlier than the release datestamp and names a release that held the same set_id.",
+  "description": "DRAFT, format_version 0.6. Schema for OTC_{YYYYMMDD}.json. Each line of OTC_{YYYYMMDD}.jsonl (and of the optional OTC_{YYYYMMDD}.jsonl.gz) is one station document, valid against #/$defs/station. OTC_{YYYYMMDD}.meta.json is the same document without `stations`, valid against #/$defs/meta, so a .jsonl reader can get the conventions, licences, constituent table and release metadata. Units: metres, metres per second (current amplitudes), degrees, degrees per hour, UTC. Every pattern ends with $(?![\\s\\S]) so that a validator whose $ also matches before a final newline (Python re) still rejects one. Cross-references (convention_id, licence_id, recommended_set_id, constituent names, default_current_bin, current_offsets reference_station_id and reference_bin) must resolve inside the same release, alias ids must be unique within each alias system across the release, and bin numbers must be unique within a set's current_bins and within a station's current_offsets. JSON Schema cannot express these, so the release build checks them separately. The build also checks: (1) a no_constants set with too_short has fewer than release.fit_min_good_hours hours of good data, and every set with constants fitted from a record has at least that many; good_hours is never more than the hours between record_span start and end; (2) a station's recommended set is never a no_constants set, never a short_record set when the station has a set of the same quantity with constants and more good_hours, and always has the quantity of the station's kind; (3) a time_base correction has from different from to, its from equals declared and its to equals published, and an unverified or disputed time_base has published equal to declared; (4) a tombstone's merged_into names an active station whose aliases include every alias id the removed station had; (5) provenance.carried_from_release is earlier than the release datestamp and names a release that held the same set_id, and a carried set's convention_id and licence_id exist in this release; (6) recommended_set_id is null on a reference station only when every set of the station is no_constants (the schema checks this too), and a subordinate station has constant sets, subordinate_offsets or current_offsets (the schema checks this too).",
   "type": "object",
   "required": ["format_version", "release", "conventions", "licences", "constituents", "stations"],
   "additionalProperties": false,
   "properties": {
-    "format_version": { "$ref": "#/$defs/format_version" },
+    "format_version": { "description": "Always 0.6 in this schema.", "const": "0.6" },
     "release": { "$ref": "#/$defs/release" },
     "conventions": {
       "type": "array",
@@ -37,7 +37,7 @@
       "required": ["format_version", "release", "conventions", "licences", "constituents"],
       "additionalProperties": false,
       "properties": {
-        "format_version": { "$ref": "#/$defs/format_version" },
+        "format_version": { "const": "0.6" },
         "release": { "$ref": "#/$defs/release" },
         "conventions": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/convention" } },
         "licences": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/licence" } },
@@ -56,13 +56,18 @@
     },
     "release": {
       "type": "object",
-      "required": ["datestamp", "created", "source_versions", "min_reader_version"],
+      "required": ["datestamp", "created", "source_versions", "min_reader_version", "fit_min_good_hours"],
       "additionalProperties": false,
       "properties": {
         "datestamp": { "$ref": "#/$defs/datestamp" },
         "min_reader_version": {
-          "description": "The oldest format version a reader must understand to use this release safely, MAJOR.MINOR. A reader that supports only an older version must not use the release, and stays on its last release (the latest pointer per format major and OTC_index.json carry the same value). 0.6 sets it to 0.6: a 0.5 reader filters out only qc_status excluded, so it would treat a no_constants set as usable. Readers before 0.6 do not read this field; for them the publish gate holds: no 0.6 release is published until the SDK releases that read 0.6 are out.",
-          "$ref": "#/$defs/format_version"
+          "description": "Always 0.6 in this schema. The oldest format version a reader must understand to use this release safely, MAJOR.MINOR. A reader that supports only an older version must not use the release, and stays on its last release (the latest pointer per format major and OTC_index.json carry the same value). 0.6 sets it to 0.6: a 0.5 reader filters out only qc_status excluded, so it would treat a no_constants set as usable. Readers before 0.6 do not read this field; for them the publish gate holds: no 0.6 release is published until the SDK releases that read 0.6 are out.",
+          "const": "0.6"
+        },
+        "fit_min_good_hours": {
+          "description": "The minimum hours of good data this build needs to fit constants (about 15 days, 360 hours). A record with fewer is a no_constants set with no_constants_reason too_short.",
+          "type": "number",
+          "exclusiveMinimum": 0
         },
         "created": { "type": "string", "format": "date-time" },
         "doi": {
@@ -252,7 +257,18 @@
         "validation": { "type": "array", "items": { "$ref": "#/$defs/validation" } }
       },
       "if": { "properties": { "type": { "const": "reference" } } },
-      "then": { "properties": { "constant_sets": { "minItems": 1 } } }
+      "then": {
+        "properties": { "constant_sets": { "minItems": 1 } },
+        "if": { "properties": { "constant_sets": { "contains": { "properties": { "qc_status": { "not": { "const": "no_constants" } } } } } } },
+        "then": { "properties": { "recommended_set_id": { "type": "string" } } }
+      },
+      "else": {
+        "anyOf": [
+          { "required": ["subordinate_offsets"] },
+          { "required": ["current_offsets"] },
+          { "properties": { "constant_sets": { "minItems": 1 } } }
+        ]
+      }
     },
     "constant_set": {
       "type": "object",
@@ -320,7 +336,7 @@
           "properties": {
             "start": { "type": "string", "format": "date-time" },
             "end": { "type": "string", "format": "date-time" },
-            "reason": { "type": "string", "minLength": 1 }
+            "reason": { "type": "string", "pattern": "\\S" }
           }
         },
         "expected_accuracy": { "$ref": "#/$defs/expected_accuracy" },
@@ -473,6 +489,11 @@
           "then": { "properties": { "provenance": { "required": ["carried_from_release"] } } }
         },
         {
+          "description": "The deprecated qc_status fallback is a carried-over set.",
+          "if": { "properties": { "qc_status": { "const": "fallback" } } },
+          "then": { "required": ["provenance"], "properties": { "provenance": { "required": ["carried_from_release"] } } }
+        },
+        {
           "description": "The 0.6 time_base replaces provenance.time_base: a set has one or the other.",
           "if": { "required": ["time_base"] },
           "then": { "properties": { "provenance": { "not": { "required": ["time_base"] } } } }
@@ -491,7 +512,7 @@
       "additionalProperties": false,
       "properties": {
         "code": { "enum": ["verified", "corrected", "unverified", "disputed"] },
-        "reason": { "description": "One line for people, e.g. 'declared utc_instant corrected to utc_mean_start60 by official predictions (kartverket:EXF)'.", "type": "string", "minLength": 1, "maxLength": 800 },
+        "reason": { "description": "One line for people, e.g. 'declared utc_instant corrected to utc_mean_start60 by official predictions (kartverket:EXF)'.", "type": "string", "pattern": "\\S", "maxLength": 800 },
         "declared": { "description": "The time base the source declares for the record.", "$ref": "#/$defs/time_base_label" },
         "published": { "description": "The time base the constants were fitted with: declared, unless code is corrected.", "$ref": "#/$defs/time_base_label" },
         "correction": {
@@ -549,7 +570,7 @@
         "issue": { "enum": ["datum_step", "flatline", "spikes", "gaps", "clock_step", "quantised", "out_of_range", "unstable_constituents", "neighbour_disagreement", "no_tide"] },
         "start": { "type": "string", "format": "date-time" },
         "end": { "type": "string", "format": "date-time" },
-        "reason": { "type": "string", "minLength": 1 },
+        "reason": { "type": "string", "pattern": "\\S" },
         "values": { "description": "The numbers behind the issue, e.g. {\"step_m\": -0.31}.", "type": "object" }
       }
     },
@@ -661,17 +682,38 @@
       "additionalProperties": false,
       "properties": {
         "flag": { "enum": ["time_base", "broken_record", "microtidal", "non_tidal_signal", "short_record", "sibling_disagreement", "carried_over"] },
-        "reason": { "description": "One line for people.", "type": "string", "minLength": 1 },
+        "reason": { "description": "One line for people, not blank.", "type": "string", "pattern": "\\S" },
         "verdict": { "description": "Deprecated in 0.6: free text. Use reason, and the set's time_base for a time_base flag.", "type": "string" },
         "values": { "type": "object" }
       }
     },
     "provenance": {
-      "description": "Where the set came from and what was done to it. A source may add its own keys (e.g. analysis_years), but no key may carry a status: qc_status is the only status of a set.",
+      "description": "Where the set came from and what was done to it. A closed list of keys: qc_status is the only status of a set, so no provenance key can carry one. A new source-specific key is added here first.",
       "type": "object",
-      "additionalProperties": true,
-      "propertyNames": { "not": { "pattern": "^(qc_status|status|excluded?|removed?|dropped|hidden|withheld|omitted)$" } },
+      "additionalProperties": false,
       "properties": {
+        "analysis_years": {
+          "description": "JMA: the years the agency's analysis used, per period, as the source gives them.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "long_period": { "type": ["string", "null"] }, "short_period": { "type": ["string", "null"] } }
+        },
+        "list_distance_km": { "description": "LINZ: distance from the file's header position to the LINZ port list position.", "type": "number", "minimum": 0 },
+        "source_constituents_not_published": {
+          "description": "JMA: source constituents that have no OTC name, so they are not in the set.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["source_name", "reason"],
+            "additionalProperties": false,
+            "properties": {
+              "source_name": { "type": "string", "maxLength": 31 },
+              "speed_deg_per_hour": { "type": ["number", "null"] },
+              "amplitude_m": { "type": "number", "minimum": 0 },
+              "reason": { "type": "string", "pattern": "\\S" }
+            }
+          }
+        },
         "carried_from_release": {
           "description": "The datestamp of the earlier release whose constants this set keeps, because its source failed a check in this build. Goes with the carried_over flag.",
           "$ref": "#/$defs/datestamp"

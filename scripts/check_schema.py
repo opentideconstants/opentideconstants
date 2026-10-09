@@ -333,7 +333,9 @@ must_pass("an unverified time base that lists the weak checks tried",
               "evidence", [{"comparator_kind": "model", "comparator_id": "eot20", "distance_km": None}]))
 must_pass("deprecated qc_status accepted and fallback (0.5 writers)",
           lambda d: [d["stations"][0]["constant_sets"][1].__setitem__("qc_status", "accepted"),
-                     current_set(d).__setitem__("qc_status", "fallback")])
+                     current_set(d).__setitem__("qc_status", "fallback"),
+                     current_set(d)["provenance"].__setitem__("carried_from_release", "20991130"),
+                     current_set(d).__setitem__("qc_flags", [{"flag": "carried_over", "reason": "NOAA failed its check"}])])
 must_pass("deprecated qc_flags verdict next to reason", lambda d: fjord(d, "b")["qc_flags"][1].__setitem__("verdict", "unverified"))
 must_pass("deprecated provenance.time_base on an official set (no 0.6 time_base)",
           lambda d: d["stations"][0]["constant_sets"][1]["provenance"].__setitem__(
@@ -425,7 +427,10 @@ must_pass("D9 a set carried over from the previous release", lambda d: carried(f
 must_pass("D9 a gate fallback carried over", lambda d: [carried(fjord(d, "a")), fjord(d, "a")["provenance"].__setitem__(
     "decision", {"tier": "fallback", "outcome": "fallback", "reason": "the source failed its convention check"})])
 must_pass("a source's own provenance keys (JMA analysis_years, LINZ list_distance_km)",
-          lambda d: d["stations"][0]["constant_sets"][1]["provenance"].update(analysis_years=19, list_distance_km=0.4))
+          lambda d: d["stations"][0]["constant_sets"][1]["provenance"].update(
+              analysis_years={"long_period": "2011-20", "short_period": "2011-20"}, list_distance_km=0.4,
+              source_constituents_not_published=[{"source_name": "OQ2", "speed_deg_per_hour": 27.3416964,
+                                                  "amplitude_m": 0.002, "reason": "no OTC name"}]))
 must_pass("a duplicate tombstone", lambda d: station(d, "OTC-EXAMPLE-0002").__setitem__("removed_reason", "duplicate"))
 must_pass("an official set without record_span", lambda d: d["stations"][0]["constant_sets"][1].pop("record_span", None))
 must_pass("a reference station whose only sets have no constants (no recommended set)",
@@ -484,3 +489,44 @@ index_must_fail("entry without min_reader_version", lambda d: latest(d).pop("min
 index_must_fail("file without sha256", lambda d: latest(d)["files"][0].pop("sha256"))
 index_must_fail("zenodo_version_doi that is not a DOI", lambda d: latest(d).__setitem__("zenodo_version_doi", "zenodo.1"))
 index_must_fail("bare list instead of {releases: [...]}", lambda d: d.__setitem__("releases", {}))
+
+
+# --- 0.6 confirmation round (provenance allowlist, fallback, versions, reasons, stations) --------
+
+for key in ("Excluded", "EXCLUDED", "is_excluded", "exclusion", "suppressed", "qc", "state", "visibility", "rejected"):
+    must_fail(f"provenance key {key}", lambda d, k=key: fjord(d, "a")["provenance"].__setitem__(k, True))
+must_fail("provenance with a nested gate status",
+          lambda d: fjord(d, "a")["provenance"].__setitem__("gate", {"status": "excluded"}))
+must_fail("JMA analysis_years with an extra key",
+          lambda d: d["stations"][0]["constant_sets"][1]["provenance"].__setitem__("analysis_years", {"status": "excluded"}))
+must_fail("qc_status fallback without carried_from_release", lambda d: fjord(d, "a").__setitem__("qc_status", "fallback"))
+must_fail("min_reader_version 0.5", lambda d: d["release"].__setitem__("min_reader_version", "0.5"))
+must_fail("min_reader_version 9.9", lambda d: d["release"].__setitem__("min_reader_version", "9.9"))
+must_fail("format_version 0.5 under the 0.6 schema", lambda d: d.__setitem__("format_version", "0.5"))
+must_fail("release without fit_min_good_hours", lambda d: d["release"].pop("fit_min_good_hours"))
+must_fail("flag reason that is only whitespace", lambda d: fjord(d, "b")["qc_flags"][0].__setitem__("reason", " \t"))
+must_fail("time_base reason that is only whitespace", lambda d: fjord(d, "b")["time_base"].__setitem__("reason", "  "))
+must_fail("record issue reason that is only whitespace", lambda d: fjord(d, "b")["record_issues"][0].__setitem__("reason", " "))
+must_fail("reference station with constants but no recommended set",
+          lambda d: station(d, "OTC-EXAMPLE-0005").__setitem__("recommended_set_id", None))
+must_fail("subordinate station with no sets and no offsets",
+          lambda d: station(d, "OTC-EXAMPLE-0004").pop("current_offsets"))
+index_must_fail("zenodo_material that is not a boolean", lambda d: latest(d).__setitem__("zenodo_material", "yes"))
+index_must_fail("file name with a bad datestamp counter", lambda d: latest(d)["files"][0].__setitem__("name", "OTC_20991231.1.json"))
+index_must_fail("file name without a datestamp", lambda d: latest(d)["files"][0].__setitem__("name", "OTC_latest.json"))
+for label, mutate in (
+        ("zenodo_material on an index entry", lambda d: latest(d).__setitem__("zenodo_material", True)),
+        ("an older release with min_reader_version 0.5", lambda d: d["releases"][1].__setitem__("min_reader_version", "0.5")),
+        ("a second release of the day, OTC_20991231.2.json", lambda d: latest(d)["files"][0].__setitem__("name", "OTC_20991231.2.json"))):
+    doc = copy.deepcopy(index_example)
+    mutate(doc)
+    if not index_validator.is_valid(doc):
+        print(f"FAIL: index {label}")
+        sys.exit(1)
+    print(f"ok: accepted index {label}")
+doc = copy.deepcopy(example)
+fjord(doc, "a")["record_span"]["good_hours"] = 1e9
+if problems(doc):
+    print("FAIL: good_hours above the span should be left to the build check")
+    sys.exit(1)
+print("ok: left to the build check: good_hours above the record span")

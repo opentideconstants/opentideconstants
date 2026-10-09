@@ -22,7 +22,7 @@
         "datestamp": { "type": "string", "pattern": "^[0-9]{8}(\\.[2-9]|\\.[1-9][0-9]+)?$(?![\\s\\S])" },
         "created": { "type": "string", "format": "date-time" },
         "format_version": { "$ref": "#/$defs/version" },
-        "min_reader_version": { "description": "As release.min_reader_version in the release document.", "$ref": "#/$defs/version" },
+        "min_reader_version": { "description": "As release.min_reader_version in the release document. An index lists older releases too, so lower values are valid here. A reader checks it before it downloads a release.", "$ref": "#/$defs/version" },
         "concept_doi": { "description": "The one DOI for all Zenodo versions. Cite a release by the concept DOI and its datestamp. Null only before the concept DOI exists.", "anyOf": [{ "$ref": "#/$defs/doi" }, { "type": "null" }] },
         "zenodo_version_doi": { "description": "The DOI of this release's own Zenodo version, or null when it has none: Zenodo gets one version a month and one for each material change.", "anyOf": [{ "$ref": "#/$defs/doi" }, { "type": "null" }] },
         "content_sha256": { "description": "SHA-256 of the release content without its build-identity fields. The pipeline publishes nothing when it equals the newest release's value.", "$ref": "#/$defs/sha256" },
@@ -34,13 +34,14 @@
             "required": ["name", "url", "size", "sha256"],
             "additionalProperties": false,
             "properties": {
-              "name": { "type": "string", "pattern": "^OTC_[0-9]{8}(\\.[0-9]+)?\\.[a-z0-9.]+$(?![\\s\\S])" },
+              "name": { "description": "OTC_{DATESTAMP}.{ext}, with the datestamp pattern of the release document.", "type": "string", "pattern": "^OTC_[0-9]{8}(\\.[2-9]|\\.[1-9][0-9]+)?\\.[a-z][a-z0-9.]*$(?![\\s\\S])" },
               "url": { "description": "Relative to the URL of the file that lists it, or absolute.", "type": "string", "minLength": 1 },
               "size": { "type": "integer", "minimum": 0 },
               "sha256": { "$ref": "#/$defs/sha256" }
             }
           }
         },
+        "zenodo_material": { "description": "Pipeline only: true when the release is a material change and gets its own Zenodo version at publish. The SDKs ignore it.", "type": "boolean" },
         "changes": { "description": "Short lines for the Downloads page.", "type": "array", "items": { "type": "string" } },
         "source_versions": { "type": "object", "additionalProperties": { "type": "string" } },
         "changelog_url": { "type": "string", "format": "uri" }
