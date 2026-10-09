@@ -78,6 +78,7 @@ Documentation pages (`layout: docs`) work like the aimock docs:
 - **Caution frame.** Status notes (for example "Not in the current release" on a source page) have a 2px accent frame (magenta by day, sea-glass green by night), as cautions are printed on charts. The Helgoland note on the hero uses the same frame.
 - **Graticule.** The proof section sits on a graticule of the same cell size as the hero chart (`--graticule`).
 - **Diamonds.** Lists of properties use the tidal-diamond mark.
+- **Request icon.** A per-item action is an inline outline SVG (`currentColor`, link colour, `aria-hidden` inside a link with an `aria-label` and a matching `title`), never an emoji or a repeated text link; it sits in one trailing column with a 32px hit target (44px on touch).
 
 ## Home
 
