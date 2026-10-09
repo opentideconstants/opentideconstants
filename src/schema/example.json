@@ -132,11 +132,15 @@
           "datum": {
             "msl_offset_m": 1.0,
             "zero": "gauge_zero",
-            "named": { "mhw": 1.5, "msl": 1.003, "mlw": 0.51 },
+            "named": { "mhhw": 1.55, "mhw": 1.5, "dtl": 1.005, "mtl": 1.005, "msl": 1.003, "mlw": 0.51, "mllw": 0.46 },
             "basis": {
+              "mhhw": { "kind": "observed", "method": "first_reduction", "epoch": { "start": "2002-01-01", "end": "2020-12-31", "name": "OTC 2002-2020" }, "data_span": { "start": "2002-01-01", "end": "2020-12-31", "months": 228 }, "uncertainty_m": 0.004, "uncertainty_basis": "propagated" },
               "mhw": { "kind": "observed", "method": "first_reduction", "epoch": { "start": "2002-01-01", "end": "2020-12-31", "name": "OTC 2002-2020" }, "data_span": { "start": "2002-01-01", "end": "2020-12-31", "months": 228 }, "uncertainty_m": 0.004, "uncertainty_basis": "propagated" },
+              "dtl": { "kind": "observed", "method": "first_reduction", "epoch": { "start": "2002-01-01", "end": "2020-12-31", "name": "OTC 2002-2020" }, "data_span": { "start": "2002-01-01", "end": "2020-12-31", "months": 228 }, "uncertainty_m": 0.004, "uncertainty_basis": "propagated" },
+              "mtl": { "kind": "observed", "method": "first_reduction", "epoch": { "start": "2002-01-01", "end": "2020-12-31", "name": "OTC 2002-2020" }, "data_span": { "start": "2002-01-01", "end": "2020-12-31", "months": 228 }, "uncertainty_m": 0.004, "uncertainty_basis": "propagated" },
               "msl": { "kind": "observed", "method": "first_reduction", "epoch": { "start": "2002-01-01", "end": "2020-12-31", "name": "OTC 2002-2020" }, "data_span": { "start": "2002-01-01", "end": "2020-12-31", "months": 228 }, "uncertainty_m": 0.004, "uncertainty_basis": "propagated" },
-              "mlw": { "kind": "observed", "method": "first_reduction", "epoch": { "start": "2002-01-01", "end": "2020-12-31", "name": "OTC 2002-2020" }, "data_span": { "start": "2002-01-01", "end": "2020-12-31", "months": 228 }, "uncertainty_m": 0.004, "uncertainty_basis": "propagated" }
+              "mlw": { "kind": "observed", "method": "first_reduction", "epoch": { "start": "2002-01-01", "end": "2020-12-31", "name": "OTC 2002-2020" }, "data_span": { "start": "2002-01-01", "end": "2020-12-31", "months": 228 }, "uncertainty_m": 0.004, "uncertainty_basis": "propagated" },
+              "mllw": { "kind": "observed", "method": "first_reduction", "epoch": { "start": "2002-01-01", "end": "2020-12-31", "name": "OTC 2002-2020" }, "data_span": { "start": "2002-01-01", "end": "2020-12-31", "months": 228 }, "uncertainty_m": 0.004, "uncertainty_basis": "propagated" }
             }
           },
           "convention_id": "otc-greenwich-schureman-v1",
@@ -504,11 +508,11 @@
             "chart_datum": "mllw",
             "named": { "mhhw": 3.141, "msl": 1.554, "mllw": 0.0, "lat": -0.511, "hat": 3.765, "otc_lat": -0.523 },
             "basis": {
-              "mhhw": { "kind": "published", "method": "source", "source_name": "MHHW", "control": { "source_id": "8443970" }, "epoch": { "start": "1983-01-01", "end": "2001-12-31", "name": "NTDE 1983-2001" } },
-              "msl": { "kind": "published", "method": "source", "source_name": "MSL", "control": { "source_id": "8443970" }, "epoch": { "start": "1983-01-01", "end": "2001-12-31", "name": "NTDE 1983-2001" } },
-              "mllw": { "kind": "published", "method": "source", "source_name": "MLLW", "control": { "source_id": "8443970" }, "epoch": { "start": "1983-01-01", "end": "2001-12-31", "name": "NTDE 1983-2001" } },
-              "lat": { "kind": "published", "method": "source", "source_name": "LAT", "control": { "source_id": "8443970" } },
-              "hat": { "kind": "published", "method": "source", "source_name": "HAT", "control": { "source_id": "8443970" } },
+              "mhhw": { "kind": "published", "method": "source", "source_name": "MHHW", "epoch": { "start": "1983-01-01", "end": "2001-12-31", "name": "NTDE 1983-2001" } },
+              "msl": { "kind": "published", "method": "source", "source_name": "MSL", "epoch": { "start": "1983-01-01", "end": "2001-12-31", "name": "NTDE 1983-2001" } },
+              "mllw": { "kind": "published", "method": "source", "source_name": "MLLW", "epoch": { "start": "1983-01-01", "end": "2001-12-31", "name": "NTDE 1983-2001" } },
+              "lat": { "kind": "published", "method": "source", "source_name": "LAT" },
+              "hat": { "kind": "published", "method": "source", "source_name": "HAT" },
               "otc_lat": { "kind": "computed", "method": "harmonic_extremes", "epoch": { "start": "2020-01-01", "end": "2038-12-31", "name": "OTC LAT 2020-2038" }, "uncertainty_m": 0.012, "uncertainty_basis": "calibrated" }
             }
           },
@@ -548,10 +552,10 @@
           "zero": "chart_datum",
           "zero_name": "MLLW",
           "chart_datum": "mllw",
-          "named": { "mhhw": 2.953, "mllw": 0.0, "lat": -0.482, "hat": 3.351 },
+          "named": { "mhhw": 2.953, "mllw": 0.0, "lat": -0.48, "hat": 3.539 },
           "basis": {
-            "mhhw": { "kind": "published", "method": "source", "source_name": "MHHW", "control": { "source_id": "8443970" }, "epoch": { "start": "1983-01-01", "end": "2001-12-31", "name": "NTDE 1983-2001" } },
-            "mllw": { "kind": "published", "method": "source", "source_name": "MLLW", "control": { "source_id": "8443970" }, "epoch": { "start": "1983-01-01", "end": "2001-12-31", "name": "NTDE 1983-2001" } },
+            "mhhw": { "kind": "published", "method": "source", "source_name": "MHHW", "epoch": { "start": "1983-01-01", "end": "2001-12-31", "name": "NTDE 1983-2001" }, "control": { "source_id": "8443970" } },
+            "mllw": { "kind": "published", "method": "source", "source_name": "MLLW", "epoch": { "start": "1983-01-01", "end": "2001-12-31", "name": "NTDE 1983-2001" }, "control": { "source_id": "8443970" } },
             "lat": { "kind": "computed", "method": "subordinate_offsets", "epoch": { "start": "2020-01-01", "end": "2038-12-31", "name": "OTC LAT 2020-2038" }, "uncertainty_m": 0.03, "uncertainty_basis": "calibrated" },
             "hat": { "kind": "computed", "method": "subordinate_offsets", "epoch": { "start": "2020-01-01", "end": "2038-12-31", "name": "OTC LAT 2020-2038" }, "uncertainty_m": 0.03, "uncertainty_basis": "calibrated" }
           }
