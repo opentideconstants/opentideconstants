@@ -21,7 +21,7 @@ layout: full
 <!-- 1 -->
 <section id="s1">
   <h2><span class="n">1</span>A tide is a sum of waves</h2>
-  <p>Each constituent is a pure cosine with its own period and size. Add them and you get the tide. Turn them on and off below. The amplitudes start at Boston-like values.</p>
+  <p>Each constituent is a pure cosine with its own period and size. Add them and you get the tide. Turn them on and off below. The amplitudes start at Boston-like values. These six are the largest at a port like Boston, out of a much bigger set: section 2 lists <a href="#s2-full-det">all 37 that NOAA publishes</a>.</p>
   <div class="controls" id="s1-controls" role="group" aria-label="Constituents to include"></div>
   <div class="fig"><canvas id="s1-lanes" aria-label="Individual constituent waves over three days and their sum" role="img"></canvas></div>
   <p class="cap">Three days. Each lane is one constituent on a shared scale; the bottom lane is their sum. Raise K1 and O1 to about 0.5 m and successive high waters become unequal: that is <b>diurnal inequality</b>.</p>
@@ -34,15 +34,30 @@ layout: full
   <h2><span class="n">2</span>What a constituent is</h2>
   <p>A constituent is one astronomical rhythm. Its speed in degrees per hour comes from the motions of the Moon and Sun, so it is the same at every port. The Doodson number encodes that speed as a sum of six basic astronomical frequencies.</p>
   <div class="fig"><canvas id="s2-spec" aria-label="Spectrum of constituent amplitudes by speed" role="img"></canvas></div>
-  <p class="cap">The tidal spectrum at a Boston-like port. Constituents cluster into species: diurnal near 15°/h (once a day), semidiurnal near 30°/h (twice a day), and shallow-water overtides like M4 near 58°/h. The lower panels zoom into the two crowded clusters.</p>
+  <p class="cap">The tidal spectrum at a Boston-like port, all 37 constituents NOAA publishes. Constituents cluster into species: diurnal near 15°/h (once a day), semidiurnal near 30°/h (twice a day), and shallow-water overtides at 3, 4, 6 and 8 times a day. The ticks under the axis mark every constituent; the number over each band counts them. The lower panels zoom into the two crowded clusters. Most lines are only millimetres tall: here M2, S2, N2, K2, K1, O1, P1 and Q1 carry <b id="s2-share">most</b> of the tide's variance. The nine constituents of the table below keep their illustrative amplitudes; the other 28 use NOAA's published amplitudes for Boston (station 8443970).</p>
   <div class="tbl"><table id="s2-table"><thead><tr><th>Name</th><th>Speed <span class="sym">°/h</span></th><th>Period <span class="sym">h</span></th><th>Doodson</th><th>What it tracks</th></tr></thead><tbody></tbody></table></div>
+  <details class="tm-full" id="s2-full-det">
+    <summary>The full set: all 37 constituents NOAA publishes</summary>
+    <div class="tbl"><table id="s2-full"><thead><tr><th>Name</th><th>Speed <span class="sym">°/h</span></th><th>Period</th><th>Doodson</th><th>Species</th><th>What it tracks</th></tr></thead><tbody></tbody></table></div>
+    <p class="cap">Sorted by speed. <span class="pill figmark">fig</span> marks the six in the figures. Each speed is computed from the Doodson arguments, the whole-number multiples of six astronomical rates: τ the lunar day, s the Moon, h the Sun, p the lunar perigee, N′ the lunar node and p<sub>1</sub> the solar perigee. The computed speeds agree with NOAA's published values to the precision NOAA gives them. The Doodson number writes the six multiples as digits, adding 5 to all but the first so that none is negative: M2 is 2τ, so 255.555; Z<sub>0</sub> is 055.555. S6 needs a multiple of +6, which has no single digit, so its multiples are shown instead. Sa is 056.555 here, as its NOAA speed implies; Doodson's own list gives 056.554, which adds the slow solar-perigee term. NOAA spells ρ1, μ2, ν2 and λ2 as RHO, MU2, NU2 and LAM2.</p>
+  </details>
+  <h3 class="tm-sub">How many constituents?</h3>
+  <p>There is no fixed number. Each source publishes the set its own analysis resolved:</p>
+  <ul class="tm-counts">
+    <li><b>NOAA CO-OPS</b>: the same 37 at every station, even where some round to zero (Boston's Mm, MSf and Mf are 0.000 m).</li>
+    <li><b>JMA</b>: 60 at the 70 stations JMA runs; only M2, S2, K1 and O1 at the other stations of its tide tables.</li>
+    <li><b>Kartverket</b> and <b>LINZ</b>: a list per station. Kartverket gives Bergen 55, Stavanger 52 and Trondheim 57; seven LINZ ports we checked have 16 to 30.</li>
+    <li><b>OTC's own fit</b> of GESLA records tries up to 45: NOAA's 37 plus 8 more. Record length sets how many fit (section 6).</li>
+    <li><b>The prediction engine's constituent table</b> names 176, so it can evaluate whatever a source publishes.</li>
+  </ul>
+  <p>In practice a few carry most of the tide: M2, S2, N2, K2, K1, O1, P1 and Q1. The shallow-water overtides (M4, MS4, M6 and the rest) are small at the open coast but grow in estuaries and shallow harbours, where they make the tide rise and fall at different rates.</p>
   <div class="tm-note">Per constituent, a station supplies only two numbers: amplitude <b>H</b> (how big) and phase lag <b>g</b> (how late). The speed is never station data.</div>
 </section>
 
 <!-- 3 -->
 <section id="s3">
   <h2><span class="n">3</span>The prediction formula</h2>
-  <p>Every tide predictor evaluates this sum. Select a term to see it on the wave.</p>
+  <p>Every tide predictor evaluates this sum. Σ runs over every constituent a station publishes: 37 for a NOAA station, up to 60 for JMA. The six in the figures carry most of the tide. Select a term to see it on the wave.</p>
   <div class="formula" id="s3-formula">
     <span>h(t) = </span><button class="t" type="button" data-term="z0" data-owner="pub" aria-pressed="false">Z<sub>0</sub></button>
     <span> + Σ </span><button class="t" type="button" data-term="f" data-owner="sdk" aria-pressed="false">f</button><span>·</span><button class="t" type="button" data-term="H" data-owner="pub" aria-pressed="false">H</button>
@@ -89,7 +104,7 @@ layout: full
 <!-- 5 -->
 <section id="s5">
   <h2><span class="n">5</span>Harmonic analysis: getting H and g from a record</h2>
-  <p>Analysis runs the formula backwards. Given hourly water levels, a least-squares fit finds the Z<sub>0</sub>, H and g that best explain them. Below is a synthetic record built from known constants plus noise; the fit tries to recover them.</p>
+  <p>Analysis runs the formula backwards. Given hourly water levels, a least-squares fit finds the Z<sub>0</sub>, H and g that best explain them. Below is a synthetic record built from known constants plus noise; the fit tries to recover them. Real analyses fit dozens of constituents, not the handful in this toy: OTC's fit tries up to 45.</p>
   <div class="controls">
     <div class="ctl"><label for="s5-days">Record length</label><input type="range" id="s5-days" min="1" max="60" step="1" value="30"><output id="s5-days-o" for="s5-days">30 d</output></div>
     <div class="ctl"><label for="s5-noise">Noise σ</label><input type="range" id="s5-noise" min="0" max="0.4" step="0.01" value="0.10"><output id="s5-noise-o" for="s5-noise">0.10 m</output></div>
@@ -105,6 +120,7 @@ layout: full
 <section id="s6">
   <h2><span class="n">6</span>Record length decides what you can separate</h2>
   <p>Two constituents with close speeds look like one wave until they drift a full cycle apart. The Rayleigh criterion sets the minimum record: T ≥ 360° / |ω<sub>1</sub> − ω<sub>2</sub>|. The figures below compute T from the speeds.</p>
+  <p>Record length is what limits how many constituents a fit can hold. Applied to OTC's 45 candidates, the rule keeps 29 for a 30-day record, 43 for one year and all 45 for 19 years. A noise test can then drop more.</p>
   <div class="controls">
     <div class="ctl"><label for="s6-len">Record length</label><input type="range" id="s6-len" min="0" max="1000" step="1" value="500"><output id="s6-len-o" for="s6-len"></output></div>
   </div>

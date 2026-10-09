@@ -51,7 +51,7 @@
 .tm .fig{container-type:inline-size}
 #s1-lanes{height:364px}
 #s1-month{height:clamp(190px,30cqw,260px)}
-#s2-spec{height:330px}
+#s2-spec{height:442px}
 #s3-wave{height:300px}
 #s3-nodal{height:220px}
 #s4-clock,#s4-mer{height:min(154px,calc(20cqw + 46px))}
@@ -62,7 +62,7 @@
 #s7-cur{height:290px}
 #s7-surge{height:240px}
 @container (width < 560px){
-  #s2-spec{height:420px}
+  #s2-spec{height:598px}
   #s3-wave{height:270px}
   #s5-plot{height:300px}
 }
@@ -124,4 +124,17 @@
 .tm .chip.v{border-color:var(--ok);color:var(--ok)} .tm .chip.c{border-color:var(--c-m2);color:var(--c-m2)} .tm .chip.u{border-color:var(--muted);color:var(--muted)} .tm .chip.d{border-color:var(--bad);color:var(--bad)}
 .tm .tm-note{font-size:.9rem;border-top:1px solid var(--accent);border-bottom:1px solid var(--accent);padding:8px 0;margin:16px 0}
 .tm .tm-foot{margin-top:50px;font-size:.82rem;color:var(--muted);border-top:1px solid var(--rule);padding-top:14px;max-width:none}
+/* section 2: the full constituent set and the counts */
+.tm .tm-full{margin:16px 0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+.tm .tm-full summary{cursor:pointer;padding:10px 0;font-weight:600;font-size:.95rem}
+.tm .tm-full summary:hover{color:var(--accent)}
+.tm .tm-full .tbl{margin-top:4px}
+.tm #s2-full td.sp{font-family:var(--f-body);color:var(--ink-2);text-align:left}
+.tm #s2-full td.what{font-family:var(--f-body);text-align:left;white-space:normal;min-width:16em}
+.tm #s2-full th:nth-child(5),.tm #s2-full th:nth-child(6){text-align:left}
+.tm #s2-full tr.fig-row td{color:var(--ink);font-weight:500}
+.tm .pill.figmark{border:1px solid var(--accent);color:var(--accent);font-size:.66rem;padding:0 5px;vertical-align:1px}
+.tm .tm-sub{margin:26px 0 4px;font-size:1.15rem}
+.tm .tm-counts{margin:.4em 0 .8em;padding-left:1.2em;font-size:.95rem}
+.tm .tm-counts li{margin:.3em 0}
 @media (prefers-reduced-motion: reduce){.tm *{scroll-behavior:auto!important;transition:none!important}}
