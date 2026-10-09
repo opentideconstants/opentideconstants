@@ -23,7 +23,7 @@ src/assets/site.css       layout and element styles; uses only tokens
 src/assets/fonts/         self-hosted fonts (woff2, latin subset) and their SIL OFL licences
 src/assets/mode.js        day/night palette toggle, kept in localStorage
 src/assets/plot.js        plays the Home tide-curve animation when it scrolls into view
-src/schema/               draft JSON Schema and an example document, served at /schema/
+src/schema/               JSON Schema and an example document, served at /schema/
 src/CNAME, src/robots.txt copied to dist/
 scripts/check-links.mjs   internal link and fragment check (add --external to report external URLs)
 scripts/check_schema.py   schema and example check, with negative controls

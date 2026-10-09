@@ -5,6 +5,6 @@
   "dataUrl": "https://data.opentideconstants.org",
   "repoUrl": "https://github.com/opentideconstants/opentideconstants",
   "webcaltidesUrl": "https://webcaltides.org",
-  "formatVersion": "0.1",
+  "formatVersion": "1.0",
   "released": false
 }
