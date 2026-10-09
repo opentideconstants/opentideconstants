@@ -11,6 +11,17 @@ r"""Check the JSON Schema and the example document.
 5. negative controls must fail: for example a constant set without
    convention_id or quantity, a local convention without utc_offset_hours, a
    bad datestamp, a constituent name over 15 characters, duplicate aliases,
+   a release (or .meta.json) with no astro_tables while a convention uses
+   f_u_at_prediction, an empty astro_tables, an unknown key in a table or
+   a row, a table without (or with a malformed) tables_sha256 or with a key
+   that is not a constituent name, a row without f, a v0u_deg outside
+   [0, 360), a negative f, a convention without (or with an empty)
+   astro_table_id, a datum.named key chart, mean_level or zero, a
+   datum.zero outside its enum, an empty datum.chart_datum,
+   a licence without commercial_use (or with a string), a non-commercial
+   licence without restriction or terms_url, an empty or non-string
+   restriction, a terms_url that is not a string or not a URI,
+   a record_span.start that is a date and not a date-time,
    a current set without current_bins (or with water-level constituents),
    current offsets without a reference bin, a mean current written as a
    constituent Z0 or as a string, and a value with a trailing
@@ -24,7 +35,10 @@ r"""Check the JSON Schema and the example document.
    final newline; ECMA-262 does not. The schema ends every pattern with
    $(?![\s\S]) so both reject it.
 
-Needs the jsonschema package (pip install jsonschema).
+Needs the jsonschema package with its format checkers
+(pip install 'jsonschema[format-nongpl]'), so that "format": "uri" and
+"date-time" are enforced. Without them jsonschema skips those formats, so
+this script stops if they are missing.
 """
 import copy
 import json
@@ -40,11 +54,17 @@ example = json.loads((schema_dir / "example.json").read_text())
 
 for path in sorted(schema_dir.glob("otc-*.schema.json")):
     Draft202012Validator.check_schema(json.loads(path.read_text()))
-validator = Draft202012Validator(schema)
+FORMATS = Draft202012Validator.FORMAT_CHECKER
+missing = {"uri", "date-time"} - set(FORMATS.checkers)
+if missing:
+    print(f"FAIL: jsonschema cannot check the formats {sorted(missing)}; pip install 'jsonschema[format-nongpl]'")
+    sys.exit(1)
+validator = Draft202012Validator(schema, format_checker=FORMATS)
 
 
 def sub_validator(name):
-    return Draft202012Validator({"$schema": schema["$schema"], "$defs": schema["$defs"], "$ref": f"#/$defs/{name}"})
+    return Draft202012Validator({"$schema": schema["$schema"], "$defs": schema["$defs"], "$ref": f"#/$defs/{name}"},
+                                format_checker=FORMATS)
 
 
 meta_validator = sub_validator("meta")
@@ -426,11 +446,128 @@ must_pass("a reference station whose only sets have no constants (no recommended
           lambda d: station(d, "OTC-EXAMPLE-0005").update(
               constant_sets=[fjord(d, "d"), fjord(d, "e")], recommended_set_id=None))
 
+# Astronomical tables and datum fields.
+def no_astro_tables(d):
+    d.pop("astro_tables", None)
+
+
+def no_astro_table_id(d):
+    d["conventions"][0].pop("astro_table_id", None)
+
+
+def meta_must_fail(label, mutate):
+    doc = copy.deepcopy(example)
+    mutate(doc)
+    doc.pop("stations")
+    if meta_validator.is_valid(doc):
+        print(f"FAIL: negative control passed validation as .meta.json: {label}")
+        sys.exit(1)
+    print(f"ok: rejected as .meta.json: {label}")
+
+
+def named_datums(d, named):
+    first_set(d).setdefault("datum", {})["named"] = named
+
+
+must_fail("no astro_tables while a convention uses f_u_at_prediction", no_astro_tables)
+meta_must_fail("no astro_tables while a convention uses f_u_at_prediction", no_astro_tables)
+must_fail("an f_u_at_prediction convention without astro_table_id", no_astro_table_id)
+meta_must_fail("an f_u_at_prediction convention without astro_table_id", no_astro_table_id)
+must_fail("an empty astro_tables", lambda d: d.__setitem__("astro_tables", []))
+meta_must_fail("an empty astro_tables", lambda d: d.__setitem__("astro_tables", []))
+must_fail("an unknown key in an astro table", lambda d: d["astro_tables"][0].__setitem__("note", "x"))
+must_fail("an unknown key in an astro table row (constituents.M2.u)",
+          lambda d: d["astro_tables"][0]["constituents"]["M2"].__setitem__("u", 1))
+
+
+def astro_table(d):
+    return d["astro_tables"][0]
+
+
+def m2_row(d):
+    return astro_table(d)["constituents"]["M2"]
+
+
+must_fail("v0u_deg 360.0", lambda d: m2_row(d)["v0u_deg"].__setitem__(0, 360.0))
+must_fail("v0u_deg -0.01", lambda d: m2_row(d)["v0u_deg"].__setitem__(0, -0.01))
+must_fail("a negative f", lambda d: m2_row(d)["f"].__setitem__(0, -0.5))
+must_fail("an astro table row without f", lambda d: m2_row(d).pop("f"))
+must_fail("an astro table without tables_sha256", lambda d: astro_table(d).pop("tables_sha256"))
+must_fail("an astro table with a malformed tables_sha256", lambda d: astro_table(d).__setitem__("tables_sha256", "33f97cb7"))
+must_fail("an astro table constituent key that is not a constituent name (M2(KS)2)",
+          lambda d: astro_table(d)["constituents"].__setitem__("M2(KS)2", m2_row(d)))
+must_fail("an empty convention.astro_table_id", lambda d: d["conventions"][0].__setitem__("astro_table_id", ""))
+meta_must_fail("an invalid table in astro_tables (no constituents)", lambda d: astro_table(d).pop("constituents"))
+for key in ("chart", "mean_level", "zero"):
+    must_fail(f"datum.named key {key}", lambda d, k=key: named_datums(d, {k: 0.0}))
+must_fail("datum.zero lat (not a kind of zero)", lambda d: first_set(d)["datum"].__setitem__("zero", "lat"))
+for zero in ("chart_datum", "gauge_zero", "msl", "unknown"):
+    must_pass(f"datum.zero {zero}", lambda d, z=zero: first_set(d)["datum"].__setitem__("zero", z))
+must_fail("an empty datum.chart_datum", lambda d: first_set(d)["datum"].update(chart_datum="", named={"mllw": 0.0}))
+
+
+def all_conventions_none(d):
+    for convention in d["conventions"]:
+        convention["nodal_handling"] = "none"
+        convention.pop("astro_table_id", None)
+    no_astro_tables(d)
+
+
+def meta_must_pass(label, mutate):
+    doc = copy.deepcopy(example)
+    mutate(doc)
+    doc.pop("stations")
+    errors = [e.message for e in meta_validator.iter_errors(doc)]
+    if errors:
+        print(f"FAIL: {label} as .meta.json: {errors[0]}")
+        sys.exit(1)
+    print(f"ok: accepted as .meta.json: {label}")
+
+
+must_pass("every convention with nodal_handling none, no astro_table_id and no astro_tables", all_conventions_none)
+meta_must_pass("every convention with nodal_handling none, no astro_table_id and no astro_tables", all_conventions_none)
+
+# Licences: commercial_use, and the restriction and terms_url of a non-commercial licence.
+NON_COMMERCIAL = {
+    "licence_id": "nc-control",
+    "spdx": "CC-BY-NC-4.0",
+    "provider": "Example provider via GESLA",
+    "attribution": "Example attribution text.",
+    "commercial_use": False,
+    "restriction": "Non-commercial use only: example restriction.",
+    "terms_url": "https://example.org/terms",
+}
+
+
+def with_nc_licence(d, **changes):
+    licence = dict(NON_COMMERCIAL, **changes)
+    for key in [k for k, v in changes.items() if v is None]:
+        licence.pop(key)
+    d["licences"].append(licence)
+
+
+must_fail("a licence without commercial_use", lambda d: d["licences"][0].pop("commercial_use", None))
+must_fail("commercial_use false without restriction", lambda d: with_nc_licence(d, restriction=None))
+must_fail("commercial_use false without terms_url", lambda d: with_nc_licence(d, terms_url=None))
+must_fail("a record_span.start that is not a date-time (2007-01-01)",
+          lambda d: first_set(d)["record_span"].__setitem__("start", "2007-01-01"))
+must_fail("commercial_use as the string \"false\", without restriction",
+          lambda d: with_nc_licence(d, commercial_use="false", restriction=None))
+must_fail("an empty restriction", lambda d: with_nc_licence(d, restriction=""))
+must_fail("a restriction that is not a string", lambda d: with_nc_licence(d, restriction=5))
+must_fail("a terms_url that is not a string", lambda d: with_nc_licence(d, terms_url=5))
+must_fail("a terms_url that is not a URI", lambda d: with_nc_licence(d, terms_url="not a uri"))
+must_pass("a non-commercial licence with spdx CC-BY-NC-4.0", lambda d: with_nc_licence(d))
+must_pass("a non-commercial licence with spdx LicenseRef-GESLA-Research",
+          lambda d: with_nc_licence(d, spdx="LicenseRef-GESLA-Research"))
+
 # Numbers that depend on the build (the ~15-day minimum, the ranking by good_hours) are build
 # checks, listed in the schema's top description. These instances are valid JSON Schema on purpose.
 for label, mutate in (
         ("too_short with 10000 good hours", lambda d: fjord(d, "d")["record_span"].__setitem__("good_hours", 10000)),
-        ("constants fitted from 24 good hours", lambda d: fjord(d, "a")["record_span"].__setitem__("good_hours", 24))):
+        ("constants fitted from 24 good hours", lambda d: fjord(d, "a")["record_span"].__setitem__("good_hours", 24)),
+        ("datum.chart_datum naming a key that is not in datum.named",
+         lambda d: first_set(d)["datum"].update(chart_datum="mllw", named={"msl": 1.0}))):
     doc = copy.deepcopy(example)
     mutate(doc)
     if problems(doc):
@@ -443,9 +580,9 @@ for label, mutate in (
 
 index_schema = json.loads((schema_dir / "otc-index-1.0.schema.json").read_text())
 Draft202012Validator.check_schema(index_schema)
-index_validator = Draft202012Validator(index_schema)
+index_validator = Draft202012Validator(index_schema, format_checker=FORMATS)
 pointer_validator = Draft202012Validator({"$schema": index_schema["$schema"], "$defs": index_schema["$defs"],
-                                          "$ref": "#/$defs/release_info"})
+                                          "$ref": "#/$defs/release_info"}, format_checker=FORMATS)
 index_example = json.loads((schema_dir / "index-example.json").read_text())
 errors = [e.message for e in index_validator.iter_errors(index_example)]
 if errors:

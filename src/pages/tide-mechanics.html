@@ -64,20 +64,20 @@ layout: full
     <span>·cos(</span><button class="t" type="button" data-term="w" data-owner="fix" aria-pressed="false">ω</button><span>t + </span><button class="t" type="button" data-term="v0" data-owner="pred" aria-pressed="false">V<sub>0</sub></button>
     <span> + </span><button class="t" type="button" data-term="u" data-owner="pred" aria-pressed="false">u</button><span> − </span><button class="t" type="button" data-term="g" data-owner="pub" aria-pressed="false">g</button><span>)</span>
   </div>
-  <div class="btnrow"><span class="pill pub">OTC publishes</span><span class="pill pred">predictor computes</span><span class="pill fix">fixed by astronomy</span></div>
+  <div class="btnrow"><span class="pill pub">OTC publishes per station</span><span class="pill pred">OTC publishes per year</span><span class="pill fix">fixed by astronomy</span></div>
   <ul class="terms" id="s3-terms">
     <li data-term="z0"><b>Z<sub>0</sub></b> Mean water level above the chart datum. One number per station. <span class="pill pub">OTC</span></li>
     <li data-term="H"><b>H</b> Amplitude: half the crest-to-trough height of this constituent. <span class="pill pub">OTC</span></li>
     <li data-term="g"><b>g</b> Phase lag: how many degrees the local crest trails the Moon or Sun's pull. <span class="pill pub">OTC</span></li>
     <li data-term="w"><b>ω</b> Speed in °/h. Identical worldwide. <span class="pill fix">astronomy</span></li>
-    <li data-term="v0"><b>V<sub>0</sub></b> Where the astronomical driver sits at t = 0. Depends only on the date. <span class="pill pred">predictor</span></li>
-    <li data-term="f"><b>f</b> and <b>u</b> Nodal corrections for amplitude and phase over the 18.6-year lunar node cycle. <span class="pill pred">predictor</span></li>
+    <li data-term="v0"><b>V<sub>0</sub></b> Where the astronomical driver sits at t = 0. Depends only on the date, so the release gives V<sub>0</sub> + u for each year (V<sub>0</sub> at 1 January, u at mid-year). <span class="pill pred">OTC per year</span></li>
+    <li data-term="f"><b>f</b> and <b>u</b> Nodal corrections for amplitude and phase over the 18.6-year lunar node cycle. The release gives f for each year. <span class="pill pred">OTC per year</span></li>
     <li data-term="t"><b>t</b> Hours since the time origin, in UTC. Σ adds every constituent. <span class="pill fix">input</span></li>
   </ul>
   <div class="fig"><canvas id="s3-wave" aria-label="One M2 wave with each formula term annotated" role="img"></canvas></div>
   <p class="cap">One M2 wave. The dashed curve is the equilibrium tide, the astronomical driver set by V<sub>0</sub> + u. The real crest arrives g degrees later; for M2 every 28.98° of lag is one hour.</p>
   <div class="fig"><canvas id="s3-nodal" aria-label="Nodal amplitude factor f for M2 and K1 over one 18.6 year cycle" role="img"></canvas></div>
-  <p class="cap">The nodal factor f across one lunar node cycle, centred on today. M2 moves about ±3.7%. K1 moves about ±11.5%, and the two run in opposite directions. A predictor computes f and u from the date, so OTC never stores them.</p>
+  <p class="cap">The nodal factor f across one lunar node cycle, centred on today. M2 moves about ±3.7%. K1 moves about ±11.5%, and the two run in opposite directions. The values of f and u depend only on the date, so they are the same at every station. Each release carries them in its astronomical tables, one value per year from 1700 to 2100, computed with congen after Schureman, and a predictor reads them from there.</p>
 </section>
 
 <!-- 4 -->
@@ -184,7 +184,7 @@ layout: full
     <li><span class="dot">rel</span><div><h3>Release</h3><p>Dated release files (<code>OTC_{YYYYMMDD}</code>) on <code>data.opentideconstants.org</code>. The pointer <code>OTC_latest-f1.json</code> names the newest release in format 1. Cite a release by the concept DOI and its datestamp (<a href="/about/#cite">How to cite</a>).</p></div></li>
     <li><span class="dot">sdk</span><div><h3>SDKs</h3><p>Python, Ruby, TypeScript and C libraries read a release, check its SHA-256 checksums, and give typed access to stations, constant sets, constituents (H and g), provenance and licences. They also predict tides and currents from the release.</p>
       <div class="chips"><span class="chip">Python</span><span class="chip">Ruby</span><span class="chip">TypeScript</span><span class="chip">C</span></div></div></li>
-    <li><span class="dot">h(t)</span><div><h3>Prediction</h3><p>A tide predictor takes Z<sub>0</sub>, H and g from the release, computes V<sub>0</sub>, f and u for the requested time, and sums the formula of section 3. The reference predictor is the webcaltides engine; <a href="/validation/">Validation</a> scores every release with it.</p></div></li>
+    <li><span class="dot">h(t)</span><div><h3>Prediction</h3><p>A tide predictor takes Z<sub>0</sub>, H and g from the release, takes V<sub>0</sub> + u and f for the year of the requested time from the release's astronomical tables, and sums the formula of section 3. The reference predictor is the webcaltides engine; <a href="/validation/">Validation</a> scores every release with it.</p></div></li>
   </ol>
 </section>
 

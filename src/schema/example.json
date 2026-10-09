@@ -15,6 +15,7 @@
       "v0_model": "schureman_tcd",
       "nodal_handling": "f_u_at_prediction",
       "constituent_table_version": "example",
+      "astro_table_id": "tcd-20251228",
       "canary": { "status": "not_applicable" }
     },
     {
@@ -24,6 +25,7 @@
       "v0_model": "schureman_tcd",
       "nodal_handling": "f_u_at_prediction",
       "constituent_table_version": "example",
+      "astro_table_id": "tcd-20251228",
       "canary": { "status": "pass", "gauges": 3 }
     },
     {
@@ -32,6 +34,7 @@
       "v0_model": "schureman_tcd",
       "nodal_handling": "f_u_at_prediction",
       "constituent_table_version": "example",
+      "astro_table_id": "tcd-20251228",
       "canary": { "status": "not_applicable" }
     }
   ],
@@ -40,19 +43,32 @@
       "licence_id": "gesla-derived",
       "spdx": "CC-BY-4.0",
       "provider": "Example provider via GESLA",
-      "attribution": "Example attribution text."
+      "attribution": "Example attribution text.",
+      "commercial_use": true
     },
     {
       "licence_id": "kartverket",
       "spdx": "CC-BY-4.0",
       "provider": "Kartverket",
-      "attribution": "Example attribution text."
+      "attribution": "Example attribution text.",
+      "commercial_use": true
     },
     {
       "licence_id": "noaa",
       "spdx": "LicenseRef-PublicDomain-USGov",
       "provider": "NOAA CO-OPS",
-      "attribution": "Example attribution text."
+      "attribution": "Example attribution text.",
+      "commercial_use": true
+    },
+    {
+      "licence_id": "gesla-cmems-nc",
+      "spdx": "CC-BY-NC-4.0",
+      "provider": "Copernicus Marine Service (CMEMS) via GESLA",
+      "attribution": "Generated using E.U. Copernicus Marine Service Information, via GESLA-4.1. CC BY-NC 4.0: non-commercial use only.",
+      "url": "https://creativecommons.org/licenses/by-nc/4.0/legalcode",
+      "commercial_use": false,
+      "restriction": "Non-commercial use only: the GESLA licence page lists CMEMS records for research use; commercial use needs the data owner's permission.",
+      "terms_url": "https://gesla787883612.wordpress.com/license/"
     }
   ],
   "constituents": [
@@ -64,6 +80,26 @@
     { "constituent_table_version": "example", "name": "SA", "doodson": "056 555", "speed_deg_per_hour": 0.0410686 },
     { "constituent_table_version": "example", "name": "P1", "doodson": "163 555", "speed_deg_per_hour": 14.9589314, "nodal_formula_id": "P1" },
     { "constituent_table_version": "example", "name": "K2", "doodson": "275 555", "speed_deg_per_hour": 30.0821373, "nodal_formula_id": "K2" }
+  ],
+  "astro_tables": [
+    {
+      "astro_table_id": "tcd-20251228",
+      "v0_model": "schureman_tcd",
+      "tables_sha256": "33f97cb73ac25a0fec273950c0b85ff55ddbe7edf4448e80ea8d5b3d59b0aeb1",
+      "generator": "congen (XTide) after Schureman, US C&GS Special Publication 98",
+      "first_year": 2024,
+      "last_year": 2026,
+      "constituents": {
+        "M2": { "speed_deg_per_hour": 28.9841042, "v0u_deg": [247.82, 324.92, 66.36], "f": [0.9639, 0.9636, 0.9674] },
+        "S2": { "speed_deg_per_hour": 30.0, "v0u_deg": [0.0, 0.0, 0.0], "f": [1.0, 1.0, 1.0] },
+        "N2": { "speed_deg_per_hour": 28.4397295, "v0u_deg": [71.64, 46.94, 59.66], "f": [0.9639, 0.9636, 0.9674] },
+        "K1": { "speed_deg_per_hour": 15.0410686, "v0u_deg": [8.66, 12.0, 14.26], "f": [1.1112, 1.112, 1.1031] },
+        "O1": { "speed_deg_per_hour": 13.9430356, "v0u_deg": [239.75, 312.48, 50.65], "f": [1.1801, 1.1814, 1.1668] },
+        "SA": { "speed_deg_per_hour": 0.0410686, "v0u_deg": [280.16, 280.9, 280.67], "f": [1.0, 1.0, 1.0] },
+        "P1": { "speed_deg_per_hour": 14.9589314, "v0u_deg": [349.84, 349.1, 349.33], "f": [1.0, 1.0, 1.0] },
+        "K2": { "speed_deg_per_hour": 30.0821373, "v0u_deg": [197.15, 204.13, 208.93], "f": [1.3104, 1.3131, 1.2815] }
+      }
+    }
   ],
   "stations": [
     {
@@ -86,7 +122,7 @@
           "source_record_id": "example-file-id",
           "source_version": "4.1",
           "record_span": { "start": "2007-01-01T00:00:00Z", "end": "2026-01-01T00:00:00Z", "good_samples": 160000, "good_hours": 160000 },
-          "datum": { "msl_offset_m": 1.0 },
+          "datum": { "msl_offset_m": 1.0, "zero": "gauge_zero" },
           "convention_id": "otc-greenwich-schureman-v1",
           "licence_id": "gesla-derived",
           "qc_status": "ok",
@@ -116,6 +152,7 @@
           "quantity": "water_level",
           "source_record_id": "EXA",
           "source_version": "20991231",
+          "datum": { "msl_offset_m": 0.9, "zero": "chart_datum", "chart_datum": "lat", "named": { "lat": 0.0, "msl": 0.9 } },
           "convention_id": "kartverket-utc1-v1",
           "licence_id": "kartverket",
           "qc_status": "ok",
@@ -237,7 +274,7 @@
           "licence_id": "gesla-derived",
           "source_record_id": "example-fjord-a",
           "record_span": { "start": "2007-01-01T00:00:00Z", "end": "2026-01-01T00:00:00Z", "good_samples": 158000, "good_hours": 158000 },
-          "datum": { "msl_offset_m": 1.1 },
+          "datum": { "msl_offset_m": 1.1, "zero": "gauge_zero" },
           "qc_status": "ok",
           "time_base": {
             "code": "corrected",
@@ -267,7 +304,7 @@
           "quantity": "water_level",
           "source_version": "4.1",
           "convention_id": "otc-greenwich-schureman-v1",
-          "licence_id": "gesla-derived",
+          "licence_id": "gesla-cmems-nc",
           "source_record_id": "example-fjord-b",
           "record_span": { "start": "2000-01-01T00:00:00Z", "end": "2012-01-01T00:00:00Z", "good_samples": 220000, "good_hours": 55000 },
           "qc_status": "flagged",
