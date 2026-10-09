@@ -707,7 +707,7 @@
     },
     "direction_deg": { "description": "Degrees true, clockwise from north.", "type": "number", "minimum": 0, "exclusiveMaximum": 360 },
     "current_bin": {
-      "description": "Ellipse constants for one depth bin: per constituent, the amplitude and phase of the current along the major axis (azimuth_deg) and along the minor axis, perpendicular to it, as NOAA harcon gives them.",
+      "description": "Ellipse constants for one depth bin: per constituent, the amplitude and phase of the current along the major axis (azimuth_deg) and along the minor axis, perpendicular to it, as NOAA harcon gives them. Minor-axis velocity is positive toward `azimuth_deg + 90°`, that is, 90° clockwise from the positive major-axis direction (measured against NOAA `speed_dir` predictions).",
       "type": "object",
       "required": ["bin", "depth_m", "depth_type", "azimuth_deg", "constituents"],
       "additionalProperties": false,

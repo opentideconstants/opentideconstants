@@ -64,14 +64,14 @@ layout: full
     <span>·cos(</span><button class="t" type="button" data-term="w" data-owner="fix" aria-pressed="false">ω</button><span>t + </span><button class="t" type="button" data-term="v0" data-owner="pred" aria-pressed="false">V<sub>0</sub></button>
     <span> + </span><button class="t" type="button" data-term="u" data-owner="pred" aria-pressed="false">u</button><span> − </span><button class="t" type="button" data-term="g" data-owner="pub" aria-pressed="false">g</button><span>)</span>
   </div>
-  <div class="btnrow"><span class="pill pub">OTC publishes</span><span class="pill pred">predictor computes</span><span class="pill fix">fixed by astronomy</span></div>
+  <div class="btnrow"><span class="pill pub">OTC publishes per station</span><span class="pill pred">OTC publishes per year</span><span class="pill fix">fixed by astronomy</span></div>
   <ul class="terms" id="s3-terms">
     <li data-term="z0"><b>Z<sub>0</sub></b> Mean water level above the chart datum. One number per station. <span class="pill pub">OTC</span></li>
     <li data-term="H"><b>H</b> Amplitude: half the crest-to-trough height of this constituent. <span class="pill pub">OTC</span></li>
     <li data-term="g"><b>g</b> Phase lag: how many degrees the local crest trails the Moon or Sun's pull. <span class="pill pub">OTC</span></li>
     <li data-term="w"><b>ω</b> Speed in °/h. Identical worldwide. <span class="pill fix">astronomy</span></li>
-    <li data-term="v0"><b>V<sub>0</sub></b> Where the astronomical driver sits at t = 0. Depends only on the date. <span class="pill pred">predictor</span></li>
-    <li data-term="f"><b>f</b> and <b>u</b> Nodal corrections for amplitude and phase over the 18.6-year lunar node cycle. <span class="pill pred">predictor</span></li>
+    <li data-term="v0"><b>V<sub>0</sub></b> Where the astronomical driver sits at t = 0. Depends only on the date, so the release gives V<sub>0</sub> + u for 1 January of each year. <span class="pill pred">OTC tables</span></li>
+    <li data-term="f"><b>f</b> and <b>u</b> Nodal corrections for amplitude and phase over the 18.6-year lunar node cycle. The release gives f for each year. <span class="pill pred">OTC tables</span></li>
     <li data-term="t"><b>t</b> Hours since the time origin, in UTC. Σ adds every constituent. <span class="pill fix">input</span></li>
   </ul>
   <div class="fig"><canvas id="s3-wave" aria-label="One M2 wave with each formula term annotated" role="img"></canvas></div>

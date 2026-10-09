@@ -11,6 +11,9 @@ r"""Check the JSON Schema and the example document.
 5. negative controls must fail: for example a constant set without
    convention_id or quantity, a local convention without utc_offset_hours, a
    bad datestamp, a constituent name over 15 characters, duplicate aliases,
+   a release (or .meta.json) with no astro_tables while a convention uses
+   f_u_at_prediction, such a convention without astro_table_id, a
+   datum.named key chart, mean_level or zero, a datum.zero outside its enum,
    a current set without current_bins (or with water-level constituents),
    current offsets without a reference bin, a mean current written as a
    constituent Z0 or as a string, and a value with a trailing
@@ -425,6 +428,44 @@ must_pass("an official set without record_span", lambda d: d["stations"][0]["con
 must_pass("a reference station whose only sets have no constants (no recommended set)",
           lambda d: station(d, "OTC-EXAMPLE-0005").update(
               constant_sets=[fjord(d, "d"), fjord(d, "e")], recommended_set_id=None))
+
+# Astronomical tables and datum fields.
+def no_astro_tables(d):
+    d.pop("astro_tables", None)
+
+
+def no_astro_table_id(d):
+    d["conventions"][0].pop("astro_table_id", None)
+
+
+def meta_must_fail(label, mutate):
+    doc = copy.deepcopy(example)
+    mutate(doc)
+    doc.pop("stations")
+    if meta_validator.is_valid(doc):
+        print(f"FAIL: negative control passed validation as .meta.json: {label}")
+        sys.exit(1)
+    print(f"ok: rejected as .meta.json: {label}")
+
+
+def named_datums(d, named):
+    first_set(d).setdefault("datum", {})["named"] = named
+
+
+must_fail("no astro_tables while a convention uses f_u_at_prediction", no_astro_tables)
+meta_must_fail("no astro_tables while a convention uses f_u_at_prediction", no_astro_tables)
+must_fail("an f_u_at_prediction convention without astro_table_id", no_astro_table_id)
+meta_must_fail("an f_u_at_prediction convention without astro_table_id", no_astro_table_id)
+for key in ("chart", "mean_level", "zero"):
+    must_fail(f"datum.named key {key}", lambda d, k=key: named_datums(d, {k: 0.0}))
+must_fail("datum.zero lat (not a kind of zero)", lambda d: first_set(d)["datum"].__setitem__("zero", "lat"))
+for zero in ("chart_datum", "gauge_zero", "msl", "unknown"):
+    must_pass(f"datum.zero {zero}", lambda d, z=zero: first_set(d)["datum"].__setitem__("zero", z))
+must_pass("datum.chart_datum naming a key of datum.named",
+          lambda d: first_set(d)["datum"].update(chart_datum="mllw", named={"mllw": 0.0, "mhhw": 1.2}))
+must_pass("every convention with nodal_handling none, no astro_table_id and no astro_tables",
+          lambda d: [[c.__setitem__("nodal_handling", "none"), c.pop("astro_table_id", None)] for c in d["conventions"]]
+          + [d.pop("astro_tables", None)])
 
 # Numbers that depend on the build (the ~15-day minimum, the ranking by good_hours) are build
 # checks, listed in the schema's top description. These instances are valid JSON Schema on purpose.
