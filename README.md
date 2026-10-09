@@ -14,7 +14,7 @@ OTC takes three kinds of source. At one location, they rank in this order:
 
 A station keeps every constant set from every source. One set is recommended by a published rule. Each station has a stable id and its aliases in other systems (NOAA, GESLA, TICON, XTide, Kartverket, Slackwater). The [Sources](https://opentideconstants.org/sources/) page gives the licence, access and coverage of each source.
 
-The format is version 1.0. A release has one JSON document with a published [JSON Schema](https://opentideconstants.org/schema/otc-1.0.schema.json), the same data as JSON Lines (one station per line), and one long CSV table for spreadsheets.
+The format is version 1.0. A release has one JSON document with a published [JSON Schema](https://opentideconstants.org/schema/otc-1.0.schema.json), the same data as JSON Lines (one station per line), and one long CSV table for spreadsheets. The JSON document also carries the per-year astronomical tables (V0+u and the node factor f) that a predictor needs, computed with congen after Schureman.
 
 Every constant set carries:
 
