@@ -52,11 +52,14 @@ order: 5
 <p>OTC depends on the work of the agencies that run tide gauges, the GESLA team that assembles their records, and the TICON team, whose constants and methods are the reference this project compares against.</p>
 
 <h2 id="cite">How to cite</h2>
-<p>A citation lets a reader get the exact data you used. Each release has its own DOI, through <a href="https://zenodo.org/">Zenodo</a>, and one concept DOI resolves to the latest release.</p>
+<p>A citation lets a reader get the exact data you used. Every release that changes the data is published at <code>{{site.dataUrl}}</code>, at most once a week, and every release stays available. <a href="https://zenodo.org/">Zenodo</a> archives one version a month, which holds the latest release of that month. A material change gets its own Zenodo version at once: a source added or removed, a format change, or a large accuracy change. All Zenodo versions share one concept DOI.</p>
 <ul>
-  <li>Cite the release you used by its date (<code>OTC_{YYYYMMDD}</code>) and its DOI. Both are in the release files and on <a href="/downloads/">Downloads</a>.</li>
-  <li>To cite the project as a whole, use the concept DOI, or the <a href="{{site.repoUrl}}/blob/main/CITATION.cff"><code>CITATION.cff</code></a> file that GitHub and reference managers read:</li>
+  <li>Cite the release you used by the concept DOI and its datestamp (<code>OTC_{YYYYMMDD}</code>). The datestamp names the exact files, for example <code>{{site.dataUrl}}/OTC_{YYYYMMDD}.json</code>.</li>
+  <li>If the release has its own Zenodo version, add its version DOI.</li>
+  <li>The concept DOI is in the release files (<code>release.concept_doi</code>), in <code>OTC_index.json</code>, in the latest pointers and on <a href="/downloads/">Downloads</a>. The version DOI is only in <code>OTC_index.json</code> and the latest pointers (<code>zenodo_version_doi</code>), because Zenodo makes it after the release files are fixed. In the release files, <code>release.doi</code> is always null.</li>
+  <li>The <a href="{{site.repoUrl}}/blob/main/CITATION.cff"><code>CITATION.cff</code></a> file gives the citation for GitHub and reference managers.</li>
 </ul>
-<pre><code>OpenTideConstants contributors. OpenTideConstants: open tidal harmonic constants.
-{{site.url}}/</code></pre>
+<p>The citation, with the release year, the datestamp and the concept DOI:</p>
+<pre><code>OpenTideConstants contributors ({YYYY}). OpenTideConstants, release {YYYYMMDD} [Data set]. https://doi.org/{concept_doi}</code></pre>
+<p>If the release has a version DOI, add <code>(version DOI: https://doi.org/{zenodo_version_doi})</code> at the end.</p>
 <p>Also cite the upstream data of the stations you used, as listed under <a href="#attribution">Attribution</a>. GESLA asks for Haigh et al. (2023) and Woodworth et al. (2017), and Caldwell et al. (2015) for UHSLC records. Where you compare with TICON, cite the TICON release you used, for example TICON-4, <a href="https://doi.org/10.17882/109129">doi:10.17882/109129</a>.</p>
