@@ -44,18 +44,18 @@ Zenodo archives one version a month and one for each material change, all under 
 
 Client libraries for Python, Ruby, TypeScript and C are in [opentideconstants/sdk](https://github.com/opentideconstants/sdk). They read a release, check its SHA-256 checksums, cache it, and give typed access to stations, constant sets, constituents, conventions, provenance, validation and licences. All four pass one shared conformance suite.
 
-The SDKs are published as `opentideconstants` on [PyPI](https://pypi.org/project/opentideconstants/), [RubyGems](https://rubygems.org/gems/opentideconstants) and [npm](https://www.npmjs.com/package/opentideconstants), and they read release format 1.0.
+The Python, Ruby and TypeScript SDKs are published as `opentideconstants` on [PyPI](https://pypi.org/project/opentideconstants/), [RubyGems](https://rubygems.org/gems/opentideconstants) and [npm](https://www.npmjs.com/package/opentideconstants), and the C library is published on the SDK repository's GitHub releases. All four read release format 1.0.
 
 | Language | Package | Install command | Requires |
 |---|---|---|---|
 | Python | `opentideconstants` | `pip install opentideconstants` | Python 3.10 or later |
 | Ruby | `opentideconstants` | `gem install opentideconstants` | Ruby 3.0 or later |
 | TypeScript / JavaScript | `opentideconstants` | `npm install opentideconstants` | Node 22.12 or later |
-| C | `libopentideconstants` | build `c/` in the SDK repository with CMake, or copy in the single-file amalgamation (`opentideconstants.c` and `.h`) | a C99 compiler |
+| C | `libopentideconstants` | build `c/` in the SDK repository with CMake, or copy in the single-file amalgamation (`opentideconstants.c` and `.h`), or download it from the SDK repository's GitHub releases | a C99 compiler |
 
 Each snippet below opens the latest release, finds the reference stations within 25 km of a point, prints the M2 constituent of each station's recommended constant set, and prints the attribution text for those stations. The snippets were run against the SDK's conformance fixtures.
 
-The SDKs read a release and predict tides and currents from it. [Tide Mechanics](https://opentideconstants.org/tide-mechanics/) shows how the constants turn into a prediction.
+The SDKs also predict tides and currents. [Tide Mechanics](https://opentideconstants.org/tide-mechanics/) shows how the constants turn into a prediction.
 
 **Python**
 
