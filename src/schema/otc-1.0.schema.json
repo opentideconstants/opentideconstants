@@ -2,10 +2,11 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://opentideconstants.org/schema/otc-1.0.schema.json",
   "title": "OpenTideConstants release document",
-  "description": "format_version 1.0. Schema for OTC_{YYYYMMDD}.json. Each line of OTC_{YYYYMMDD}.jsonl (and of the optional OTC_{YYYYMMDD}.jsonl.gz) is one station document, valid against #/$defs/station. OTC_{YYYYMMDD}.meta.json is the same document without `stations`, valid against #/$defs/meta, so a .jsonl reader can get the conventions, licences, constituent table and release metadata. Units: metres, metres per second (current amplitudes), degrees, degrees per hour, UTC. Every pattern ends with $(?![\\s\\S]) so that a validator whose $ also matches before a final newline (Python re) still rejects one. Cross-references (convention_id, licence_id, recommended_set_id, constituent names, default_current_bin, current_offsets reference_station_id and reference_bin) must resolve inside the same release, alias ids must be unique within each alias system across the release, and bin numbers must be unique within a set's current_bins and within a station's current_offsets. JSON Schema cannot express these, so the release build checks them separately. The build also checks: (1) a no_constants set with too_short has fewer than release.fit_min_good_hours hours of good data, and every set with constants fitted from a record has at least that many; good_hours is never more than the hours between record_span start and end; (2) a station's recommended set is never a no_constants set, never a short_record set when the station has a set of the same quantity with constants and more good_hours, and always has the quantity of the station's kind; (3) a time_base correction has from different from to, its from equals declared and its to equals published, and an unverified or disputed time_base has published equal to declared; (4) a tombstone's merged_into names an active station whose aliases include every alias id the removed station had; (5) provenance.carried_from_release is earlier than the release datestamp and names a release that held the same set_id, and a carried set's convention_id and licence_id exist in this release; (6) recommended_set_id is null on a reference station only when every set of the station is no_constants (the schema checks this too), and a subordinate station has constant sets, subordinate_offsets or current_offsets (the schema checks this too).",
+  "description": "format_version 1.0. Schema for OTC_{YYYYMMDD}.json. Each line of OTC_{YYYYMMDD}.jsonl (and of the optional OTC_{YYYYMMDD}.jsonl.gz) is one station document, valid against #/$defs/station. OTC_{YYYYMMDD}.meta.json is the same document without `stations`, valid against #/$defs/meta, so a .jsonl reader can get the conventions, licences, constituent table and release metadata. Units: metres, metres per second (current amplitudes), degrees, degrees per hour, UTC. Every pattern ends with $(?![\\s\\S]) so that a validator whose $ also matches before a final newline (Python re) still rejects one. Cross-references (convention_id, licence_id, recommended_set_id, constituent names, astro_table_id, datum.chart_datum, default_current_bin, current_offsets reference_station_id and reference_bin) must resolve inside the same release, alias ids must be unique within each alias system across the release, and bin numbers must be unique within a set's current_bins and within a station's current_offsets. JSON Schema cannot express these, so the release build checks them separately. The build also checks: (1) a no_constants set with too_short has fewer than release.fit_min_good_hours hours of good data, and every set with constants fitted from a record has at least that many; good_hours is never more than the hours between record_span start and end; (2) a station's recommended set is never a no_constants set, never a short_record set when the station has a set of the same quantity with constants and more good_hours, and always has the quantity of the station's kind; (3) a time_base correction has from different from to, its from equals declared and its to equals published, and an unverified or disputed time_base has published equal to declared; (4) a tombstone's merged_into names an active station whose aliases include every alias id the removed station had; (5) provenance.carried_from_release is earlier than the release datestamp and names a release that held the same set_id, and a carried set's convention_id and licence_id exist in this release; (6) recommended_set_id is null on a reference station only when every set of the station is no_constants (the schema checks this too), and a subordinate station has constant sets, subordinate_offsets or current_offsets (the schema checks this too); (7) every constituent of every set with constants has a row in its convention's astro table, each row's speed equals the set's speed and the constituents table speed within 1e-7 degrees per hour, every v0u_deg and f array has last_year - first_year + 1 entries, and a convention's tables_sha256, when present, equals its astro table's; (8) datum.chart_datum names a key of datum.named.",
   "type": "object",
   "required": ["format_version", "release", "conventions", "licences", "constituents", "stations"],
   "additionalProperties": false,
+  "allOf": [{ "$ref": "#/$defs/astro_tables_when_used" }],
   "properties": {
     "format_version": { "description": "Always 1.0 in this schema.", "const": "1.0" },
     "release": { "$ref": "#/$defs/release" },
@@ -25,6 +26,7 @@
       "minItems": 1,
       "items": { "$ref": "#/$defs/constituent_definition" }
     },
+    "astro_tables": { "$ref": "#/$defs/astro_tables" },
     "stations": {
       "type": "array",
       "items": { "$ref": "#/$defs/station" }
@@ -36,12 +38,71 @@
       "type": "object",
       "required": ["format_version", "release", "conventions", "licences", "constituents"],
       "additionalProperties": false,
+      "allOf": [{ "$ref": "#/$defs/astro_tables_when_used" }],
       "properties": {
         "format_version": { "const": "1.0" },
         "release": { "$ref": "#/$defs/release" },
         "conventions": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/convention" } },
         "licences": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/licence" } },
-        "constituents": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/constituent_definition" } }
+        "constituents": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/constituent_definition" } },
+        "astro_tables": { "$ref": "#/$defs/astro_tables" }
+      }
+    },
+    "astro_tables_when_used": {
+      "description": "astro_tables is required, with at least one table, when any convention has nodal_handling f_u_at_prediction.",
+      "if": {
+        "required": ["conventions"],
+        "properties": { "conventions": { "contains": { "required": ["nodal_handling"], "properties": { "nodal_handling": { "const": "f_u_at_prediction" } } } } }
+      },
+      "then": { "required": ["astro_tables"] }
+    },
+    "astro_tables": {
+      "description": "The predictor's per-year astronomical tables: V0+u and the node factor f for each constituent the release uses, computed with congen (XTide, David Flater) after Schureman, Manual of Harmonic Analysis and Prediction of Tides, US C&GS Special Publication 98. A convention with nodal_handling f_u_at_prediction names its table by astro_table_id. Published under the release's licence.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/astro_table" }
+    },
+    "astro_table": {
+      "type": "object",
+      "required": ["astro_table_id", "v0_model", "tables_sha256", "generator", "first_year", "last_year", "constituents"],
+      "additionalProperties": false,
+      "properties": {
+        "astro_table_id": { "description": "Id that convention.astro_table_id refers to, e.g. tcd-20251228.", "type": "string", "minLength": 1 },
+        "v0_model": { "description": "Astronomical-argument model of the table, as in convention.v0_model, e.g. schureman_tcd.", "type": "string", "minLength": 1 },
+        "tables_sha256": {
+          "description": "SHA-256 of the TCD file whose values the table equals. Same meaning as convention.tables_sha256.",
+          "$ref": "#/$defs/sha256"
+        },
+        "generator": { "description": "What computed the values, e.g. congen (XTide) after Schureman, US C&GS Special Publication 98.", "type": "string", "minLength": 1 },
+        "first_year": { "description": "Year of the first entry of every array.", "type": "integer" },
+        "last_year": { "description": "Year of the last entry of every array. Each array has last_year - first_year + 1 entries; the release build checks this.", "type": "integer" },
+        "constituents": {
+          "description": "One row per constituent the release uses, keyed by OTC canonical name.",
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "$ref": "#/$defs/constituent_name" },
+          "additionalProperties": { "$ref": "#/$defs/astro_table_row" }
+        }
+      }
+    },
+    "astro_table_row": {
+      "type": "object",
+      "required": ["speed_deg_per_hour", "v0u_deg", "f"],
+      "additionalProperties": false,
+      "properties": {
+        "speed_deg_per_hour": { "type": "number", "minimum": 0 },
+        "v0u_deg": {
+          "description": "v0u_deg[i] is V0+u in degrees at (first_year + i)-01-01T00:00:00Z, rounded to 0.01 and reduced to [0, 360).",
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "number", "minimum": 0, "exclusiveMaximum": 360 }
+        },
+        "f": {
+          "description": "f[i] is the node factor for the year first_year + i, rounded to 0.0001.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "number", "minimum": 0 }
+        }
       }
     },
     "format_version": {
@@ -107,6 +168,11 @@
         },
         "constituent_table_version": { "type": "string" },
         "tables_sha256": { "$ref": "#/$defs/sha256" },
+        "astro_table_id": {
+          "description": "The astro_tables entry with the V0+u and f for this convention. Required when nodal_handling is f_u_at_prediction. When tables_sha256 is also present, it equals the table's (the release build checks this).",
+          "type": "string",
+          "minLength": 1
+        },
         "canary": {
           "description": "Result of the per-source convention check that confirmed this convention.",
           "type": "object",
@@ -121,7 +187,13 @@
         }
       },
       "if": { "properties": { "phase_reference": { "const": "local" } } },
-      "then": { "required": ["utc_offset_hours"] }
+      "then": { "required": ["utc_offset_hours"] },
+      "allOf": [
+        {
+          "if": { "properties": { "nodal_handling": { "const": "f_u_at_prediction" } } },
+          "then": { "required": ["astro_table_id"] }
+        }
+      ]
     },
     "licence": {
       "type": "object",
@@ -308,9 +380,19 @@
           "additionalProperties": false,
           "properties": {
             "msl_offset_m": { "type": "number" },
+            "zero": {
+              "description": "What the constants' zero is. chart_datum: the source's chart datum (e.g. JMA's tide-table datum); gauge_zero: the gauge's own zero (GESLA fits); msl: mean sea level; unknown: the source does not say.",
+              "enum": ["chart_datum", "gauge_zero", "msl", "unknown"]
+            },
+            "chart_datum": {
+              "description": "The key in named that is the official chart datum, e.g. mllw, lat or tide_table_datum. Absent when the source gives none. The release build checks that named has this key.",
+              "type": "string",
+              "minLength": 1
+            },
             "named": {
-              "description": "Named datums in metres relative to the constants' zero, as the source gives them.",
+              "description": "Named datums in metres relative to the constants' zero, as the source gives them. A key may not be mean_level, zero or chart: those are datum keywords in the SDKs' API.",
               "type": "object",
+              "propertyNames": { "not": { "enum": ["mean_level", "zero", "chart"] } },
               "additionalProperties": { "type": "number" }
             }
           }
