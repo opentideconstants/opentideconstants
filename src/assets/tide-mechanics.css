@@ -45,6 +45,27 @@
 .tm section:first-of-type{border-top:0}
 .tm .fig{margin:18px 0 6px;min-width:0}
 .tm .fig canvas{display:block;width:100%;background:var(--paper);border:1px solid var(--rule);border-radius:3px}
+/* Reserve each figure's drawn height before assets/tide-mechanics.js runs, so the page does not
+   shift after load and a link to #s4 or #s6 lands on its heading. These match the heights the
+   draw functions pass to prep(); w is the width of the .fig, hence the container query. */
+.tm .fig{container-type:inline-size}
+#s1-lanes{height:364px}
+#s1-month{height:clamp(190px,30cqw,260px)}
+#s2-spec{height:330px}
+#s3-wave{height:300px}
+#s3-nodal{height:220px}
+#s4-clock,#s4-mer{height:min(154px,calc(20cqw + 46px))}
+#s5-plot{height:320px}
+#s6-time{height:238px}
+#s7-h{height:150px}
+#s7-sub{height:190px}
+#s7-cur{height:290px}
+#s7-surge{height:240px}
+@container (width < 560px){
+  #s2-spec{height:420px}
+  #s3-wave{height:270px}
+  #s5-plot{height:300px}
+}
 .tm .cap{font-size:.92rem;color:var(--ink-2);max-width:65ch;margin:.5em 0}
 .tm .cap b{color:var(--ink)}
 .tm .mono{font-family:var(--f-mono)}
