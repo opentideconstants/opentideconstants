@@ -57,7 +57,7 @@
       "then": { "required": ["astro_tables"] }
     },
     "astro_tables": {
-      "description": "The predictor's per-year astronomical tables: V0+u and the node factor f for each constituent the release uses, computed with congen (XTide, David Flater) after Schureman, Manual of Harmonic Analysis and Prediction of Tides, US C&GS Special Publication 98. A convention with nodal_handling f_u_at_prediction names its table by astro_table_id. Published under CC BY 4.0, like the constants OTC derives.",
+      "description": "The predictor's per-year astronomical tables: V0+u and the node factor f for each constituent the release uses, computed with congen (XTide, David Flater) after Schureman, Manual of Harmonic Analysis and Prediction of Tides, US C&GS Special Publication 98. A convention with nodal_handling f_u_at_prediction names its table by astro_table_id. Published under CC BY 4.0.",
       "type": "array",
       "minItems": 1,
       "items": { "$ref": "#/$defs/astro_table" }

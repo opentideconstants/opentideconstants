@@ -18,8 +18,9 @@ r"""Check the JSON Schema and the example document.
    [0, 360), a negative f, a convention without (or with an empty)
    astro_table_id, a datum.named key chart, mean_level or zero, a
    datum.zero outside its enum, an empty datum.chart_datum,
-   a licence without commercial_use, a non-commercial licence without
-   restriction or terms_url,
+   a licence without commercial_use (or with a string), a non-commercial
+   licence without restriction or terms_url, an empty or non-string
+   restriction, a terms_url that is not a string or not a URI,
    a current set without current_bins (or with water-level constituents),
    current offsets without a reference bin, a mean current written as a
    constituent Z0 or as a string, and a value with a trailing
@@ -33,7 +34,10 @@ r"""Check the JSON Schema and the example document.
    final newline; ECMA-262 does not. The schema ends every pattern with
    $(?![\s\S]) so both reject it.
 
-Needs the jsonschema package (pip install jsonschema).
+Needs the jsonschema package with its format checkers
+(pip install 'jsonschema[format-nongpl]'), so that "format": "uri" and
+"date-time" are enforced. Without them jsonschema skips those formats, so
+this script stops if they are missing.
 """
 import copy
 import json
@@ -49,11 +53,17 @@ example = json.loads((schema_dir / "example.json").read_text())
 
 for path in sorted(schema_dir.glob("otc-*.schema.json")):
     Draft202012Validator.check_schema(json.loads(path.read_text()))
-validator = Draft202012Validator(schema)
+FORMATS = Draft202012Validator.FORMAT_CHECKER
+missing = {"uri", "date-time"} - set(FORMATS.checkers)
+if missing:
+    print(f"FAIL: jsonschema cannot check the formats {sorted(missing)}; pip install 'jsonschema[format-nongpl]'")
+    sys.exit(1)
+validator = Draft202012Validator(schema, format_checker=FORMATS)
 
 
 def sub_validator(name):
-    return Draft202012Validator({"$schema": schema["$schema"], "$defs": schema["$defs"], "$ref": f"#/$defs/{name}"})
+    return Draft202012Validator({"$schema": schema["$schema"], "$defs": schema["$defs"], "$ref": f"#/$defs/{name}"},
+                                format_checker=FORMATS)
 
 
 meta_validator = sub_validator("meta")
@@ -538,6 +548,12 @@ def with_nc_licence(d, **changes):
 must_fail("a licence without commercial_use", lambda d: d["licences"][0].pop("commercial_use", None))
 must_fail("commercial_use false without restriction", lambda d: with_nc_licence(d, restriction=None))
 must_fail("commercial_use false without terms_url", lambda d: with_nc_licence(d, terms_url=None))
+must_fail("commercial_use as the string \"false\", without restriction",
+          lambda d: with_nc_licence(d, commercial_use="false", restriction=None))
+must_fail("an empty restriction", lambda d: with_nc_licence(d, restriction=""))
+must_fail("a restriction that is not a string", lambda d: with_nc_licence(d, restriction=5))
+must_fail("a terms_url that is not a string", lambda d: with_nc_licence(d, terms_url=5))
+must_fail("a terms_url that is not a URI", lambda d: with_nc_licence(d, terms_url="not a uri"))
 must_pass("a non-commercial licence with spdx CC-BY-NC-4.0", lambda d: with_nc_licence(d))
 must_pass("a non-commercial licence with spdx LicenseRef-GESLA-Research",
           lambda d: with_nc_licence(d, spdx="LicenseRef-GESLA-Research"))
@@ -561,9 +577,9 @@ for label, mutate in (
 
 index_schema = json.loads((schema_dir / "otc-index-1.0.schema.json").read_text())
 Draft202012Validator.check_schema(index_schema)
-index_validator = Draft202012Validator(index_schema)
+index_validator = Draft202012Validator(index_schema, format_checker=FORMATS)
 pointer_validator = Draft202012Validator({"$schema": index_schema["$schema"], "$defs": index_schema["$defs"],
-                                          "$ref": "#/$defs/release_info"})
+                                          "$ref": "#/$defs/release_info"}, format_checker=FORMATS)
 index_example = json.loads((schema_dir / "index-example.json").read_text())
 errors = [e.message for e in index_validator.iter_errors(index_example)]
 if errors:

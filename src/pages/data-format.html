@@ -45,7 +45,7 @@ order: 8
   <dt>release index and latest pointers</dt>
   <dd><code>OTC_index.json</code> lists every release, newest first, in <code>releases</code>. <code>OTC_latest.json</code> and <code>OTC_latest-f{MAJOR}.json</code> are one entry each. An entry has the datestamp, <code>format_version</code>, <code>min_reader_version</code>, <code>concept_doi</code>, <code>zenodo_version_doi</code> (or null), <code>content_sha256</code>, and the name, URL, size and SHA-256 of each file. Optional: <code>created</code>, <code>changes</code>, <code>source_versions</code>, <code>changelog_url</code> and <code>zenodo_material</code> (pipeline only; true when the release gets its own Zenodo version at publish). A reader checks <code>min_reader_version</code> before it downloads a release.</dd>
   <dt>licence</dt>
-  <dd>SPDX id (or a <code>LicenseRef-</code> id), provider, required citation, the assembled attribution text, and <code>commercial_use</code>. When <code>commercial_use</code> is false, the set is for non-commercial use only: <code>restriction</code> says why, and <code>terms_url</code> links the upstream terms. See <a href="/about/#licence">Licence and attribution</a>.</dd>
+  <dd>SPDX id (or a <code>LicenseRef-</code> id), provider, the citation the provider requires, if any, the assembled attribution text, and <code>commercial_use</code>. When <code>commercial_use</code> is false, every set with that <code>licence_id</code> is for non-commercial use only: <code>restriction</code> says why, and <code>terms_url</code> links the upstream terms. See <a href="/about/#licence">Licence and attribution</a>.</dd>
 </dl>
 
 <h2 id="schema">JSON Schema</h2>
