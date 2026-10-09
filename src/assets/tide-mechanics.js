@@ -42,6 +42,11 @@ function prep(cv, hFn){
   return {ctx, w, h};
 }
 function reg(f){ draws.push(f); }
+// A table wider than its box scrolls sideways inside it; .more fades the right edge while there is
+// more to see (assets/tide-mechanics.css).
+function tblCue(){ document.querySelectorAll('.tm .tbl').forEach(b=> b.classList.toggle('more', b.scrollLeft + b.clientWidth < b.scrollWidth - 1)); }
+document.querySelectorAll('.tm .tbl').forEach(b=> b.addEventListener('scroll', tblCue, {passive:true}));
+draws.push(tblCue);
 let pending = false;
 function redrawAll(){ if (pending) return; pending = true; requestAnimationFrame(()=>{ pending = false; draws.forEach(f=>{ try{ f(); }catch(e){ console.error(e); } }); }); }
 function font(ctx, px, weight){ ctx.font = (weight||'400') + ' ' + px + 'px ' + FONT(); }
@@ -216,6 +221,7 @@ NOAA37.forEach(c=>{
   const det = document.getElementById('s2-full-det');
   const openIfTarget = () => { if (det && location.hash === '#s2-full-det') det.open = true; };
   openIfTarget(); window.addEventListener('hashchange', openIfTarget);
+  if (det) det.addEventListener('toggle', tblCue);
   // share of the tide's variance (sum of H^2/2) the big eight carry, from the figure's amplitudes
   const v = c => c.H*c.H/2, tot = NOAA37.reduce((s,c)=> s+v(c), 0);
   const big = ['M2','S2','N2','K2','K1','O1','P1','Q1'];
@@ -229,7 +235,7 @@ NOAA37.forEach(c=>{
     const c=C[k], per = 360/c.speed;
     const perS = per > 1000 ? (per/24).toFixed(2)+' d' : per.toFixed(2);
     const tr=document.createElement('tr');
-    tr.innerHTML = `<td><span class="sw" style="background:var(${c.col})"></span> ${k}</td><td>${c.speed.toFixed(4)}</td><td>${perS}</td><td>${c.doodson}</td><td style="font-family:var(--f-body);text-align:left">${c.what}</td>`;
+    tr.innerHTML = `<td><span class="sw" style="background:var(${c.col})"></span> ${k}</td><td>${c.speed.toFixed(4)}</td><td>${perS}</td><td>${c.doodson}</td><td class="what" style="font-family:var(--f-body);text-align:left">${c.what}</td>`;
     tb.appendChild(tr);
   });
 })();
@@ -462,6 +468,9 @@ function fitRecord(days, sigma){
   res.pred = ti => { let v=res.Z0; inc.forEach(k=>{ const c=res.con[k]; v+=c.H*Math.cos(rad(C[k].speed*ti - c.g)); }); return v; };
   return {t,y,res,inc};
 }
+// Status pill for the s5 and s6 tables. On a phone the CSS shows only the mark and keeps the word
+// for screen readers; the key under each table explains the marks.
+const stPill = (ok, word) => `<span class="pill st ${ok?'ok':'no'}"><span class="pm" aria-hidden="true">${ok?'✓':'✕'}</span><span class="pt">${word}</span></span>`;
 let fit5 = null;
 const st5 = {days:30, noise:0.10};
 function updS5(){
@@ -469,10 +478,10 @@ function updS5(){
   document.getElementById('s5-days-o').textContent = st5.days+' d';
   document.getElementById('s5-noise-o').textContent = st5.noise.toFixed(2)+' m';
   const tb=document.querySelector('#s5-table tbody'); tb.innerHTML='';
-  tb.insertAdjacentHTML('beforeend', `<tr class="yes"><td>Z₀</td><td>1.55</td><td>${fit5.res.Z0.toFixed(3)}</td><td></td><td></td><td><span class="pill ok">fitted</span></td></tr>`);
+  tb.insertAdjacentHTML('beforeend', `<tr class="yes"><td>Z₀</td><td>1.55</td><td>${fit5.res.Z0.toFixed(3)}</td><td></td><td></td><td>${stPill(true,'fitted')}</td></tr>`);
   ['M2','S2','N2','K1','O1','M4'].forEach(k=>{ const c=fit5.res.con[k];
-    tb.insertAdjacentHTML('beforeend', c ? `<tr class="yes"><td>${k}</td><td>${C[k].H.toFixed(2)}</td><td>${c.H.toFixed(3)}</td><td>${C[k].g}</td><td>${c.g.toFixed(1)}</td><td><span class="pill ok">fitted</span></td></tr>`
-      : `<tr class="no"><td>${k}</td><td>${C[k].H.toFixed(2)}</td><td>–</td><td>${C[k].g}</td><td>–</td><td><span class="pill no">record too short</span></td></tr>`); });
+    tb.insertAdjacentHTML('beforeend', c ? `<tr class="yes"><td>${k}</td><td>${C[k].H.toFixed(2)}</td><td>${c.H.toFixed(3)}</td><td>${C[k].g}</td><td>${c.g.toFixed(1)}</td><td>${stPill(true,'fitted')}</td></tr>`
+      : `<tr class="no"><td>${k}</td><td>${C[k].H.toFixed(2)}</td><td>–</td><td>${C[k].g}</td><td>–</td><td>${stPill(false,'record too short')}</td></tr>`); });
   redrawAll();
 }
 document.getElementById('s5-days').addEventListener('input', e=>{ st5.days=+e.target.value; updS5(); });
@@ -524,7 +533,7 @@ function updS6(){
   document.getElementById('s6-len-o').textContent = fmtDays(s6days);
   const tb=document.querySelector('#s6-table tbody'); tb.innerHTML='';
   PAIRS.forEach(p=>{ const ok = s6days >= p.days;
-    tb.insertAdjacentHTML('beforeend', `<tr class="${ok?'yes':'no'}"><td>${p.name}</td><td>${p.dw.toFixed(7)}</td><td>${fmtDays(p.days)}</td><td><span class="pill ${ok?'ok':'no'}">${ok?'separable':'merged'}</span></td></tr>`); });
+    tb.insertAdjacentHTML('beforeend', `<tr class="${ok?'yes':'no'}"><td>${p.name}</td><td>${p.dw.toFixed(7)}</td><td>${fmtDays(p.days)}</td><td>${stPill(ok, ok?'separable':'merged')}</td></tr>`); });
   redrawAll();
 }
 const lenEl = document.getElementById('s6-len');
@@ -539,18 +548,30 @@ reg(function drawTime(){
   const L = narrow ? 92 : 150, R=w-14, Tp=10, B=h-34;
   const X = d => L + (R-L)*Math.log(d)/Math.log(MAXD);
   [[1,'1 d'],[7,'1 wk'],[30,'1 mo'],[182.6,'6 mo'],[365.25,'1 yr'],[5*365.25,'5 yr'],[MAXD,'19 yr']].filter(t=>!narrow||!['1 wk','6 mo','5 yr'].includes(t[1])).forEach(([d,l])=>{ gridV(ctx, X(d), Tp, B); text(ctx, l, X(d), B+14, cssv('--ink-2'), 10, d===MAXD?'right':'center'); });
-  ctx.fillStyle = cssv('--accent-soft'); ctx.fillRect(L, Tp, X(s6days)-L, B-Tp);
+  const xs = X(s6days), soft = cssv('--accent-soft'), paper = cssv('--paper');
+  ctx.fillStyle = soft; ctx.fillRect(L, Tp, xs-L, B-Tp);
+  const rowY = i => Tp + rowH*i + rowH/2 + 2;
   PAIRS.forEach((p,i)=>{
-    const y = Tp + rowH*i + rowH/2 + 2, ok = s6days>=p.days;
+    const y = rowY(i), ok = s6days>=p.days;
     text(ctx, narrow ? (p.short||p.name) : p.name, 6, y+4, ok?cssv('--ink'):cssv('--muted'), narrow?10:11, 'left', ok?'600':'400');
     line(ctx, [[L,y],[X(p.days),y]], cssv('--rule'), 1, [2,3]);
-    ctx.fillStyle = ok ? cssv('--ok') : cssv('--paper'); ctx.strokeStyle = ok ? cssv('--ok') : cssv('--muted'); ctx.lineWidth=1.6;
+    ctx.fillStyle = ok ? cssv('--ok') : paper; ctx.strokeStyle = ok ? cssv('--ok') : cssv('--muted'); ctx.lineWidth=1.6;
     ctx.beginPath(); ctx.arc(X(p.days), y, 5, 0, 7); ctx.fill(); ctx.stroke();
-    const lbl = fmtDays(p.days), lx = X(p.days);
-    const right = lx < R - 70;
-    text(ctx, lbl, right ? lx+9 : lx-9, y+4, cssv('--ink-2'), 10, right?'left':'right');
   });
-  line(ctx, [[X(s6days),Tp-2],[X(s6days),B]], cssv('--accent'), 2);
+  line(ctx, [[xs,Tp-2],[xs,B]], cssv('--accent'), 2);
+  // Value labels go after the record line, each on a knockout of the colour behind it, so the line
+  // never runs through the digits. A label sits right of its dot unless that side runs past the
+  // plot or puts the record line through the text and the left side does not.
+  PAIRS.forEach((p,i)=>{
+    const y = rowY(i), lx = X(p.days), lbl = fmtDays(p.days), gap = 9;
+    font(ctx, 10); const tw = ctx.measureText(lbl).width;
+    const cand = [lx+gap, lx-gap-tw].map(x0=>({x0, fits: x0 >= L+2 && x0+tw <= R, hit: xs > x0-3 && xs < x0+tw+3}));
+    const pick = cand.find(c=> c.fits && !c.hit) || cand.find(c=> c.fits) || cand[1];
+    const x0 = Math.max(L+2, Math.min(pick.x0, R-tw)), kx = x0-2, kw = tw+4, ky = y-7, kh = 13;
+    ctx.fillStyle = paper; ctx.fillRect(kx, ky, kw, kh);
+    if (xs > kx){ ctx.fillStyle = soft; ctx.fillRect(kx, ky, Math.min(kw, xs-kx), kh); }
+    text(ctx, lbl, x0, y+4, cssv('--ink-2'), 10, 'left');
+  });
   text(ctx, 'record: '+fmtDays(s6days), Math.min(Math.max(X(s6days), L+60), R-60), h-4, cssv('--accent'), 11, 'center', '600');
 });
 

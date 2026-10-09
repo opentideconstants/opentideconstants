@@ -112,7 +112,8 @@ layout: full
   </div>
   <div class="fig"><canvas id="s5-plot" aria-label="Synthetic noisy record with fitted curve and residuals" role="img"></canvas></div>
   <p class="cap">Grey dots: observed hourly values. Magenta line: the fitted sum. The lower strip shows the residual, observed minus fit. The fit includes only constituents the record length can separate (section 6). Below about 15 days, S2 is left out and its energy leaks into M2.</p>
-  <div class="tbl"><table id="s5-table"><thead><tr><th>Name</th><th>True <span class="sym">H m</span></th><th>Fit <span class="sym">H m</span></th><th>True <span class="sym">g°</span></th><th>Fit <span class="sym">g°</span></th><th>Status</th></tr></thead><tbody></tbody></table></div>
+  <div class="tbl"><table id="s5-table"><thead><tr><th>Name</th><th><span class="ww">True </span><span class="sym">H<span class="ww"> m</span></span><span class="nw"> true</span></th><th><span class="ww">Fit </span><span class="sym">H<span class="ww"> m</span></span><span class="nw"> fit</span></th><th><span class="ww">True </span><span class="sym">g°</span><span class="nw"> true</span></th><th><span class="ww">Fit </span><span class="sym">g°</span><span class="nw"> fit</span></th><th>Status</th></tr></thead><tbody></tbody></table></div>
+  <p class="tbl-key"><b>✓</b> fitted · <b>✕</b> record too short. H in metres.</p>
   <p class="cap">This toy omits nodal corrections, so its true values stand for f·H and g − (V<sub>0</sub> + u). A real fit applies f and u for each observation time.</p>
 </section>
 
@@ -130,6 +131,7 @@ layout: full
   </div>
   <div class="fig"><canvas id="s6-time" aria-label="Log timeline of Rayleigh separation periods with current record length" role="img"></canvas></div>
   <div class="tbl"><table id="s6-table"><thead><tr><th>Pair</th><th><span class="sym">|Δω| °/h</span></th><th>Needs</th><th>Status</th></tr></thead><tbody></tbody></table></div>
+  <p class="tbl-key"><b>✓</b> separable · <b>✕</b> merged at this record length.</p>
   <div class="tm-note">OTC's fit counts the hours a record actually holds, not its calendar span, and a short record simply gets fewer constituents. That is why short GESLA records are worth keeping: 30 days of Boston gave M2 within 1.6 cm and 0.24° of the 19-year fit.</div>
 </section>
 
