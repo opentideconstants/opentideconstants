@@ -59,7 +59,7 @@ Tokens: colours `--color-bg`, `-surface`, `-text`, `-text-muted`, `-border`, `-l
 
 - GitHub Pages, deployed by `.github/workflows/pages.yml` on every push to `main` (pull requests build and check only). In the repository settings, set Pages to "GitHub Actions".
 - Custom domain `opentideconstants.org` (`src/CNAME`), behind Cloudflare.
-- Data downloads are not served from this site. They will come from `data.opentideconstants.org` (Cloudflare R2), with `OTC_latest.json` as the pointer to the current release.
+- Data downloads are served from `data.opentideconstants.org` (Cloudflare R2), not from this site, with `OTC_latest.json` as the pointer to the current release.
 
 ## Licence
 
