@@ -122,14 +122,18 @@ function iconHtml(size) {
 <body>${mark(size - 2 * pad, stroke)}</body></html>`;
 }
 
-// The SVG favicon: the same mark on a rounded tile, so it stands out on any tab bar. The tile
-// and colours follow the site's palettes (src/assets/tokens.css): day by default, night under
-// prefers-color-scheme: dark. The stroke is heavier than in the header so it holds at 16px.
+// The SVG favicon: the same mark on a tile, so it stands out on any tab bar. The tile and
+// colours follow the site's palettes (src/assets/tokens.css): day by default, night under
+// prefers-color-scheme: dark. The viewBox is a 16-unit grid and the mark is scaled onto it
+// with its corners at 8,1 / 15,8 / 8,15 / 1,8 and its centre on a pixel corner, so the 16px
+// render is symmetric. The outline is drawn over the fill, so all four sides keep the same
+// weight at small sizes.
 function faviconSvg() {
   const BG_NIGHT = "oklch(0.15 0.005 250)";
   const INK_NIGHT = "oklch(0.86 0.008 250)";
   const ACCENT_NIGHT = "oklch(0.68 0.12 158)";
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -2 26 26"><style>.t{fill:#fff}.o{stroke:${INK}}.a{fill:${ACCENT}}@media (prefers-color-scheme:dark){.t{fill:${BG_NIGHT}}.o{stroke:${INK_NIGHT}}.a{fill:${ACCENT_NIGHT}}}</style><rect class="t" x="-2" y="-2" width="26" height="26" rx="5"/><path class="o" d="${MARK_OUTLINE}" fill="none" stroke-width="2.4" stroke-linejoin="round"/><path class="a" d="${MARK_FILL}"/></svg>\n`;
+  const k = 0.7; // 22-unit mark (corners 10 from its centre) to 7 units
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><style>.t{fill:#fff}.o{stroke:${INK}}.a{fill:${ACCENT}}@media (prefers-color-scheme:dark){.t{fill:${BG_NIGHT}}.o{stroke:${INK_NIGHT}}.a{fill:${ACCENT_NIGHT}}}</style><rect class="t" width="16" height="16" rx="3"/><g transform="translate(8 8) scale(${k}) translate(-11 -11)"><path class="a" d="${MARK_FILL}"/><path class="o" d="${MARK_OUTLINE}" fill="none" stroke-width="${(1.5 / k).toFixed(4)}" stroke-linejoin="round"/></g></svg>\n`;
 }
 writeFileSync(new URL("assets/favicon.svg", src), faviconSvg());
 console.log("wrote src/assets/favicon.svg");
