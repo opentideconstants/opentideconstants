@@ -7,6 +7,12 @@
 /* ---------- Base ---------- */
 *, *::before, *::after { box-sizing: border-box; }
 html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+/* Night palette: keep the macOS default smoothing. "antialiased" turns off its stem
+   darkening, and regular-weight light text on the dark background then renders thin
+   and grainy. Bold headings are not affected; the day palette keeps "antialiased". */
+@media (prefers-color-scheme: dark) {
+  html { -webkit-font-smoothing: auto; -moz-osx-font-smoothing: auto; }
+}
 body {
   margin: 0;
   background: var(--color-bg);
