@@ -489,6 +489,22 @@
           "then": { "properties": { "provenance": { "required": ["carried_from_release"] } } }
         },
         {
+          "description": "The JMA provenance keys only on a jma set, and a jma set always states that it may be redistributed.",
+          "if": { "properties": { "source": { "not": { "const": "jma" } } } },
+          "then": { "properties": { "provenance": { "not": { "anyOf": [
+            { "required": ["owner"] }, { "required": ["redistribution"] }, { "required": ["phase_reference_longitude_deg"] },
+            { "required": ["jma_station_code"] }, { "required": ["analysis_years"] }, { "required": ["source_constituents_not_published"] }
+          ] } } } },
+          "else": { "required": ["provenance"], "properties": { "provenance": { "required": ["owner", "redistribution"] } } }
+        },
+        {
+          "description": "The LINZ provenance keys only on a linz set.",
+          "if": { "properties": { "source": { "not": { "const": "linz" } } } },
+          "then": { "properties": { "provenance": { "not": { "anyOf": [
+            { "required": ["member"] }, { "required": ["position"] }, { "required": ["header_dropped"] }
+          ] } } } }
+        },
+        {
           "description": "The deprecated qc_status fallback is a carried-over set.",
           "if": { "properties": { "qc_status": { "const": "fallback" } } },
           "then": { "required": ["provenance"], "properties": { "provenance": { "required": ["carried_from_release"] } } }
@@ -691,6 +707,7 @@
       "description": "Where the set came from and what was done to it. A closed list of keys: qc_status is the only status of a set, so no provenance key can carry one. A new source-specific key is added here first. Keys for every set: adapter_version, input_sha256, tcd_sha256, selection_reason, decision, carried_from_release, build (the build-only fields), and the deprecated time_base and build_commit. JMA: owner, redistribution, phase_reference_longitude_deg, jma_station_code, analysis_years, source_constituents_not_published. LINZ: member, position, header_dropped.",
       "type": "object",
       "additionalProperties": false,
+      "not": { "required": ["build_commit", "build"], "properties": { "build": { "required": ["build_commit"] } } },
       "properties": {
         "analysis_years": {
           "description": "JMA: the years the agency's analysis used, per period, as the source gives them.",
@@ -699,12 +716,12 @@
           "properties": { "long_period": { "type": ["string", "null"] }, "short_period": { "type": ["string", "null"] } }
         },
         "owner": {
-          "description": "JMA: who owns the station. Only jma stations may be redistributed under JMA's terms; jcg_or_gsi and third_party stations are used only as comparators.",
-          "enum": ["jma", "jcg_or_gsi", "third_party"]
+          "description": "JMA: who owns the station. Always jma in a release file: JMA's licence covers only JMA-owned stations. Stations of other owners (the pipeline's jcg_or_gsi and third_party) are used only as a comparator inside the pipeline; never in the release files.",
+          "const": "jma"
         },
         "redistribution": {
-          "description": "JMA: redistribute (owner jma) or comparator_only (any other owner). A comparator_only set is not published as data.",
-          "enum": ["redistribute", "comparator_only"]
+          "description": "JMA: always redistribute in a release file. The pipeline's comparator_only sets are used only as a comparator inside the pipeline; never in the release files.",
+          "const": "redistribute"
         },
         "phase_reference_longitude_deg": { "description": "JMA: the longitude whose local meridian the source phases refer to.", "type": "number", "minimum": -180, "maximum": 180 },
         "jma_station_code": { "description": "JMA tide-table station code, e.g. TK.", "type": "string", "pattern": "^[A-Z0-9]{1,4}$(?![\\s\\S])" },
@@ -716,8 +733,8 @@
           "required": ["header_lat", "header_lon", "from"],
           "additionalProperties": false,
           "properties": {
-            "header_lat": { "type": "number", "minimum": -90, "maximum": 90 },
-            "header_lon": { "type": "number", "minimum": -180, "maximum": 180 },
+            "header_lat": { "description": "Null when the header position cannot be read (e.g. minutes of 60 or more); the station list then gives the position.", "type": ["number", "null"], "minimum": -90, "maximum": 90 },
+            "header_lon": { "type": ["number", "null"], "minimum": -180, "maximum": 180 },
             "list_port": { "description": "LINZ port number on the station list.", "type": "integer", "minimum": 0 },
             "list_lat": { "type": "number", "minimum": -90, "maximum": 90 },
             "list_lon": { "type": "number", "minimum": -180, "maximum": 180 },
@@ -739,7 +756,12 @@
             "built_at": { "type": "string", "format": "date-time" },
             "fetched_at": { "description": "When the inputs were fetched.", "type": "string", "format": "date-time" },
             "run_id": { "description": "The CI run that built the set.", "type": "string", "pattern": "\\S" },
-            "tool_versions": { "description": "{name: version} of the tools used, e.g. {\"utide\": \"0.3.0\"}.", "type": "object", "additionalProperties": { "type": "string", "pattern": "\\S" } }
+            "tool_versions": {
+              "description": "{name: version} of the tools used, e.g. {\"python\": \"3.12.7\"}. A name is lower case; a version starts with a digit (or v and a digit).",
+              "type": "object",
+              "propertyNames": { "pattern": "^[a-z0-9][a-z0-9_.-]{0,63}$(?![\\s\\S])" },
+              "additionalProperties": { "type": "string", "pattern": "^v?[0-9][0-9A-Za-z.+_-]{0,63}$(?![\\s\\S])" }
+            }
           }
         },
         "source_constituents_not_published": {
@@ -762,7 +784,7 @@
           "$ref": "#/$defs/datestamp"
         },
         "tcd_sha256": { "$ref": "#/$defs/sha256" },
-        "build_commit": { "description": "Deprecated in 0.6: use build.build_commit, which the content digest leaves out.", "type": "string" },
+        "build_commit": { "description": "Deprecated in 0.6: use build.build_commit, which the content digest leaves out. A set has one or the other, not both.", "type": "string", "pattern": "^[0-9a-f]{7,40}$(?![\\s\\S])" },
         "adapter_version": { "type": "string" },
         "input_sha256": { "type": "array", "items": { "$ref": "#/$defs/sha256" } },
         "time_base": {

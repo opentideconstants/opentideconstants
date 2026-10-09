@@ -542,24 +542,54 @@ print(f"ok: accepted the provenance of {len(real)} real sets from "
       f"{', '.join(sorted({r['adapter'] for r in real}))}")
 
 
+def official(d):
+    return d["stations"][0]["constant_sets"][1]
+
+
 def jma(d):
-    return d["stations"][0]["constant_sets"][1]["provenance"]
+    return official(d)["provenance"]
+
+
+def as_source(source, prov):
+    def f(d):
+        official(d)["source"] = source
+        official(d)["provenance"] = copy.deepcopy(prov)
+    return f
 
 
 real_jma = next(r["provenance"] for r in real if r["adapter"] == "A-JMA-a")
 real_linz = next(r["provenance"] for r in real if r["adapter"] == "A-LINZ" and r["provenance"]["position"]["from"] == "station_list")
-must_pass("the real JMA provenance on a set", lambda d: d["stations"][0]["constant_sets"][1].__setitem__("provenance", copy.deepcopy(real_jma)))
-must_pass("the real LINZ provenance (position from the station list) on a set",
-          lambda d: d["stations"][0]["constant_sets"][1].__setitem__("provenance", copy.deepcopy(real_linz)))
+must_pass("the real JMA provenance on a jma set", as_source("jma", real_jma))
+must_pass("the real LINZ provenance (position from the station list) on a linz set", as_source("linz", real_linz))
+must_pass("a LINZ header position that could not be read (null)",
+          lambda d: [as_source("linz", real_linz)(d), jma(d)["position"].update(header_lat=None, header_lon=None)])
 must_pass("build-only fields in provenance.build",
           lambda d: jma(d).__setitem__("build", {"build_commit": "0123abc", "built_at": "2099-12-31T00:00:00Z",
                                                  "fetched_at": "2099-12-30T00:00:00Z", "run_id": "123456",
-                                                 "tool_versions": {"python": "3.12.7"}}))
-must_fail("JMA owner outside its enum", lambda d: jma(d).update(copy.deepcopy(real_jma), owner="anyone"))
-must_fail("JMA redistribution outside its enum", lambda d: jma(d).update(copy.deepcopy(real_jma), redistribution="excluded"))
+                                                 "tool_versions": {"python": "3.12.7", "uv": "v0.4.18"}}))
+must_fail("JMA owner other than jma", lambda d: [as_source("jma", real_jma)(d), jma(d).__setitem__("owner", "third_party")])
+must_fail("JMA owner jma with comparator_only",
+          lambda d: [as_source("jma", real_jma)(d), jma(d).__setitem__("redistribution", "comparator_only")])
+must_fail("a comparator_only JMA set",
+          lambda d: [as_source("jma", real_jma)(d), jma(d).update(owner="jcg_or_gsi", redistribution="comparator_only")])
+must_fail("a jma set without owner and redistribution",
+          lambda d: [as_source("jma", real_jma)(d), jma(d).pop("owner"), jma(d).pop("redistribution")])
+must_fail("a GESLA set carrying owner and redistribution",
+          lambda d: fjord(d, "a")["provenance"].update(owner="jma", redistribution="redistribute"))
+must_fail("a GESLA set carrying redistribution comparator_only",
+          lambda d: fjord(d, "a")["provenance"].__setitem__("redistribution", "comparator_only"))
+must_fail("a kartverket set carrying the LINZ position", lambda d: jma(d).__setitem__("position", copy.deepcopy(real_linz["position"])))
+must_fail("a GESLA set carrying the LINZ member", lambda d: fjord(d, "a")["provenance"].__setitem__("member", "x_Harm_y.txt"))
 must_fail("LINZ position with an extra key",
-          lambda d: jma(d).update(position=dict(copy.deepcopy(real_linz["position"]), status="excluded")))
+          lambda d: [as_source("linz", real_linz)(d), jma(d)["position"].__setitem__("status", "excluded")])
 must_fail("LINZ position from the station list without replaced_because",
-          lambda d: jma(d).update(position={k: v for k, v in real_linz["position"].items() if k != "replaced_because"}))
+          lambda d: [as_source("linz", real_linz)(d), jma(d)["position"].pop("replaced_because")])
 must_fail("list_distance_km at the top of provenance", lambda d: jma(d).__setitem__("list_distance_km", 0.4))
 must_fail("provenance.build with an extra key", lambda d: jma(d).__setitem__("build", {"status": "excluded"}))
+must_fail("tool_versions smuggling a status",
+          lambda d: jma(d).__setitem__("build", {"tool_versions": {"excluded": "true", "qc_status": "removed"}}))
+must_fail("tool_versions with an upper-case name", lambda d: jma(d).__setitem__("build", {"tool_versions": {"Python": "3.12"}}))
+must_fail("the deprecated build_commit that is not hex", lambda d: jma(d).__setitem__("build_commit", "not a commit"))
+must_fail("both build_commit and build.build_commit",
+          lambda d: jma(d).update(build_commit="aaaaaaa", build={"build_commit": "bbbbbbb"}))
+must_pass("the deprecated build_commit alone", lambda d: jma(d).__setitem__("build_commit", "aaaaaaa"))
