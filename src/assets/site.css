@@ -37,7 +37,7 @@ code { font-size: 0.85em; background: var(--color-code-bg); color: var(--color-c
 pre { margin: 0 0 var(--space-5); background: var(--color-code-bg); color: var(--color-code-text); padding: var(--space-4) var(--space-5); overflow-x: auto; font-size: 0.85rem; line-height: 1.7; border-radius: var(--radius-md); border: var(--border-width) solid var(--color-border); }
 pre code { background: none; padding: 0; font-size: inherit; overflow-wrap: normal; }
 
-.lead { font-size: var(--font-size-lead); line-height: var(--line-height-lead); color: var(--color-prose); max-width: var(--measure-lead); }
+.lead { font-size: var(--font-size-lead); line-height: var(--line-height-lead); color: var(--color-prose); }
 .muted, small { color: var(--color-text-muted); }
 .pending { font-style: italic; color: var(--color-text-muted); }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -99,8 +99,10 @@ table code { white-space: nowrap; overflow-wrap: normal; }
 
 /* ---------- Documentation pages ---------- */
 .doc { padding-block: var(--space-6) var(--space-8); }
-.doc > * { max-width: var(--measure); }
-.doc > .table-wrap, .doc > h1 { max-width: none; }
+/* Running text fills its column, the same width as the tables and figures in it. Line length
+   is set by the column: a stand-alone page (.wrap.doc) is as wide as a docs page's content,
+   and keeps its left edge on the header's. */
+.wrap.doc { max-width: calc(var(--measure-page) + 2 * var(--gutter)); margin-inline: max(0px, (100% - var(--content-max)) / 2) auto; }
 .doc > .table-wrap.narrow { max-width: var(--measure); }
 /* The page title sits on a graduated neatline, the border of a printed chart */
 .doc > h1 {
@@ -110,7 +112,6 @@ table code { white-space: nowrap; overflow-wrap: normal; }
     linear-gradient(var(--color-text), var(--color-text)) left calc(100% - 9px) / 100% 1px no-repeat;
   padding-bottom: calc(var(--space-3) + 10px);
 }
-.doc > .lead { max-width: var(--measure-lead); }
 .doc > h1 + .lead { margin-bottom: var(--space-5); }
 /* Running text one step softer than headings; bold run-in labels keep the heading colour */
 .doc p, .doc li, .doc dd { color: var(--color-prose); }
@@ -155,8 +156,6 @@ table code { white-space: nowrap; overflow-wrap: normal; }
 .sidebar-section a:hover { color: var(--color-text); background: var(--color-bg); }
 .sidebar-section a.active { color: var(--color-link); background: var(--color-accent-glow); font-weight: 600; }
 .docs-content { flex: 1; min-width: 0; max-width: 960px; padding: 3rem 4rem; margin-right: auto; margin-left: calc(var(--sidebar-w) + max(0px, (100vw - var(--sidebar-w) - 220px - 960px) / 2)); }
-.docs-content.doc > * { max-width: var(--measure); }
-.docs-content.doc > :is(.table-wrap, h1) { max-width: none; }
 .page-toc { position: sticky; top: 80px; align-self: flex-start; flex-shrink: 0; width: 220px; max-height: calc(100vh - 100px); overflow-y: auto; padding: var(--space-4) var(--space-4) var(--space-4) 0; font-size: 0.78rem; scrollbar-width: thin; }
 .page-toc-label { font-family: var(--font-mono); font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-text-muted); margin: 0 0 var(--space-2); padding: 0 0.5rem; }
 .page-toc a { display: block; padding: 0.3rem 0.5rem; border-radius: 4px; color: var(--color-text-muted); text-decoration: none; line-height: 1.4; transition: color var(--duration-fast) var(--easing), background var(--duration-fast) var(--easing); }
@@ -197,7 +196,6 @@ body:has(.docs-layout) .footer-inner { padding-inline: 4rem; max-width: none; }
 .acc-hint { color: var(--color-text-muted); font-size: var(--font-size-small); }
 .acc-body { padding-bottom: var(--space-5); }
 .acc-body > :first-child { margin-top: 0; }
-.acc-body > :not(.table-wrap) { max-width: var(--measure); }
 
 /* Downloads: the release list, one entry per release (assets/releases.js) */
 .doc > .releases { max-width: none; }
@@ -217,9 +215,9 @@ body:has(.docs-layout) .footer-inner { padding-inline: 4rem; max-width: none; }
 
 /* ---------- Home ---------- */
 .section { padding-top: calc(var(--space-section) + var(--font-size-h2) / 4); }   /* --space-h2-leading, in the heading's size */
-.section-head { max-width: 46rem; text-wrap: pretty; margin-bottom: var(--space-head); }
+.section-head { text-wrap: pretty; margin-bottom: var(--space-head); }
 .section-head h2:not(:last-child) { margin-bottom: calc(var(--space-h2-sub) + var(--space-h2-leading)); }
-.section-head p { color: var(--color-prose); font-size: var(--font-size-sub); line-height: var(--line-height-lead); max-width: var(--measure-lead); margin: 0; }
+.section-head p { color: var(--color-prose); font-size: var(--font-size-sub); line-height: var(--line-height-lead); margin: 0; }
 .tag { display: inline-block; font-family: var(--font-mono); font-size: 0.75rem; font-weight: 500; letter-spacing: 0; color: var(--color-link); border: 1.5px solid currentColor; border-radius: 999px; padding: 0.15rem 0.75rem; vertical-align: 0.3em; white-space: nowrap; }
 .actions { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5); align-items: center; margin-top: var(--space-5); }
 .button { display: inline-flex; gap: var(--space-2); align-items: center; background: var(--color-accent); color: var(--color-on-accent); text-decoration: none; font-family: var(--font-mono); font-size: var(--font-size-small); font-weight: 600; padding: 0.75rem 1.75rem; border-radius: var(--radius-md); transition: background var(--duration-fast) var(--easing); }
@@ -349,7 +347,7 @@ body:has(.docs-layout) .footer-inner { padding-inline: 4rem; max-width: none; }
 .plot-key .k-official { border-color: var(--color-plot-official); }
 .plot-key .k-ticon { border-top-style: dashed; border-color: var(--color-plot-ticon); }
 .plot-key .k-fit { border-color: var(--color-plot-fit); }
-.plot figcaption p { margin: 0; max-width: 72ch; }
+.plot figcaption p { margin: 0; }
 
 /* What every release carries: diamond-marked list, first item leads */
 .marked { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr)); gap: var(--space-6) var(--space-7); }
@@ -358,12 +356,12 @@ body:has(.docs-layout) .footer-inner { padding-inline: 4rem; max-width: none; }
 .marked li.first { grid-column: 1 / -1; padding-bottom: var(--space-5); border-bottom: var(--border-width) solid var(--color-border); }
 .marked li.first::before { background: var(--color-accent); width: 1rem; height: 1rem; margin-top: 0.5rem; }
 .marked li.first h3 { font-size: var(--font-size-h2); font-weight: 700; letter-spacing: var(--tracking-heading); line-height: var(--line-height-heading); }
-.marked li.first p { font-size: var(--font-size-lead); line-height: var(--line-height-lead); max-width: 70ch; color: var(--color-prose); }
+.marked li.first p { font-size: var(--font-size-lead); line-height: var(--line-height-lead); color: var(--color-prose); }
 .marked h3 { margin-bottom: var(--space-1); }
 .marked p { margin: 0; color: var(--color-prose); font-size: 0.95rem; }
 
 .glance .table-wrap { margin-block: var(--space-5) var(--space-6); }
-.glance > p { max-width: var(--measure); }
+.glance > p { color: var(--color-prose); font-size: var(--font-size-sub); line-height: var(--line-height-lead); }   /* set as a section introduction, so its lines stay as long as theirs */
 .page-index main > .section:last-child { padding-bottom: var(--space-8); }
 
 @media (max-width: 75rem) {
