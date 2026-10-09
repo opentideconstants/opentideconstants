@@ -26,6 +26,8 @@ const C = {
 const NODE_SPEED = 0.0022064; // deg/hour, lunar node regression
 
 // ---------- canvas plumbing ----------
+// A height change here needs the same change in assets/tide-mechanics.css, which reserves each
+// canvas's height before this script runs.
 const draws = [];
 function prep(cv, hFn){
   const w = Math.max(200, Math.floor(cv.parentElement.clientWidth));
@@ -522,4 +524,18 @@ new ResizeObserver(()=>{ const w = scope.clientWidth; if (w!==lastW){ lastW=w; r
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(redrawAll);
 
 updS4(); updS5(); updS6(); redrawAll();
+
+// A link such as #s6 starts its smooth scroll before the web fonts arrive. When they swap in, the
+// text above the target gets shorter and the scroll overshoots. Once the fonts and the page have
+// loaded, go to the target again, unless the reader has already started to scroll.
+const target = location.hash && document.getElementById(decodeURIComponent(location.hash.slice(1)));
+if (target && scope.contains(target)){
+  let moved = false;
+  const mark = () => { moved = true; };
+  ['wheel','touchstart','keydown','pointerdown'].forEach(t => window.addEventListener(t, mark, {once:true, passive:true}));
+  const loaded = document.readyState === 'complete' ? Promise.resolve() : new Promise(r => window.addEventListener('load', r, {once:true}));
+  Promise.all([loaded, document.fonts ? document.fonts.ready : null]).then(() => requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (!moved) target.scrollIntoView({behavior:'instant', block:'start'});
+  })));
+}
 })();
