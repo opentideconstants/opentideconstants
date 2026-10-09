@@ -1,9 +1,10 @@
 cff-version: 1.2.0
 message: >-
-  If you use OpenTideConstants, cite the release you used by its release date
-  and DOI, and also cite the upstream data sources of the stations you used
-  (see https://opentideconstants.org/licence/).
-  Release DOIs are coming with the first release.
+  If you use OpenTideConstants, cite the release you used by the concept DOI
+  (the one DOI for all versions) and the release datestamp (YYYYMMDD). If the
+  release has its own Zenodo version, add its version DOI. Also cite the
+  upstream data sources of the stations you used
+  (see https://opentideconstants.org/about/#attribution).
 title: "OpenTideConstants: open tidal harmonic constants"
 abstract: >-
   An open dataset of tidal harmonic constants, rebuilt automatically from the
@@ -21,5 +22,5 @@ keywords:
   - sea level
   - tide gauges
   - GESLA
-# TODO with the first release: add version (YYYYMMDD), date-released, and
-# identifiers (the Zenodo concept DOI and the version DOI).
+# The concept DOI is minted at the first release. Then add it here as doi:
+# (the concept DOI, not a version DOI), so this file cites all versions.

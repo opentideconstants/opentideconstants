@@ -18,7 +18,7 @@ Third: sailors and boaters who want to know why their tide times are now right (
 
 ## Product Purpose
 
-OpenTideConstants (OTC) is one open dataset of tidal harmonic constants, rebuilt automatically from the latest upstream data and released under CC BY 4.0 with a DOI per release. It combines constants fitted from GESLA sea-level records (replacing TICON), NOAA CO-OPS constants and offsets (replacing the XTide harmonics for US data), and constants from agencies that publish them openly (Kartverket today). Every release publishes the accuracy of every station against official predictions, declares the convention of every constant set, and carries per-record provenance and checksums.
+OpenTideConstants (OTC) is one open dataset of tidal harmonic constants, rebuilt automatically from the latest upstream data and released under CC BY 4.0 with one concept DOI for all releases. It combines constants fitted from GESLA sea-level records (replacing TICON), NOAA CO-OPS constants and offsets (replacing the XTide harmonics for US data), and constants from agencies that publish them openly (Kartverket today). Every release publishes the accuracy of every station against official predictions, declares the convention of every constant set, and carries per-record provenance and checksums.
 
 Success: developers switch their pipelines from TICON/XTide files to `OTC_latest.json`; researchers cite the DOI; issues about specific stations arrive in the public tracker.
 
