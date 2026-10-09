@@ -1,6 +1,6 @@
 ---
 title: Method
-description: How an OpenTideConstants release is built: fitting, time-base checks, broken-record checks, record and constituent selection, automation and the release gate.
+description: How an OpenTideConstants release is built: fitting, time-base checks, broken-record checks, record and constituent selection, short records, automation and the release gate.
 layout: docs
 docs: Documentation
 order: 5
@@ -12,19 +12,20 @@ order: 5
 <p>For a visual walk-through of constituents, phase and record length, see <a href="/tide-mechanics/">Tide Mechanics</a>.</p>
 <ul>
   <li><strong>Basis:</strong> least squares on the reference predictor's own equation, h(t) = Z0 + c·(t − t̄) + Σ f<sub>k</sub>·(a<sub>k</sub> cos X<sub>k</sub> + b<sub>k</sub> sin X<sub>k</sub>), where X<sub>k</sub> = speed<sub>k</sub>·t + (V0+u)<sub>k</sub>. Speeds, V0+u and f come from the same tables the predictor uses. The fitted constants therefore plug into the predictor exactly, and the convention mismatches on the <a href="/why/">Why</a> page cannot arise.</li>
-  <li><strong>Span:</strong> the last 19 years of good data (one nodal cycle is 18.61 years). A shorter record is fitted whole; records under 1 year are not used, and records of 1–3 years are flagged as short. A linear trend is fitted alongside, so sea-level rise does not leak into the annual constituent.</li>
+  <li><strong>Span:</strong> the last 19 years of good data (one nodal cycle is 18.61 years). A shorter record is fitted whole, however short it is. See <a href="#short-records">Short records</a>. A linear trend is fitted alongside, so sea-level rise does not leak into the annual constituent.</li>
   <li><strong>Quality control before fitting:</strong> null values, values flagged as not usable, and duplicate time stamps are dropped. Sub-hourly records are reduced to one value per hour. Spikes are removed against a rolling median of the residual, and the fit is repeated.</li>
   <li><strong>Uncertainty:</strong> for each constituent, the larger of the residual noise in its frequency band and half the difference between fits to the two halves of the span.</li>
   <li><strong>Determinism:</strong> fixed random seeds, sorted inputs, fixed output precision. Two builds from the same inputs must give byte-identical files.</li>
 </ul>
 
 <h2 id="timestamps">Time-base checks</h2>
-<p>Every record that a build might use is checked for a wrong or undeclared clock. The metadata cannot be trusted for this: in GESLA-4.1, 6,681 of 6,682 records declare a time zone offset of 0, including records that are not UTC. <a href="/tide-mechanics/#s4">Phase and time base</a> in Tide Mechanics shows how a clock offset moves each phase.</p>
+<p>Every record is checked for a wrong or undeclared clock. OTC never removes a GESLA record for its time base: at worst, a record keeps the time base that GESLA declares for it. The metadata cannot be trusted for this: in GESLA-4.1, 6,681 of 6,682 records declare a time zone offset of 0, including records that are not UTC. <a href="/tide-mechanics/#s4">Phase and time base</a> in Tide Mechanics shows how a clock offset moves each phase.</p>
 <ol>
   <li><strong>Comparators</strong>, in order of preference: official predictions near the gauge; NOAA harmonic constants for NOAA records; and other records at the same gauge from a different contributor, after their own correction.</li>
   <li><strong>Measurements:</strong> the monthly time lag at 1-min resolution, the lag per constituent, amplitude ratios, a direct test of instantaneous against averaged sampling, and the missing hour on daylight-saving change days.</li>
   <li><strong>Verdict classes</strong>, each with a fixed correction: UTC instantaneous; UTC hourly mean stamped at the start of the hour (shift +30 min and correct the amplitudes); UTC plus a whole number of hours; local time with daylight saving; a step at a date; isolated bad months.</li>
-  <li><strong>Pass rule:</strong> after the correction, the residual M2 lag must be within ±3 min in every month used. A record that matches no class is not used as it is.</li>
+  <li><strong>Pass rule:</strong> a correction is made only on positive evidence. After the correction, the residual M2 lag must be within ±3 min in every month used.</li>
+  <li><strong>Annotation:</strong> every record carries one of four time-base annotations. <em>Verified</em>: the evidence confirms the declared time base, and the evidence is listed. <em>Corrected</em>: the time base is changed, and the annotation states from what to what and the evidence. <em>Unverified</em>: no comparator exists, so GESLA's declared time base is kept. <em>Disputed</em>: the evidence disagrees with the declared time base but no class explains it, so GESLA's declared time base is kept.</li>
   <li><strong>Positive controls on every build:</strong> pinned GESLA-4.0 WSV files must come out as local time with daylight saving; a record shifted by +60 min must be detected; an hourly-averaged copy must be detected. If a control fails, the build stops.</li>
 </ol>
 
@@ -43,6 +44,15 @@ order: 5
   <li><strong>Non-tidal daily cycles</strong> (S1, S3, S4) are left out at river and lake gauges, and where they are larger than both M2 and K1.</li>
 </ol>
 <p>At the validation stations this keeps 41–45 constituents for 19-year records and 23–28 for records of 1.5–2.5 years. Every constituent in a release records why it was kept or dropped.</p>
+
+<h2 id="short-records">Short records</h2>
+<p>A record is never removed for being short.</p>
+<ul>
+  <li>The fit solves only the constituents that the record's own good data can resolve, by the record-length rule in <a href="#constituents">Constituent selection</a>.</li>
+  <li>Each short record notes its length, the constituents left out, and an expected-accuracy indicator. The indicator is measured on long records cut down to the same length.</li>
+  <li>A record with less than about 15 days of good data is kept and annotated <em>no constants fitted</em>.</li>
+  <li>In the combined dataset, a short record never outranks a longer or better record at the same station. See <a href="#selection">Record selection</a>.</li>
+</ul>
 
 <h2 id="source-checks">Per-source convention check</h2>
 <p>Every source is compared on every build with an independent comparator at the same gauges: our own GESLA fit, predicted with the reference predictor. The pass rule is that the median M2, S2, K1 and O1 differences are within 1 cm and 2° over at least 3 overlapping gauges. A source that fails is not published in that release until its declared convention is fixed. A source with no overlapping gauge cannot be added.</p>
