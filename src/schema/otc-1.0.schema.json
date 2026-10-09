@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://opentideconstants.org/schema/otc-1.0.schema.json",
   "title": "OpenTideConstants release document",
-  "description": "format_version 1.0. Schema for OTC_{YYYYMMDD}.json. Each line of OTC_{YYYYMMDD}.jsonl (and of the optional OTC_{YYYYMMDD}.jsonl.gz) is one station document, valid against #/$defs/station. OTC_{YYYYMMDD}.meta.json is the same document without `stations`, valid against #/$defs/meta, so a .jsonl reader can get the conventions, licences, constituent table and release metadata. Units: metres, metres per second (current amplitudes), degrees, degrees per hour, UTC. Every pattern ends with $(?![\\s\\S]) so that a validator whose $ also matches before a final newline (Python re) still rejects one. Cross-references (convention_id, licence_id, recommended_set_id, constituent names, astro_table_id, datum.chart_datum, default_current_bin, current_offsets reference_station_id and reference_bin) must resolve inside the same release, alias ids must be unique within each alias system across the release, and bin numbers must be unique within a set's current_bins and within a station's current_offsets. JSON Schema cannot express these, so the release build checks them separately. The build also checks: (1) a no_constants set with too_short has fewer than release.fit_min_good_hours hours of good data, and every set with constants fitted from a record has at least that many; good_hours is never more than the hours between record_span start and end; (2) a station's recommended set is never a no_constants set, never a short_record set when the station has a set of the same quantity with constants and more good_hours, and always has the quantity of the station's kind; (3) a time_base correction has from different from to, its from equals declared and its to equals published, and an unverified or disputed time_base has published equal to declared; (4) a tombstone's merged_into names an active station whose aliases include every alias id the removed station had; (5) provenance.carried_from_release is earlier than the release datestamp and names a release that held the same set_id, and a carried set's convention_id and licence_id exist in this release; (6) recommended_set_id is null on a reference station only when every set of the station is no_constants (the schema checks this too), and a subordinate station has constant sets, subordinate_offsets or current_offsets (the schema checks this too); (7) every constituent of every set with constants has a row in its convention's astro table, each row's speed equals the set's speed and the constituents table speed within 1e-7 degrees per hour, every v0u_deg and f array has last_year - first_year + 1 entries, and a convention's tables_sha256, when present, equals its astro table's; (8) datum.chart_datum names a key of datum.named.",
+  "description": "format_version 1.0. Schema for OTC_{YYYYMMDD}.json. Each line of OTC_{YYYYMMDD}.jsonl (and of the optional OTC_{YYYYMMDD}.jsonl.gz) is one station document, valid against #/$defs/station. OTC_{YYYYMMDD}.meta.json is the same document without `stations`, valid against #/$defs/meta, so a .jsonl reader can get the conventions, licences, constituent table and release metadata. Units: metres, metres per second (current amplitudes), degrees, degrees per hour, UTC. Every pattern ends with $(?![\\s\\S]) so that a validator whose $ also matches before a final newline (Python re) still rejects one. Cross-references (convention_id, licence_id, recommended_set_id, constituent names, astro_table_id, datum.chart_datum, default_current_bin, current_offsets reference_station_id and reference_bin) must resolve inside the same release, alias ids must be unique within each alias system across the release, and bin numbers must be unique within a set's current_bins and within a station's current_offsets. JSON Schema cannot express these, so the release build checks them separately. The build also checks: (1) a no_constants set with too_short has fewer than release.fit_min_good_hours hours of good data, and every set with constants fitted from a record has at least that many; good_hours is never more than the hours between record_span start and end; (2) a station's recommended set is never a no_constants set, never a short_record set when the station has a set of the same quantity with constants and more good_hours, and always has the quantity of the station's kind; (3) a time_base correction has from different from to, its from equals declared and its to equals published, and an unverified or disputed time_base has published equal to declared; (4) a tombstone's merged_into names an active station whose aliases include every alias id the removed station had; (5) provenance.carried_from_release is earlier than the release datestamp and names a release that held the same set_id, and a carried set's convention_id and licence_id exist in this release; (6) recommended_set_id is null on a reference station only when every set of the station is no_constants (the schema checks this too), and a subordinate station has constant sets, subordinate_offsets or current_offsets (the schema checks this too); (7) every constituent of every set with constants has a row in its convention's astro table, each row's speed equals the set's speed and the constituents table speed within 1e-7 degrees per hour, every v0u_deg and f array has last_year - first_year + 1 entries, and a convention's tables_sha256, when present, equals its astro table's; (8) datum.chart_datum names a key of datum.named; (9) datum.basis and datum.named have the same keys; (10) a key starting with otc_ has kind computed or observed and exists only when the same key without the prefix is published on the same set; (11) a datum basis control.station_id and control.set_id resolve to a set in the release, and for an observed level that set has a primary determination over the same epoch; (12) datum.chart_datum names a published level whenever the set (or the subordinate offsets) has a published chart datum: a computed or observed chart datum is written only where none is published; (13) every datum date is a real calendar date, and every datum epoch and data_span has start <= end.",
   "type": "object",
   "required": ["format_version", "release", "conventions", "licences", "constituents", "stations"],
   "additionalProperties": false,
@@ -391,28 +391,7 @@
             }
           }
         },
-        "datum": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "msl_offset_m": { "type": "number" },
-            "zero": {
-              "description": "What the constants' zero is. chart_datum: the source's chart datum (e.g. JMA's tide-table datum); gauge_zero: the gauge's own zero (GESLA fits); msl: mean sea level; unknown: the source does not say.",
-              "enum": ["chart_datum", "gauge_zero", "msl", "unknown"]
-            },
-            "chart_datum": {
-              "description": "The key in named that is the official chart datum, e.g. mllw, lat or tide_table_datum. Absent when the source gives none. The release build checks that named has this key.",
-              "type": "string",
-              "minLength": 1
-            },
-            "named": {
-              "description": "Named datums in metres relative to the constants' zero, as the source gives them. A key may not be mean_level, zero or chart: those are datum keywords in the SDKs' API.",
-              "type": "object",
-              "propertyNames": { "not": { "enum": ["mean_level", "zero", "chart"] } },
-              "additionalProperties": { "type": "number" }
-            }
-          }
-        },
+        "datum": { "$ref": "#/$defs/datum" },
         "convention_id": { "type": "string", "minLength": 1 },
         "licence_id": { "type": "string", "minLength": 1 },
         "qc_status": {
@@ -910,8 +889,181 @@
         "height_offset_high": { "type": "number" },
         "height_offset_low": { "type": "number" },
         "height_adjusted_type": { "description": "R = ratio, A = additive (metres), as NOAA gives it.", "enum": ["R", "A"] },
-        "licence_id": { "type": "string" }
+        "licence_id": { "type": "string" },
+        "datum": {
+          "description": "The subordinate station's own levels: the levels its source publishes for it, and LAT and HAT computed by the offsets (method subordinate_offsets). Its zero is the subordinate station's chart datum as the offsets define it (for NOAA, the subordinate station's MLLW).",
+          "$ref": "#/$defs/datum"
+        }
       }
+    },
+    "datum": {
+      "description": "Vertical reference of a constant set, or of a subordinate station's offsets. named holds levels in metres above the zero; basis says, for each level, how it was obtained: published by the source, computed from harmonic constants, or observed from the gauge record.",
+      "type": "object",
+      "additionalProperties": false,
+      "dependentRequired": { "named": ["basis"], "basis": ["named"] },
+      "properties": {
+        "msl_offset_m": { "description": "The mean level (Z0) above the zero, in metres.", "type": "number" },
+        "zero": {
+          "description": "What the zero is. chart_datum: the source's chart datum (e.g. NOAA's MLLW, JMA's tide-table datum); gauge_zero: the gauge's own zero (GESLA fits, PEGELONLINE's PNP); vertical_datum: a national or survey height system such as NAP, RH2000, N2000, DVR90, NN2000 or OD Malin; msl: mean sea level; unknown: the source does not say.",
+          "enum": ["chart_datum", "gauge_zero", "vertical_datum", "msl", "unknown"]
+        },
+        "zero_name": {
+          "description": "The source's name for the zero, e.g. MLLW, STND, PNP, NAP, RH2000, OD Malin.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 31
+        },
+        "chart_datum": {
+          "description": "The key in named that is the chart datum, e.g. mllw, lat or tide_table_datum. Absent when there is none. Its basis says whether the agency published it or OTC computed or observed it. A computed or observed chart datum is written only where the source publishes none, so it never replaces a published one (build check 12).",
+          "$ref": "#/$defs/datum_key"
+        },
+        "named": {
+          "description": "Levels in metres above the zero (negative when below). One value per key.",
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/datum_key" },
+          "additionalProperties": { "type": "number" }
+        },
+        "basis": {
+          "description": "One entry per key of named, saying how that level was obtained. Required with named. The release build checks that basis and named have the same keys (build check 9).",
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/datum_key" },
+          "additionalProperties": { "$ref": "#/$defs/datum_basis" }
+        }
+      }
+    },
+    "datum_key": {
+      "description": "A datum name: lower case, at most 31 characters (a C reader holds it in char[32]). mean_level, zero and chart are keywords in the SDKs' API and are not allowed. OTC's own levels use the canonical names lat, hat, msl, mtl, dtl, mhw, mlw, mhhw and mllw; a published level uses the canonical name when the source's definition is the same, and otherwise the source's name in lower case (mhws, stnd, navd88, nap, cd, tide_table_datum). Where a published level holds a canonical key, OTC's value for the same datum on the same set is otc_<key>, e.g. otc_lat next to NOAA's lat (build check 10).",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,30}$(?![\\s\\S])",
+      "not": { "enum": ["mean_level", "zero", "chart"] }
+    },
+    "datum_date": {
+      "description": "A calendar date YYYY-MM-DD. The release build also checks that it is a real date (no 2021-02-30; build check 13).",
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$(?![\\s\\S])"
+    },
+    "datum_period": {
+      "description": "A period with inclusive ends. The release build checks start <= end (build check 13).",
+      "type": "object",
+      "required": ["start", "end"],
+      "additionalProperties": false,
+      "properties": {
+        "start": { "$ref": "#/$defs/datum_date" },
+        "end": { "$ref": "#/$defs/datum_date" },
+        "name": { "description": "e.g. NTDE 1983-2001, OTC 2002-2020, OTC LAT 2020-2038.", "type": "string", "minLength": 1 }
+      }
+    },
+    "datum_data_span": {
+      "description": "The gauge data an observed level is reduced from: the first and last day, and how many calendar months contributed. The release build checks start <= end (build check 13).",
+      "type": "object",
+      "required": ["start", "end", "months"],
+      "additionalProperties": false,
+      "properties": {
+        "start": { "$ref": "#/$defs/datum_date" },
+        "end": { "$ref": "#/$defs/datum_date" },
+        "months": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "datum_basis": {
+      "description": "How one datum level was obtained. kind published: given by the source, unchanged except for units and zero. kind computed: from harmonic constants. kind observed: reduced from the gauge record by the NOAA tidal-datum method. Observed levels refer to the OTC datum epoch 2002-01-01 to 2020-12-31, except a first reduction over the record's own months, which has the flag no_qualified_control and an epoch equal to its data_span.",
+      "type": "object",
+      "required": ["kind", "method"],
+      "additionalProperties": false,
+      "dependentRequired": { "uncertainty_m": ["uncertainty_basis"], "uncertainty_basis": ["uncertainty_m"] },
+      "properties": {
+        "kind": { "enum": ["published", "computed", "observed"] },
+        "method": {
+          "description": "source: as published. harmonic_extremes: the lowest or highest height of the set's harmonic prediction over epoch. subordinate_offsets: the lowest or highest of the reference station's predicted extremes over epoch with the subordinate station's offsets applied. first_reduction: means over data_span with no control; with at least 216 months over the OTC datum epoch it is a 19-year primary determination, otherwise it has the flag no_qualified_control. standard, modified_range_ratio, direct: comparison with the control station on common tidal days (NOAA CO-OPS methods).",
+          "enum": ["source", "harmonic_extremes", "subordinate_offsets", "first_reduction", "standard", "modified_range_ratio", "direct"]
+        },
+        "source_name": {
+          "description": "The source's own name for this level, e.g. MThw, CD, STND.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 31
+        },
+        "epoch": {
+          "description": "The period the level refers to. Observed: the datum epoch it is reduced to, OTC 2002-2020 (for a first reduction over the record's own months, the same dates as data_span). Computed: the prediction window, OTC LAT 2020-2038. Published: the source's epoch, when it states one.",
+          "$ref": "#/$defs/datum_period"
+        },
+        "data_span": {
+          "description": "Observed only: the gauge data reduced.",
+          "$ref": "#/$defs/datum_data_span"
+        },
+        "control": {
+          "description": "The control station. station_id and set_id name the OTC station and the set (one gauge record, in its own zero) whose 19-year values the comparison used. source_id is the source's own id, for a published datum whose control is not an OTC station (NOAA's ctrlStation).",
+          "type": "object",
+          "additionalProperties": false,
+          "anyOf": [{ "required": ["station_id"] }, { "required": ["source_id"] }],
+          "properties": {
+            "station_id": { "type": "string", "pattern": "^OTC-[A-Za-z0-9_-]+$(?![\\s\\S])" },
+            "set_id": { "type": "string", "minLength": 1 },
+            "source_id": { "type": "string", "minLength": 1 }
+          }
+        },
+        "uncertainty_m": {
+          "description": "One standard deviation, in metres. Observed and computed: the expected difference from a 19-year determination over the stated epoch. Published: only when the source gives one.",
+          "type": "number",
+          "minimum": 0
+        },
+        "uncertainty_basis": {
+          "description": "source: given by the source. calibrated: from OTC's cut-down and holdout experiments. propagated: from the scatter of the data or the constituent uncertainties.",
+          "enum": ["source", "calibrated", "propagated"]
+        },
+        "flags": {
+          "description": "time_base_unverified / time_base_disputed: the set's time-base annotation. sampling_assumed: the sampling class (instantaneous or hourly mean) is the declared one, not verified; the uncertainty includes the possible bias. truncated_lows: low waters are cut off, so no low-water levels are given. gaps: gaps of 3 hours or less were filled, or months were skipped for gaps. segment: only the part of the record after a datum step is used (see data_span). short_record: observed, under 12 months of data; computed, constants from under one year of good data, so the level does not meet the IHO definition of LAT and HAT. no_qualified_control: no comparison was possible, so this is a first reduction over the record's own months, not adjusted to the OTC datum epoch. microtidal: mean range under 0.1 m. provisional: the source marks the value provisional.",
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["time_base_unverified", "time_base_disputed", "sampling_assumed", "truncated_lows", "gaps", "segment", "short_record", "no_qualified_control", "microtidal", "provisional"] }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "published" } } },
+          "then": {
+            "properties": { "method": { "const": "source" }, "flags": { "items": { "enum": ["provisional"] } } },
+            "not": { "required": ["data_span"] }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "computed" } } },
+          "then": {
+            "required": ["epoch", "uncertainty_m"],
+            "properties": {
+              "method": { "enum": ["harmonic_extremes", "subordinate_offsets"] },
+              "flags": { "items": { "enum": ["time_base_unverified", "time_base_disputed", "sampling_assumed", "short_record", "microtidal"] } }
+            },
+            "not": { "anyOf": [{ "required": ["data_span"] }, { "required": ["control"] }] }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "observed" } } },
+          "then": {
+            "required": ["epoch", "data_span", "uncertainty_m"],
+            "properties": {
+              "method": { "enum": ["first_reduction", "standard", "modified_range_ratio", "direct"] },
+              "flags": { "items": { "not": { "const": "provisional" } } }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "method": { "enum": ["standard", "modified_range_ratio", "direct"] } } },
+          "then": { "required": ["control"], "properties": { "control": { "required": ["station_id", "set_id"] } } }
+        },
+        {
+          "if": { "properties": { "method": { "const": "first_reduction" } } },
+          "then": { "not": { "required": ["control"] } }
+        },
+        {
+          "description": "Own-month averages are labelled: no_qualified_control goes only with a first reduction, and a first reduction without it is a primary determination (at least 216 months).",
+          "if": { "required": ["flags"], "properties": { "flags": { "contains": { "const": "no_qualified_control" } } } },
+          "then": { "properties": { "method": { "const": "first_reduction" } } },
+          "else": {
+            "if": { "properties": { "method": { "const": "first_reduction" } } },
+            "then": { "properties": { "data_span": { "properties": { "months": { "minimum": 216 } } } } }
+          }
+        }
+      ]
     },
     "validation": {
       "type": "object",
