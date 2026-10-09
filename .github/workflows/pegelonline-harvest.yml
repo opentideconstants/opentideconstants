@@ -1,0 +1,68 @@
+name: pegelonline-harvest
+
+on:
+  schedule:
+    # Daily. PEGELONLINE keeps about 31 days, each run fetches the last 2 days.
+    - cron: "23 4 * * *"
+  workflow_dispatch:
+    inputs:
+      period:
+        description: "ISO-8601 period to fetch (P2D daily; up to about P31D for a backfill)"
+        required: false
+        default: "P2D"
+
+permissions:
+  contents: read
+
+# Own group: runs queue behind each other and are never cancelled.
+# Not shared with the site deploy or the release workflow.
+concurrency:
+  group: otc-harvest
+  cancel-in-progress: false
+
+jobs:
+  harvest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Private R2 bucket. The data is never committed to git.
+      AWS_ACCESS_KEY_ID: ${{ secrets.OTC_WORK_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.OTC_WORK_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      AWS_ENDPOINT_URL_S3: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+      OTC_WORK_BUCKET: ${{ secrets.OTC_WORK_BUCKET }}
+    steps:
+      - uses: actions/checkout@v7
+
+      # Work tree outside the checkout, so no data can land in the repository.
+      - name: Set the work directory
+        run: |
+          mkdir -p "$RUNNER_TEMP/pegelonline"
+          echo "WORK=$RUNNER_TEMP/pegelonline" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Pull the days this run can touch from R2
+        id: pull
+        env:
+          PERIOD: ${{ inputs.period || 'P2D' }}
+        run: python3 pipeline/pegelonline/r2sync.py --root "$WORK" pull --period "$PERIOD"
+
+      - name: Harvest
+        id: harvest
+        continue-on-error: true
+        env:
+          PERIOD: ${{ inputs.period || 'P2D' }}
+        run: python3 pipeline/pegelonline/harvest.py --root "$WORK" --period "$PERIOD"
+
+      - name: Push changed files and manifests to R2
+        if: always() && steps.pull.outcome == 'success'
+        run: python3 pipeline/pegelonline/r2sync.py --root "$WORK" push
+
+      - name: Fail if harvest failed
+        if: steps.harvest.outcome == 'failure'
+        run: |
+          echo "::error::harvest step failed; see its log"
+          exit 1

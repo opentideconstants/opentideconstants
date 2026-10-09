@@ -3,7 +3,14 @@ name: Deploy site to GitHub Pages
 on:
   push:
     branches: [main]
+    # The PEGELONLINE harvest is not part of the site; changes to it do not rebuild or deploy.
+    paths-ignore:
+      - "pipeline/pegelonline/**"
+      - ".github/workflows/pegelonline-harvest.yml"
   pull_request:
+    paths-ignore:
+      - "pipeline/pegelonline/**"
+      - ".github/workflows/pegelonline-harvest.yml"
   workflow_dispatch:
 
 permissions:
