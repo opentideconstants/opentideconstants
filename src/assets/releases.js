@@ -57,8 +57,12 @@
       const meta = el("p", "rel-meta");
       const bits = [day(r), r.format_version ? `format ${r.format_version}` : ""].filter(Boolean);
       meta.append(bits.join(" · "));
-      const doi = typeof r.zenodo_version_doi === "string" ? r.zenodo_version_doi : typeof r.concept_doi === "string" ? r.concept_doi : null;
-      if (doi) { meta.append(bits.length ? " · " : "", link(`https://doi.org/${doi}`, `doi:${doi}`)); }
+      // The release's own Zenodo version DOI; without one, the concept DOI, labelled as such.
+      if (typeof r.zenodo_version_doi === "string") {
+        meta.append(bits.length ? " · " : "", link(`https://doi.org/${r.zenodo_version_doi}`, `doi:${r.zenodo_version_doi}`));
+      } else if (typeof r.concept_doi === "string") {
+        meta.append(bits.length ? " · " : "", link(`https://doi.org/${r.concept_doi}`, `concept doi:${r.concept_doi}`));
+      }
       art.append(meta);
 
       const changes = Array.isArray(r.changes) ? r.changes : [];
