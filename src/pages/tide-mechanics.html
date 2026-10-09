@@ -35,7 +35,7 @@ layout: full
   <p>A constituent is one astronomical rhythm. Its speed in degrees per hour comes from the motions of the Moon and Sun, so it is the same at every port. The Doodson number encodes that speed as a sum of six basic astronomical frequencies.</p>
   <div class="fig"><canvas id="s2-spec" aria-label="Spectrum of constituent amplitudes by speed" role="img"></canvas></div>
   <p class="cap">The tidal spectrum at a Boston-like port. Constituents cluster into species: diurnal near 15°/h (once a day), semidiurnal near 30°/h (twice a day), and shallow-water overtides like M4 near 58°/h. The lower panels zoom into the two crowded clusters.</p>
-  <div class="tbl"><table id="s2-table"><thead><tr><th>Name</th><th>Speed °/h</th><th>Period h</th><th>Doodson</th><th>What it tracks</th></tr></thead><tbody></tbody></table></div>
+  <div class="tbl"><table id="s2-table"><thead><tr><th>Name</th><th>Speed <span class="sym">°/h</span></th><th>Period <span class="sym">h</span></th><th>Doodson</th><th>What it tracks</th></tr></thead><tbody></tbody></table></div>
   <div class="tm-note">Per constituent, a station supplies only two numbers: amplitude <b>H</b> (how big) and phase lag <b>g</b> (how late). The speed is never station data.</div>
 </section>
 
@@ -83,7 +83,7 @@ layout: full
   <p class="cap"><b>Clock offset.</b> Ink needle: true Greenwich g. Magenta needle: what a fit reports if the record's clock runs Δt ahead of UTC. The shift is ω·Δt, mod 360. At 12 h, S2 lands exactly where it started while M2 is off by 12°, so S2 alone cannot catch this error.</p>
   <div class="fig"><canvas id="s4-mer" aria-label="Phase dials showing the shift between local and Greenwich phase for a given longitude" role="img"></canvas></div>
   <p class="cap"><b>Local meridian.</b> Some agencies publish κ, the lag relative to the station's own meridian. Converting to Greenwich uses g = κ − p·λ, where p is the species: 0 long-period, 1 diurnal, 2 semidiurnal (λ east-positive). Here M2 and S2 shift by the same 2λ. A clock error shifts them by different amounts, and that difference tells the two traps apart.</p>
-  <div class="tbl"><table id="s4-table"><thead><tr><th>Name</th><th>True g</th><th>ω·Δt</th><th>Reported g</th><th>p·λ</th><th>κ (local)</th></tr></thead><tbody></tbody></table></div>
+  <div class="tbl"><table id="s4-table"><thead><tr><th>Name</th><th>True <span class="sym">g</span></th><th><span class="sym">ω·Δt</span></th><th>Reported <span class="sym">g</span></th><th><span class="sym">p·λ</span></th><th><span class="sym">κ</span> (local)</th></tr></thead><tbody></tbody></table></div>
 </section>
 
 <!-- 5 -->
@@ -97,7 +97,7 @@ layout: full
   </div>
   <div class="fig"><canvas id="s5-plot" aria-label="Synthetic noisy record with fitted curve and residuals" role="img"></canvas></div>
   <p class="cap">Grey dots: observed hourly values. Magenta line: the fitted sum. The lower strip shows the residual, observed minus fit. The fit includes only constituents the record length can separate (section 6). Below about 15 days, S2 is left out and its energy leaks into M2.</p>
-  <div class="tbl"><table id="s5-table"><thead><tr><th>Name</th><th>True H m</th><th>Fit H m</th><th>True g°</th><th>Fit g°</th><th>Status</th></tr></thead><tbody></tbody></table></div>
+  <div class="tbl"><table id="s5-table"><thead><tr><th>Name</th><th>True <span class="sym">H m</span></th><th>Fit <span class="sym">H m</span></th><th>True <span class="sym">g°</span></th><th>Fit <span class="sym">g°</span></th><th>Status</th></tr></thead><tbody></tbody></table></div>
   <p class="cap">This toy omits nodal corrections, so its true values stand for f·H and g − (V<sub>0</sub> + u). A real fit applies f and u for each observation time.</p>
 </section>
 
@@ -113,7 +113,7 @@ layout: full
     <button type="button" data-days="365.25">1 year</button><button type="button" data-days="6939.6">19 years</button>
   </div>
   <div class="fig"><canvas id="s6-time" aria-label="Log timeline of Rayleigh separation periods with current record length" role="img"></canvas></div>
-  <div class="tbl"><table id="s6-table"><thead><tr><th>Pair</th><th>|Δω| °/h</th><th>Needs</th><th>Status</th></tr></thead><tbody></tbody></table></div>
+  <div class="tbl"><table id="s6-table"><thead><tr><th>Pair</th><th><span class="sym">|Δω| °/h</span></th><th>Needs</th><th>Status</th></tr></thead><tbody></tbody></table></div>
   <div class="tm-note">OTC's fit counts the hours a record actually holds, not its calendar span, and a short record simply gets fewer constituents. That is why short GESLA records are worth keeping: 30 days of Boston gave M2 within 1.6 cm and 0.24° of the 19-year fit.</div>
 </section>
 

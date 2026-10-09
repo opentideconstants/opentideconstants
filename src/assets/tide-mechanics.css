@@ -67,6 +67,7 @@
 .tm table{border-collapse:collapse;font-size:.86rem;width:100%}
 .tm th,.tm td{padding:5px 8px;text-align:right;vertical-align:baseline;border-bottom:1px solid var(--grid);white-space:nowrap}
 .tm th{font-family:var(--f-body);font-weight:600;color:var(--ink-2);border-bottom:1.5px solid var(--ink);font-size:.78rem;text-transform:uppercase;letter-spacing:.04em}
+.tm th .sym{text-transform:none;letter-spacing:0}
 .tm td:first-child,.tm th:first-child{text-align:left}
 .tm td{font-family:var(--f-mono)}
 .tm tr.yes td{color:var(--ink)} .tm tr.no td{color:var(--muted)}
