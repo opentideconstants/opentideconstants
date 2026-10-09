@@ -212,8 +212,10 @@ NOAA37.forEach(c=>{
       `<td>${c.speed.toFixed(7)}</td><td>${perS}</td><td>${dn}</td><td class="sp">${SPECIES[c.species]}</td><td class="what">${c.what}</td>`;
     tb.appendChild(tr);
   });
+  // Closed by default on every screen. A link to it (section 1 points here) opens it.
   const det = document.getElementById('s2-full-det');
-  if (det && window.matchMedia('(min-width: 720px)').matches) det.open = true;
+  const openIfTarget = () => { if (det && location.hash === '#s2-full-det') det.open = true; };
+  openIfTarget(); window.addEventListener('hashchange', openIfTarget);
   // share of the tide's variance (sum of H^2/2) the big eight carry, from the figure's amplitudes
   const v = c => c.H*c.H/2, tot = NOAA37.reduce((s,c)=> s+v(c), 0);
   const big = ['M2','S2','N2','K2','K1','O1','P1','Q1'];
