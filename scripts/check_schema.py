@@ -1,6 +1,7 @@
-r"""Check the draft JSON Schema and the example document.
+r"""Check the JSON Schema and the example document.
 
-1. The current schema (0.6), the index schema and the older schemas are valid draft 2020-12 schemas.
+1. The current schema (1.0), the index schema and the superseded pre-release
+   drafts (0.x) are valid draft 2020-12 schemas.
 2. src/schema/example.json validates. Its .meta.json form (no stations)
    validates against #/$defs/meta, and each station (one .jsonl line)
    validates against #/$defs/station.
@@ -14,11 +15,13 @@ r"""Check the draft JSON Schema and the example document.
    a current set without current_bins (or with water-level constituents),
    current offsets without a reference bin, a mean current written as a
    constituent Z0 or as a string, and a value with a trailing
-   newline. 0.6 adds controls for the record annotations: a time base
-   without a code or with an unknown one, corrected without from/to,
-   no_constants with constants, and any qc_status excluded must fail;
-   every annotation code, a broken record with a usable segment and a
-   no-constants record must pass. Python's re lets $ match before a
+   newline. Controls for the record annotations: a time base without a
+   code or with an unknown one, corrected without from/to, no_constants
+   with constants, and any qc_status excluded must fail; every annotation
+   code, a broken record with a usable segment and a no-constants record
+   must pass. The values and fields that the 0.x drafts deprecated
+   (qc_status accepted and fallback, qc_flags verdict, provenance.time_base,
+   provenance.build_commit, release.doi, depth_type above_bottom) must fail. Python's re lets $ match before a
    final newline; ECMA-262 does not. The schema ends every pattern with
    $(?![\s\S]) so both reject it.
 
@@ -33,7 +36,7 @@ from jsonschema import Draft202012Validator
 
 root = Path(__file__).resolve().parent.parent
 schema_dir = root / "src/schema"
-schema = json.loads((schema_dir / "otc-0.6.schema.json").read_text())
+schema = json.loads((schema_dir / "otc-1.0.schema.json").read_text())
 example = json.loads((schema_dir / "example.json").read_text())
 
 for old in sorted(schema_dir.glob("otc-*.schema.json")):
@@ -241,11 +244,11 @@ must_pass("a current bin with no mean current",
           lambda d: [current_bin(d).pop(k) for k in ("mean_major_ms", "mean_minor_ms")])
 must_pass("depth_type below_chart_datum (NOAA B)",
           lambda d: current_bin(d).__setitem__("depth_type", "below_chart_datum"))
-must_pass("depth_type above_bottom (kept from 0.4)",
+must_fail("depth_type above_bottom (a 0.4 draft value)",
           lambda d: current_offset(d).__setitem__("depth_type", "above_bottom"))
 
 
-# --- 0.6: record annotations -------------------------------------------------------------------
+# --- record annotations ------------------------------------------------------------------------
 
 def fjord(d, letter):
     return next(cs for cs in station(d, "OTC-EXAMPLE-0005")["constant_sets"] if cs["set_id"].endswith("-" + letter))
@@ -256,15 +259,6 @@ if codes != {"verified", "corrected", "unverified", "disputed"}:
     print(f"FAIL: example.json should show every time-base code, has {sorted(codes)}")
     sys.exit(1)
 print("ok: example.json has a set with each time-base code (verified, corrected, unverified, disputed)")
-
-# 0.5 cannot express an annotation: its constant_set rejects the 0.6 fields and values.
-old = json.loads((schema_dir / "otc-0.5.schema.json").read_text())
-old_set = Draft202012Validator({"$schema": old["$schema"], "$defs": old["$defs"], "$ref": "#/$defs/constant_set"})
-for letter in "abcde":
-    if old_set.is_valid(fjord(example, letter)):
-        print(f"FAIL: 0.5 accepts the 0.6 set gesla-fit-{letter}")
-        sys.exit(1)
-print("ok: 0.5 rejects every annotated 0.6 set of OTC-EXAMPLE-0005")
 
 must_fail("time base without a code", lambda d: fjord(d, "a")["time_base"].pop("code"))
 must_fail("unknown time-base code", lambda d: fjord(d, "a")["time_base"].__setitem__("code", "probably"))
@@ -281,7 +275,7 @@ must_fail("evidence without comparator_id", lambda d: first_set(d)["time_base"][
 must_fail("unknown comparator kind",
           lambda d: first_set(d)["time_base"]["evidence"][0].__setitem__("comparator_kind", "guess"))
 must_fail("gauge set without a time base", lambda d: first_set(d).pop("time_base"))
-must_fail("time base still only in provenance (0.5 style)",
+must_fail("time base in provenance.time_base instead of the set (0.5 draft style)",
           lambda d: first_set(d).__setitem__("provenance", {"time_base": first_set(d).pop("time_base")}))
 for i, label in enumerate(("gesla-fit (ok)", "kartverket (ok)")):
     must_fail(f"qc_status excluded on {label}",
@@ -331,21 +325,22 @@ must_pass("a corrected time base with a step and dropped months",
 must_pass("an unverified time base that lists the weak checks tried",
           lambda d: fjord(d, "d")["time_base"].__setitem__(
               "evidence", [{"comparator_kind": "model", "comparator_id": "eot20", "distance_km": None}]))
-must_pass("deprecated qc_status accepted and fallback (0.5 writers)",
-          lambda d: [d["stations"][0]["constant_sets"][1].__setitem__("qc_status", "accepted"),
-                     current_set(d).__setitem__("qc_status", "fallback"),
+must_fail("qc_status accepted (a 0.x draft value)",
+          lambda d: d["stations"][0]["constant_sets"][1].__setitem__("qc_status", "accepted"))
+must_fail("qc_status fallback on a carried-over set (a 0.x draft value)",
+          lambda d: [current_set(d).__setitem__("qc_status", "fallback"),
                      current_set(d)["provenance"].__setitem__("carried_from_release", "20991130"),
                      current_set(d).__setitem__("qc_flags", [{"flag": "carried_over", "reason": "NOAA failed its check"}])])
-must_pass("deprecated qc_flags verdict next to reason", lambda d: fjord(d, "b")["qc_flags"][1].__setitem__("verdict", "unverified"))
-must_pass("deprecated provenance.time_base on an official set (no 0.6 time_base)",
+must_fail("qc_flags verdict next to reason (a 0.x draft field)",
+          lambda d: fjord(d, "b")["qc_flags"][1].__setitem__("verdict", "unverified"))
+must_fail("provenance.time_base on an official set (a 0.x draft field)",
           lambda d: d["stations"][0]["constant_sets"][1]["provenance"].__setitem__(
               "time_base", {"verdict": "utc_instant", "correction": "none"}))
-must_pass("a concept DOI with a null release.doi",
-          lambda d: d["release"].update(doi=None, concept_doi="10.5281/zenodo.1234566"))
-must_pass("a release without release.doi", lambda d: d["release"].pop("doi"))
+must_fail("release.doi null (a 0.x draft field)", lambda d: d["release"].__setitem__("doi", None))
+must_pass("a concept DOI", lambda d: d["release"].__setitem__("concept_doi", "10.5281/zenodo.1234566"))
 
 
-# --- 0.6 gate review: holes found in review (S1-S7, D1, D9, C1, C3) ---------------------------
+# --- holes found in the format gate review (S1-S7, D1, D9, C1, C3) -------------------------------
 
 def no_flag(cs, name):
     cs["qc_flags"] = [f for f in cs["qc_flags"] if f["flag"] != name]
@@ -397,9 +392,9 @@ must_fail("S5 provenance.decision with an extra key",
 must_fail("S5 no_constants with decision outcome fallback",
           lambda d: fjord(d, "d")["provenance"].__setitem__("decision", {"tier": "fallback", "outcome": "fallback"}))
 must_fail("S5 no_constants carried over", lambda d: carried(fjord(d, "d")))
-must_fail("S5 0.6 time_base and the deprecated provenance.time_base together",
+must_fail("S5 the set's time_base and provenance.time_base together",
           lambda d: fjord(d, "a")["provenance"].__setitem__("time_base", {"verdict": "rejected", "correction": "none"}))
-must_fail("S5 deprecated provenance.time_base with an extra key",
+must_fail("S5 provenance.time_base with an extra key",
           lambda d: d["stations"][0]["constant_sets"][1]["provenance"].__setitem__("time_base", {"verdict": "x", "excluded": True}))
 must_fail("S6 time_base flag on a verified time base",
           lambda d: [first_set(d).__setitem__("qc_status", "flagged"),
@@ -447,7 +442,7 @@ for label, mutate in (
 
 # --- OTC_index.json and the latest pointers -----------------------------------------------------
 
-index_schema = json.loads((schema_dir / "otc-index-0.6.schema.json").read_text())
+index_schema = json.loads((schema_dir / "otc-index-1.0.schema.json").read_text())
 Draft202012Validator.check_schema(index_schema)
 index_validator = Draft202012Validator(index_schema)
 pointer_validator = Draft202012Validator({"$schema": index_schema["$schema"], "$defs": index_schema["$defs"],
@@ -486,7 +481,7 @@ index_must_fail("zenodo_version_doi that is not a DOI", lambda d: latest(d).__se
 index_must_fail("bare list instead of {releases: [...]}", lambda d: d.__setitem__("releases", {}))
 
 
-# --- 0.6 confirmation round (provenance allowlist, fallback, versions, reasons, stations) --------
+# --- confirmation round (provenance allowlist, fallback, versions, reasons, stations) ------------
 
 for key in ("Excluded", "EXCLUDED", "is_excluded", "exclusion", "suppressed", "qc", "state", "visibility", "rejected"):
     must_fail(f"provenance key {key}", lambda d, k=key: fjord(d, "a")["provenance"].__setitem__(k, True))
@@ -495,9 +490,9 @@ must_fail("provenance with a nested gate status",
 must_fail("JMA analysis_years with an extra key",
           lambda d: d["stations"][0]["constant_sets"][1]["provenance"].__setitem__("analysis_years", {"status": "excluded"}))
 must_fail("qc_status fallback without carried_from_release", lambda d: fjord(d, "a").__setitem__("qc_status", "fallback"))
-must_fail("min_reader_version 0.5", lambda d: d["release"].__setitem__("min_reader_version", "0.5"))
+must_fail("min_reader_version 0.6", lambda d: d["release"].__setitem__("min_reader_version", "0.6"))
 must_fail("min_reader_version 9.9", lambda d: d["release"].__setitem__("min_reader_version", "9.9"))
-must_fail("format_version 0.5 under the 0.6 schema", lambda d: d.__setitem__("format_version", "0.5"))
+must_fail("format_version 0.6 under the 1.0 schema", lambda d: d.__setitem__("format_version", "0.6"))
 must_fail("release without fit_min_good_hours", lambda d: d["release"].pop("fit_min_good_hours"))
 must_fail("flag reason that is only whitespace", lambda d: fjord(d, "b")["qc_flags"][0].__setitem__("reason", " \t"))
 must_fail("time_base reason that is only whitespace", lambda d: fjord(d, "b")["time_base"].__setitem__("reason", "  "))
@@ -529,7 +524,7 @@ print("ok: left to the build check: good_hours above the record span")
 
 # --- provenance written by the real adapters ----------------------------------------------------
 # scripts/fixtures/adapter-sets.json holds the provenance of real sets from every adapter that
-# writes sets (one per distinct shape). 0.6 provenance is a closed list, so it must accept each.
+# writes sets (one per distinct shape). Provenance is a closed list, so it must accept each.
 
 prov_validator = sub_validator("provenance")
 real = json.loads((root / "scripts/fixtures/adapter-sets.json").read_text())["sets"]
@@ -540,6 +535,11 @@ if bad:
     sys.exit(1)
 print(f"ok: accepted the provenance of {len(real)} real sets from "
       f"{', '.join(sorted({r['adapter'] for r in real}))}")
+# The fixtures keep only provenance and identity, so their recorded qc_status is not validated here.
+# A status that 1.0 does not have is a writer follow-up, not a schema failure.
+old_status = sorted({r["adapter"] for r in real if r.get("qc_status") not in (None, "ok", "flagged", "no_constants")})
+if old_status:
+    print(f"note: fixtures record a qc_status that 1.0 does not have (writer follow-up): {', '.join(old_status)}")
 
 
 def official(d):
@@ -589,10 +589,11 @@ must_fail("provenance.build with an extra key", lambda d: jma(d).__setitem__("bu
 must_fail("tool_versions smuggling a status",
           lambda d: jma(d).__setitem__("build", {"tool_versions": {"excluded": "true", "qc_status": "removed"}}))
 must_fail("tool_versions with an upper-case name", lambda d: jma(d).__setitem__("build", {"tool_versions": {"Python": "3.12"}}))
-must_fail("the deprecated build_commit that is not hex", lambda d: jma(d).__setitem__("build_commit", "not a commit"))
+must_fail("provenance.build_commit that is not hex", lambda d: jma(d).__setitem__("build_commit", "not a commit"))
 must_fail("both build_commit and build.build_commit",
           lambda d: jma(d).update(build_commit="aaaaaaa", build={"build_commit": "bbbbbbb"}))
-must_pass("the deprecated build_commit alone", lambda d: jma(d).__setitem__("build_commit", "aaaaaaa"))
+must_fail("provenance.build_commit alone (a 0.x draft field; use build.build_commit)",
+          lambda d: jma(d).__setitem__("build_commit", "aaaaaaa"))
 must_fail("LINZ header position null but from the header",
           lambda d: [as_source("linz", real_linz)(d),
                      jma(d).__setitem__("position", {"header_lat": None, "header_lon": None, "from": "header"})])

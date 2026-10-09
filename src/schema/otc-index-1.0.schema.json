@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://opentideconstants.org/schema/otc-index-0.6.schema.json",
+  "$id": "https://opentideconstants.org/schema/otc-index-1.0.schema.json",
   "title": "OpenTideConstants release index and latest pointers",
-  "description": "PRE-RELEASE DRAFT, superseded by format 1.0 (otc-index-1.0.schema.json). No release uses it. For releases of format_version 0.6. OTC_index.json validates against this schema: every release, newest first. OTC_latest.json and OTC_latest-f{MAJOR}.json each validate against #/$defs/release_info: the entry of the newest release, and of the newest release of that format major. These files change after a release is published (the month-end Zenodo deposit adds zenodo_version_doi), so the version DOI is here and never in the release files. The release build checks that the index is newest first, that every datestamp appears once, and that each entry's files and SHA-256 values match its OTC_{DATESTAMP}.sha256 file.",
+  "description": "For releases of format_version 1.0. OTC_index.json validates against this schema: every release, newest first. OTC_latest.json and OTC_latest-f{MAJOR}.json each validate against #/$defs/release_info: the entry of the newest release, and of the newest release of that format major. These files change after a release is published (the month-end Zenodo deposit adds zenodo_version_doi), so the version DOI is here and never in the release files. The release build checks that the index is newest first, that every datestamp appears once, and that each entry's files and SHA-256 values match its OTC_{DATESTAMP}.sha256 file.",
   "type": "object",
   "required": ["releases"],
   "additionalProperties": false,

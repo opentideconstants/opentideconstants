@@ -1,5 +1,5 @@
 {
- "description": "The provenance objects that real adapters write, one per distinct shape, captured from each adapter's fixture run on its branch (NOAA, NOAA currents, Kartverket, LINZ, JMA) and from gesla_sets.py on the 20261008 GESLA fit documents. Only provenance and the set's identity are kept, no constants. check_schema.py checks that 0.6 provenance accepts every one.",
+ "description": "The provenance objects that real adapters write, one per distinct shape, captured from each adapter's fixture run on its branch (NOAA, NOAA currents, Kartverket, LINZ, JMA) and from gesla_sets.py on the 20261008 GESLA fit documents. Only provenance and the set's identity are kept, no constants. check_schema.py checks that 1.0 provenance accepts every one.",
  "sets": [
   {
    "adapter": "A-NOAA",

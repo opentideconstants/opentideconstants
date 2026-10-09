@@ -1,11 +1,10 @@
 {
-  "format_version": "0.6",
+  "format_version": "1.0",
   "release": {
     "datestamp": "20991231",
     "created": "2099-12-31T00:00:00Z",
-    "min_reader_version": "0.6",
+    "min_reader_version": "1.0",
     "fit_min_good_hours": 360,
-    "doi": null,
     "concept_doi": null,
     "source_versions": { "gesla": "4.1", "kartverket": "20991231", "noaa": "20991231" }
   },
