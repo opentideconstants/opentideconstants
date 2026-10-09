@@ -409,3 +409,11 @@ body:has(.docs-layout) .footer-inner { padding-inline: 4rem; max-width: none; }
 
 /* On documentation pages the header spans the full width, as on the aimock docs */
 body:has(.docs-layout) .header-inner { max-width: none; }
+
+/* Request icon (Not included): one trailing column, an outline icon in the link colour */
+.doc dl.requests dd { display: grid; grid-template-columns: 1fr auto; gap: var(--space-3); align-items: start; }
+.request { display: inline-grid; place-items: center; inline-size: 2rem; block-size: 2rem; margin-top: -0.15rem; border-radius: var(--radius-sm); color: var(--color-link); }
+.request:hover { color: var(--color-link-hover); background: var(--color-accent-glow); }
+.request svg, .request-glyph svg { display: block; inline-size: 1.25rem; block-size: 1.25rem; }
+.request-glyph { display: inline-block; vertical-align: -0.2em; color: var(--color-link); }
+@media (pointer: coarse) { .request { inline-size: 2.75rem; block-size: 2.75rem; margin-top: -0.55rem; margin-right: -0.375rem; } }
