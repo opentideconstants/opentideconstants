@@ -1,0 +1,59 @@
+---
+title: Not included
+description: What OpenTideConstants and its SDKs leave out, why, and how to request it.
+layout: docs
+docs: Documentation
+order: 9
+---
+<h1>Not included</h1>
+<p class="lead">What OTC and its SDKs leave out, and why. If you need one of these, use its <strong>Request it</strong> link. It opens an issue with the request form, so the request and its evidence are public.</p>
+
+<h2 id="sources">Sources</h2>
+<dl>
+  <dt>FES2022 model constants</dt>
+  <dd><p>The AVISO+ licence registration is pending. See <a href="/source-fes2022/">FES2022</a>. <a href="{{site.repoUrl}}/issues/new?template=request.yml&amp;labels=request&amp;title=%5BRequest%5D+FES2022+model+constants">Request it</a></p></dd>
+  <dt>UHSLC Fast Delivery</dt>
+  <dd><p>The UHSLC service was unavailable when checked. GESLA records that come from UHSLC are in the release. See <a href="/source-uhslc-fast/">UHSLC Fast Delivery</a>. <a href="{{site.repoUrl}}/issues/new?template=request.yml&amp;labels=request&amp;title=%5BRequest%5D+UHSLC+Fast+Delivery">Request it</a></p></dd>
+  <dt>Other sources that were checked</dt>
+  <dd><p>Their licence or access terms do not allow it. Examples are REDMAR (Spain), ISPRA (Italy), and UNAM and CICESE (Mexico). <a href="/sources/#not-used">Considered, not added</a> gives the reason for each. <a href="{{site.repoUrl}}/issues/new?template=request.yml&amp;labels=request&amp;title=%5BRequest%5D+Source%3A+">Request it</a></p></dd>
+</dl>
+<p>To propose a source that is not listed, use the same form, with the licence, the access path and the coverage. <a href="{{site.repoUrl}}/blob/main/CONTRIBUTING.md#propose-a-source">CONTRIBUTING.md</a> gives the details.</p>
+
+<h2 id="releases">Releases</h2>
+<dl>
+  <dt>Releases in an older format major</dt>
+  <dd><p>Each release is built in the current format only. A reader of an older major keeps the last release of that major, through <code>OTC_latest-f{MAJOR}.json</code> (see <a href="/downloads/">Downloads</a>). <a href="{{site.repoUrl}}/issues/new?template=request.yml&amp;labels=request&amp;title=%5BRequest%5D+Releases+in+an+older+format+major">Request it</a></p></dd>
+</dl>
+
+<h2 id="sdks">SDKs</h2>
+<dl>
+  <dt>Packages for conda, vcpkg, Conan and other package managers</dt>
+  <dd><p>The SDK channels are PyPI, RubyGems, npm and, for C, GitHub releases. One release workflow publishes to those four, with build provenance and SHA-256 checksums. <a href="{{site.repoUrl}}/issues/new?template=request.yml&amp;labels=request&amp;title=%5BRequest%5D+SDK+package+for+">Request it</a></p></dd>
+  <dt>SDKs in other languages, such as Rust</dt>
+  <dd><p>The SDKs are Python, Ruby, TypeScript and C, with one interface and one shared conformance suite. Other languages can call the C library. <a href="{{site.repoUrl}}/issues/new?template=request.yml&amp;labels=request&amp;title=%5BRequest%5D+SDK+in+">Request it</a></p></dd>
+  <dt>Constituents that a fit did not keep</dt>
+  <dd><p>The SDKs return the constituents that each set publishes. Inferring other constituents would change the published data without saying so. <a href="{{site.repoUrl}}/issues/new?template=request.yml&amp;labels=request&amp;title=%5BRequest%5D+Constituent+inference">Request it</a></p></dd>
+</dl>
+
+<h2 id="prediction">Prediction in the SDKs</h2>
+<dl>
+  <dt>Weak flood and weak ebb</dt>
+  <dd><p>Current events are maximum flood, maximum ebb and slack water. A weak flood or ebb (a current that strengthens toward flood or ebb but does not turn) is not reported, as in the reference engine. <a href="{{site.repoUrl}}/issues/new?template=request.yml&amp;labels=request&amp;title=%5BRequest%5D+Weak+flood+and+weak+ebb+events">Request it</a></p></dd>
+  <dt>Heights between high and low water at some secondary stations</dt>
+  <dd><p>Where a secondary station's high-water and low-water offsets differ, only high and low water are given, as in NOAA's offset method. Where the two offsets are equal, the full curve is given. <a href="{{site.repoUrl}}/issues/new?template=request.yml&amp;labels=request&amp;title=%5BRequest%5D+Heights+between+extremes+at+secondary+stations">Request it</a></p></dd>
+  <dt>Current series at secondary current stations</dt>
+  <dd><p>Only current events are given there, from the reference station's events and the station's offsets. NOAA's offset method gives events only. <a href="{{site.repoUrl}}/issues/new?template=request.yml&amp;labels=request&amp;title=%5BRequest%5D+Current+series+at+secondary+stations">Request it</a></p></dd>
+  <dt>Estimated current events</dt>
+  <dd><p>When a secondary station has no published offset for a current event type, events of that type are left out, and the result names the type. OTC does not publish estimated times. <a href="{{site.repoUrl}}/issues/new?template=request.yml&amp;labels=request&amp;title=%5BRequest%5D+Estimated+current+events">Request it</a></p></dd>
+  <dt>Local times in the C SDK without an OS time-zone database</dt>
+  <dd><p>Results are in UTC and carry the station's IANA time-zone name. The C SDK gives local times only where the operating system has a time-zone database. <a href="{{site.repoUrl}}/issues/new?template=request.yml&amp;labels=request&amp;title=%5BRequest%5D+C+SDK+local+times">Request it</a></p></dd>
+  <dt>Years before 1700 or after 2100</dt>
+  <dd><p>The astronomy tables in a release cover 1700 to 2100. A time outside them is an error. <a href="{{site.repoUrl}}/issues/new?template=request.yml&amp;labels=request&amp;title=%5BRequest%5D+Prediction+years+outside+1700%E2%80%932100">Request it</a></p></dd>
+</dl>
+
+<h2 id="harmonic-limits">Outside what harmonic prediction can do</h2>
+<p>Harmonic constants describe the astronomical tide only, so these are not requests that OTC can take.</p>
+<ul>
+  <li><strong>Storm surge, wind set-up, river flow, seiches and ice.</strong> They do not repeat with astronomy, so they stay in the residual. See <a href="/tide-mechanics/#s7">What it applies to</a> in Tide Mechanics.</li>
+  <li><strong>Datums that the data does not give</strong>, such as a geoid, NAVD88, or LAT computed from constants. A prediction gives heights only above a datum that the constant set states.</li>
+</ul>

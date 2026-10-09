@@ -1,0 +1,30 @@
+name: Request a source or feature
+description: Ask for a source, a feature or a package that OpenTideConstants does not include.
+title: "[Request] "
+labels: ["request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        [Not included](https://opentideconstants.org/not-included/) lists what OTC leaves out and why. A request with a clear use and evidence is easier to decide on.
+  - type: textarea
+    id: need
+    attributes:
+      label: What you need
+      description: The source, feature or package, and what it gives you that OTC does not.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why, or who it is for
+      description: Your use, the people or tools that need it, and what you use now.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Links or evidence
+      description: For a source, give the licence text, the access path (API, files or archive) and the coverage. For a feature, give an example, a reference or a comparison.
+    validations:
+      required: false
