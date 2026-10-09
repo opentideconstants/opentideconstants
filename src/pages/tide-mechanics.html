@@ -1,0 +1,171 @@
+---
+title: Tide Mechanics
+description: How a few harmonic constants per station turn into a tide prediction, shown with interactive figures, and which of those numbers OTC publishes.
+layout: full
+---
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Bodoni:wght@500;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
+<link rel="stylesheet" href="/assets/tide-mechanics.css">
+<div class="tm">
+<div class="tm-wrap">
+<div class="top">
+  <div class="kicker">OpenTideConstants · field guide</div>
+  <h1>Tide Mechanics</h1>
+  <p class="lede">How a few numbers per station turn into a tide prediction, and which of those numbers OTC owns.</p>
+  <ol class="toc">
+    <li><a href="#s1">1 Sum of waves</a></li><li><a href="#s2">2 Constituents</a></li><li><a href="#s3">3 The formula</a></li>
+    <li><a href="#s4">4 Phase and time base</a></li><li><a href="#s5">5 Analysis</a></li><li><a href="#s6">6 Record length</a></li>
+    <li><a href="#s7">7 What it applies to</a></li><li><a href="#s8">8 OTC pipeline</a></li>
+  </ol>
+</div>
+
+<!-- 1 -->
+<section id="s1">
+  <h2><span class="n">1</span>A tide is a sum of waves</h2>
+  <p>Each constituent is a pure cosine with its own period and size. Add them and you get the tide. Turn them on and off below. The amplitudes start at Boston-like values.</p>
+  <div class="controls" id="s1-controls" role="group" aria-label="Constituents to include"></div>
+  <div class="fig"><canvas id="s1-lanes" aria-label="Individual constituent waves over three days and their sum" role="img"></canvas></div>
+  <p class="cap">Three days. Each lane is one constituent on a shared scale; the bottom lane is their sum. Raise K1 and O1 to about 0.5 m and successive high waters become unequal: that is <b>diurnal inequality</b>.</p>
+  <div class="fig"><canvas id="s1-month" aria-label="Sum of constituents over 30 days showing spring and neap tides" role="img"></canvas></div>
+  <p class="cap">Thirty days of the same sum. M2 (12.42 h) and S2 (12.00 h) drift in and out of step every 14.77 days. In step they add: <b>spring tides</b>. Out of step they cancel: <b>neap tides</b>. The dashed line is the M2+S2 envelope. N2 adds a monthly swing on top.</p>
+</section>
+
+<!-- 2 -->
+<section id="s2">
+  <h2><span class="n">2</span>What a constituent is</h2>
+  <p>A constituent is one astronomical rhythm. Its speed in degrees per hour comes from the motions of the Moon and Sun, so it is the same at every port. The Doodson number encodes that speed as a sum of six basic astronomical frequencies.</p>
+  <div class="fig"><canvas id="s2-spec" aria-label="Spectrum of constituent amplitudes by speed" role="img"></canvas></div>
+  <p class="cap">The tidal spectrum at a Boston-like port. Constituents cluster into species: diurnal near 15°/h (once a day), semidiurnal near 30°/h (twice a day), and shallow-water overtides like M4 near 58°/h. The lower panels zoom into the two crowded clusters.</p>
+  <div class="tbl"><table id="s2-table"><thead><tr><th>Name</th><th>Speed °/h</th><th>Period h</th><th>Doodson</th><th>What it tracks</th></tr></thead><tbody></tbody></table></div>
+  <div class="tm-note">Per constituent, a station supplies only two numbers: amplitude <b>H</b> (how big) and phase lag <b>g</b> (how late). The speed is never station data.</div>
+</section>
+
+<!-- 3 -->
+<section id="s3">
+  <h2><span class="n">3</span>The prediction formula</h2>
+  <p>Every tide predictor evaluates this sum. Select a term to see it on the wave.</p>
+  <div class="formula" id="s3-formula">
+    <span>h(t) = </span><button class="t" type="button" data-term="z0" data-owner="pub" aria-pressed="false">Z<sub>0</sub></button>
+    <span> + Σ </span><button class="t" type="button" data-term="f" data-owner="sdk" aria-pressed="false">f</button><span>·</span><button class="t" type="button" data-term="H" data-owner="pub" aria-pressed="false">H</button>
+    <span>·cos(</span><button class="t" type="button" data-term="w" data-owner="fix" aria-pressed="false">ω</button><span>t + </span><button class="t" type="button" data-term="v0" data-owner="sdk" aria-pressed="false">V<sub>0</sub></button>
+    <span> + </span><button class="t" type="button" data-term="u" data-owner="sdk" aria-pressed="false">u</button><span> − </span><button class="t" type="button" data-term="g" data-owner="pub" aria-pressed="false">g</button><span>)</span>
+  </div>
+  <div class="btnrow"><span class="pill pub">OTC publishes</span><span class="pill sdk">SDK computes</span><span class="pill fix">fixed by astronomy</span></div>
+  <ul class="terms" id="s3-terms">
+    <li data-term="z0"><b>Z<sub>0</sub></b> Mean water level above the chart datum. One number per station. <span class="pill pub">OTC</span></li>
+    <li data-term="H"><b>H</b> Amplitude: half the crest-to-trough height of this constituent. <span class="pill pub">OTC</span></li>
+    <li data-term="g"><b>g</b> Phase lag: how many degrees the local crest trails the Moon or Sun's pull. <span class="pill pub">OTC</span></li>
+    <li data-term="w"><b>ω</b> Speed in °/h. Identical worldwide. <span class="pill fix">astronomy</span></li>
+    <li data-term="v0"><b>V<sub>0</sub></b> Where the astronomical driver sits at t = 0. Depends only on the date. <span class="pill sdk">SDK</span></li>
+    <li data-term="f"><b>f</b> and <b>u</b> Nodal corrections for amplitude and phase over the 18.6-year lunar node cycle. <span class="pill sdk">SDK</span></li>
+    <li data-term="t"><b>t</b> Hours since the time origin, in UTC. Σ adds every constituent. <span class="pill fix">input</span></li>
+  </ul>
+  <div class="fig"><canvas id="s3-wave" aria-label="One M2 wave with each formula term annotated" role="img"></canvas></div>
+  <p class="cap">One M2 wave. The dashed curve is the equilibrium tide, the astronomical driver set by V<sub>0</sub> + u. The real crest arrives g degrees later; for M2 every 28.98° of lag is one hour.</p>
+  <div class="fig"><canvas id="s3-nodal" aria-label="Nodal amplitude factor f for M2 and K1 over one 18.6 year cycle" role="img"></canvas></div>
+  <p class="cap">The nodal factor f across one lunar node cycle, centred on today. M2 moves about ±3.7%. K1 moves about ±11.5%, and the two run in opposite directions. The SDK computes f and u from the date, so OTC never stores them.</p>
+</section>
+
+<!-- 4 -->
+<section id="s4">
+  <h2><span class="n">4</span>Phase lag g and the time-base trap</h2>
+  <p>g is measured against a clock. Move the clock by Δt and every phase moves by its own speed times Δt. One hour is 28.98° for M2 and 15.04° for K1. A wrong time zone therefore leaves a fingerprint: phase errors that scale with each constituent's speed.</p>
+  <div class="controls">
+    <div class="ctl"><label for="s4-dt">Clock offset Δt</label><input type="range" id="s4-dt" min="-12" max="12" step="0.25" value="1"><output id="s4-dt-o" for="s4-dt">+1.00 h</output></div>
+    <div class="ctl"><label for="s4-lon">Longitude λ</label><input type="range" id="s4-lon" min="-180" max="180" step="0.1" value="0"><output id="s4-lon-o" for="s4-lon">0.0°</output></div>
+  </div>
+  <div class="btnrow"><span class="lbl">Cases OTC hit:</span>
+    <button type="button" id="s4-p-kv">Kartverket: 1 h reference</button>
+    <button type="button" id="s4-p-linz">LINZ: TIME ZONE=180 (UTC+12)</button>
+    <button type="button" id="s4-p-jma">JMA: station meridian (Tokyo 139.8°E)</button>
+    <button type="button" id="s4-p-0">Reset</button>
+  </div>
+  <div class="fig"><canvas id="s4-clock" aria-label="Phase dials showing true and shifted phase for each constituent under a clock offset" role="img"></canvas></div>
+  <p class="cap"><b>Clock offset.</b> Ink needle: true Greenwich g. Magenta needle: what a fit reports if the record's clock runs Δt ahead of UTC. The shift is ω·Δt, mod 360. At 12 h, S2 lands exactly where it started while M2 is off by 12°, so S2 alone cannot catch this error.</p>
+  <div class="fig"><canvas id="s4-mer" aria-label="Phase dials showing the shift between local and Greenwich phase for a given longitude" role="img"></canvas></div>
+  <p class="cap"><b>Local meridian.</b> Some agencies publish κ, the lag relative to the station's own meridian. Converting to Greenwich uses g = κ − p·λ, where p is the species: 0 long-period, 1 diurnal, 2 semidiurnal (λ east-positive). Here M2 and S2 shift by the same 2λ. A clock error shifts them by different amounts, and that difference tells the two traps apart.</p>
+  <div class="tbl"><table id="s4-table"><thead><tr><th>Name</th><th>True g</th><th>ω·Δt</th><th>Reported g</th><th>p·λ</th><th>κ (local)</th></tr></thead><tbody></tbody></table></div>
+</section>
+
+<!-- 5 -->
+<section id="s5">
+  <h2><span class="n">5</span>Harmonic analysis: getting H and g from a record</h2>
+  <p>Analysis runs the formula backwards. Given hourly water levels, a least-squares fit finds the Z<sub>0</sub>, H and g that best explain them. Below is a synthetic record built from known constants plus noise; the fit tries to recover them.</p>
+  <div class="controls">
+    <div class="ctl"><label for="s5-days">Record length</label><input type="range" id="s5-days" min="1" max="60" step="1" value="30"><output id="s5-days-o" for="s5-days">30 d</output></div>
+    <div class="ctl"><label for="s5-noise">Noise σ</label><input type="range" id="s5-noise" min="0" max="0.4" step="0.01" value="0.10"><output id="s5-noise-o" for="s5-noise">0.10 m</output></div>
+    <div class="btnrow flush"><button type="button" id="s5-regen">New noise sample</button></div>
+  </div>
+  <div class="fig"><canvas id="s5-plot" aria-label="Synthetic noisy record with fitted curve and residuals" role="img"></canvas></div>
+  <p class="cap">Grey dots: observed hourly values. Magenta line: the fitted sum. The lower strip shows the residual, observed minus fit. The fit includes only constituents the record length can separate (section 6). Below about 15 days, S2 is left out and its energy leaks into M2.</p>
+  <div class="tbl"><table id="s5-table"><thead><tr><th>Name</th><th>True H m</th><th>Fit H m</th><th>True g°</th><th>Fit g°</th><th>Status</th></tr></thead><tbody></tbody></table></div>
+  <p class="cap">This toy omits nodal corrections, so its true values stand for f·H and g − (V<sub>0</sub> + u). A real fit applies f and u for each observation time.</p>
+</section>
+
+<!-- 6 -->
+<section id="s6">
+  <h2><span class="n">6</span>Record length decides what you can separate</h2>
+  <p>Two constituents with close speeds look like one wave until they drift a full cycle apart. The Rayleigh criterion sets the minimum record: T ≥ 360° / |ω<sub>1</sub> − ω<sub>2</sub>|. The figures below compute T from the speeds.</p>
+  <div class="controls">
+    <div class="ctl"><label for="s6-len">Record length</label><input type="range" id="s6-len" min="0" max="1000" step="1" value="500"><output id="s6-len-o" for="s6-len"></output></div>
+  </div>
+  <div class="btnrow"><span class="lbl">Jump to:</span>
+    <button type="button" data-days="1">1 day</button><button type="button" data-days="30">30 days</button>
+    <button type="button" data-days="365.25">1 year</button><button type="button" data-days="6939.6">19 years</button>
+  </div>
+  <div class="fig"><canvas id="s6-time" aria-label="Log timeline of Rayleigh separation periods with current record length" role="img"></canvas></div>
+  <div class="tbl"><table id="s6-table"><thead><tr><th>Pair</th><th>|Δω| °/h</th><th>Needs</th><th>Status</th></tr></thead><tbody></tbody></table></div>
+  <div class="tm-note">OTC's fit counts the hours a record actually holds, not its calendar span, and a short record simply gets fewer constituents. That is why short GESLA records are worth keeping: 30 days of Boston gave M2 within 1.6 cm and 0.24° of the 19-year fit.</div>
+</section>
+
+<!-- 7 -->
+<section id="s7">
+  <h2><span class="n">7</span>What it applies to</h2>
+  <div class="panels">
+    <div class="panel">
+      <h3>Tide heights at a station</h3>
+      <div class="fig"><canvas id="s7-h" aria-label="Predicted tide height at a station" role="img"></canvas></div>
+      <p class="cap">Z<sub>0</sub> plus H and g per constituent give h(t) at that gauge, for any date.</p>
+    </div>
+    <div class="panel">
+      <h3>Subordinate stations</h3>
+      <div class="fig"><canvas id="s7-sub" aria-label="Reference and subordinate station tide curves with offsets" role="img"></canvas></div>
+      <p class="cap">A NOAA "S" station has no constants of its own. It borrows a reference station's prediction and applies time offsets in minutes and height ratios or additive offsets. NOAA gives separate offsets for high and low water; this sketch uses one of each.</p>
+    </div>
+    <div class="panel">
+      <h3>Tidal currents</h3>
+      <div class="controls tight">
+        <div class="ctl"><label for="s7-phase">Tidal phase</label><input type="range" id="s7-phase" min="0" max="360" step="1" value="40"><output id="s7-phase-o" for="s7-phase">40°</output></div>
+        <div class="ctl"><label for="s7-bin">Depth bin</label><select id="s7-bin"><option value="0">Near surface</option><option value="1">Mid-depth</option><option value="2">Near bottom</option></select><span></span></div>
+      </div>
+      <div class="fig"><canvas id="s7-cur" aria-label="Tidal current ellipse with flood, ebb and slack" role="img"></canvas></div>
+      <p class="cap">Currents are vectors, so each depth bin gets a major axis, a minor axis and an azimuth per constituent. The tip of the current traces an ellipse. Flood and ebb run along the major axis; slack falls where the speed is lowest. A mean current shifts the whole ellipse.</p>
+    </div>
+    <div class="panel">
+      <h3>What harmonics cannot predict</h3>
+      <div class="fig"><canvas id="s7-surge" aria-label="Observed water level versus prediction with storm surge residual, and a microtidal lake" role="img"></canvas></div>
+      <p class="cap">Weather surge, river flow and seiches do not repeat with astronomy, so they stay in the residual. Where the tide is tiny, as in lakes and upper rivers, that residual dominates and OTC sets the <b>microtidal</b> flag.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 8 -->
+<section id="s8">
+  <h2><span class="n">8</span>From source to SDK</h2>
+  <p>The OTC pipeline, top to bottom. Every record survives to the end; the audit adds labels and never deletes.</p>
+  <ol class="flow">
+    <li><span class="dot">in</span><div><h3>Sources</h3><p>Water-level records and official constants from 15 sources, GESLA among them.</p>
+      <div class="chips"><span class="chip">GESLA</span><span class="chip">NOAA</span><span class="chip">Kartverket</span><span class="chip">LINZ</span><span class="chip">+ 11 more</span></div></div></li>
+    <li><span class="dot">Δt</span><div><h3>Per-record time-base audit</h3><p>Checks each record's clock and meridian convention against section 4's fingerprints, then annotates it. No record is dropped.</p>
+      <div class="chips"><span class="chip v">verified</span><span class="chip c">corrected</span><span class="chip u">unverified</span><span class="chip d">disputed</span></div></div></li>
+    <li><span class="dot">fit</span><div><h3>Harmonic fit</h3><p>Least squares over the hours present. Record length decides how many constituents enter (section 6).</p></div></li>
+    <li><span class="dot">✓</span><div><h3>Canary check</h3><p>Compares fitted H and g with official constants at overlapping stations to catch systematic errors.</p></div></li>
+    <li><span class="dot">db</span><div><h3>Combined dataset</h3><p>Z<sub>0</sub>, and H and g per constituent, per station, with the audit labels attached.</p></div></li>
+    <li><span class="dot">h(t)</span><div><h3>SDKs</h3><p>Python, Ruby, TypeScript and C read the dataset, compute V<sub>0</sub>, f and u for the requested time, and sum the formula.</p>
+      <div class="chips"><span class="chip">Python</span><span class="chip">Ruby</span><span class="chip">TypeScript</span><span class="chip">C</span></div></div></li>
+  </ol>
+</section>
+
+<p class="tm-foot">Speeds from the standard Doodson/Schureman tables. Nodal factors use Schureman's approximations with the lunar node longitude N from the date. Station values are illustrative, Boston-like, and are not OTC data.</p>
+</div>
+</div>
+<script src="/assets/tide-mechanics.js" defer></script>
