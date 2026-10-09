@@ -24,6 +24,8 @@ docs-label: JMA
   <dd>70 JMA stations in Japan.</dd>
   <dt>Rank</dt>
   <dd>Official constants.</dd>
+  <dt>Provenance keys</dt>
+  <dd>Each JMA set adds to its <code>provenance</code>: <code>owner</code> (<code>jma</code>, <code>jcg_or_gsi</code> or <code>third_party</code>), <code>redistribution</code> (<code>redistribute</code> for a JMA-owned station, <code>comparator_only</code> for any other, which is not published as data), <code>phase_reference_longitude_deg</code> (the meridian the source phases refer to), <code>jma_station_code</code>, <code>analysis_years</code> (<code>long_period</code> and <code>short_period</code>, as JMA gives them), and <code>source_constituents_not_published</code> (JMA constituents with no OTC name: source name, speed, amplitude and reason). See <a href="/data-format/#fields">Data format</a>.</dd>
 </dl>
 
 <p><a href="/sources/">All sources and how they rank</a></p>
