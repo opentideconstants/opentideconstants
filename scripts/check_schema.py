@@ -593,3 +593,13 @@ must_fail("the deprecated build_commit that is not hex", lambda d: jma(d).__seti
 must_fail("both build_commit and build.build_commit",
           lambda d: jma(d).update(build_commit="aaaaaaa", build={"build_commit": "bbbbbbb"}))
 must_pass("the deprecated build_commit alone", lambda d: jma(d).__setitem__("build_commit", "aaaaaaa"))
+must_fail("LINZ header position null but from the header",
+          lambda d: [as_source("linz", real_linz)(d),
+                     jma(d).__setitem__("position", {"header_lat": None, "header_lon": None, "from": "header"})])
+must_fail("LINZ header latitude null, from the header",
+          lambda d: [as_source("linz", real_linz)(d),
+                     jma(d).__setitem__("position", {"header_lat": None, "header_lon": 174.0, "from": "header"})])
+for name in ("excluded", "removed", "status", "qc_status", "state", "suppressed", "withheld"):
+    must_fail(f"tool_versions name {name}", lambda d, n=name: jma(d).__setitem__("build", {"tool_versions": {n: "1"}}))
+must_pass("tool_versions with ordinary names (python, uv, numpy)",
+          lambda d: jma(d).__setitem__("build", {"tool_versions": {"python": "3.12.7", "uv": "0.4.18", "numpy": "2.1.2"}}))

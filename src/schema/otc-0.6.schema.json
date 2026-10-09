@@ -745,7 +745,14 @@
           },
           "if": { "properties": { "from": { "const": "station_list" } } },
           "then": { "required": ["replaced_because", "list_lat", "list_lon"] },
-          "else": { "not": { "required": ["replaced_because"] } }
+          "else": { "not": { "required": ["replaced_because"] } },
+          "allOf": [
+            {
+              "description": "A header position that cannot be read (null) is always replaced from the station list.",
+              "if": { "anyOf": [{ "properties": { "header_lat": { "type": "null" } } }, { "properties": { "header_lon": { "type": "null" } } }] },
+              "then": { "properties": { "from": { "const": "station_list" } } }
+            }
+          ]
         },
         "build": {
           "description": "Build-only fields. They change on every rebuild, so the release content digest (content_sha256) leaves this whole object out.",
@@ -759,7 +766,10 @@
             "tool_versions": {
               "description": "{name: version} of the tools used, e.g. {\"python\": \"3.12.7\"}. A name is lower case; a version starts with a digit (or v and a digit).",
               "type": "object",
-              "propertyNames": { "pattern": "^[a-z0-9][a-z0-9_.-]{0,63}$(?![\\s\\S])" },
+              "propertyNames": {
+                "pattern": "^[a-z0-9][a-z0-9_.-]{0,63}$(?![\\s\\S])",
+                "not": { "pattern": "^([Ee][Xx][Cc][Ll][Uu][Dd][Ee][Dd]?|[Rr][Ee][Mm][Oo][Vv][Ee][Dd]?|([Qq][Cc]_)?[Ss][Tt][Aa][Tt][Uu][Ss]|[Ss][Tt][Aa][Tt][Ee]|[Ss][Uu][Pp][Pp][Rr][Ee][Ss][Ss][Ee][Dd]|[Ww][Ii][Tt][Hh][Hh][Ee][Ll][Dd])$(?![\\s\\S])" }
+              },
               "additionalProperties": { "type": "string", "pattern": "^v?[0-9][0-9A-Za-z.+_-]{0,63}$(?![\\s\\S])" }
             }
           }
