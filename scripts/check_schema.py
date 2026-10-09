@@ -1,6 +1,6 @@
 r"""Check the draft JSON Schema and the example document.
 
-1. The current schema (0.5) and the older schemas are valid draft 2020-12 schemas.
+1. The current schema (0.6) and the older schemas are valid draft 2020-12 schemas.
 2. src/schema/example.json validates. Its .meta.json form (no stations)
    validates against #/$defs/meta, and each station (one .jsonl line)
    validates against #/$defs/station.
@@ -14,7 +14,11 @@ r"""Check the draft JSON Schema and the example document.
    a current set without current_bins (or with water-level constituents),
    current offsets without a reference bin, a mean current written as a
    constituent Z0 or as a string, and a value with a trailing
-   newline. Python's re lets $ match before a
+   newline. 0.6 adds controls for the record annotations: a time base
+   without a code or with an unknown one, corrected without from/to,
+   no_constants with constants, and any qc_status excluded must fail;
+   every annotation code, a broken record with a usable segment and a
+   no-constants record must pass. Python's re lets $ match before a
    final newline; ECMA-262 does not. The schema ends every pattern with
    $(?![\s\S]) so both reject it.
 
@@ -29,7 +33,7 @@ from jsonschema import Draft202012Validator
 
 root = Path(__file__).resolve().parent.parent
 schema_dir = root / "src/schema"
-schema = json.loads((schema_dir / "otc-0.5.schema.json").read_text())
+schema = json.loads((schema_dir / "otc-0.6.schema.json").read_text())
 example = json.loads((schema_dir / "example.json").read_text())
 
 for old in sorted(schema_dir.glob("otc-*.schema.json")):
@@ -239,3 +243,100 @@ must_pass("depth_type below_chart_datum (NOAA B)",
           lambda d: current_bin(d).__setitem__("depth_type", "below_chart_datum"))
 must_pass("depth_type above_bottom (kept from 0.4)",
           lambda d: current_offset(d).__setitem__("depth_type", "above_bottom"))
+
+
+# --- 0.6: record annotations -------------------------------------------------------------------
+
+def fjord(d, letter):
+    return next(cs for cs in station(d, "OTC-EXAMPLE-0005")["constant_sets"] if cs["set_id"].endswith("-" + letter))
+
+
+codes = {cs["time_base"]["code"] for st in example["stations"] for cs in st.get("constant_sets", []) if "time_base" in cs}
+if codes != {"verified", "corrected", "unverified", "disputed"}:
+    print(f"FAIL: example.json should show every time-base code, has {sorted(codes)}")
+    sys.exit(1)
+print("ok: example.json has a set with each time-base code (verified, corrected, unverified, disputed)")
+
+# 0.5 cannot express an annotation: its constant_set rejects the 0.6 fields and values.
+old = json.loads((schema_dir / "otc-0.5.schema.json").read_text())
+old_set = Draft202012Validator({"$schema": old["$schema"], "$defs": old["$defs"], "$ref": "#/$defs/constant_set"})
+for letter in "abcde":
+    if old_set.is_valid(fjord(example, letter)):
+        print(f"FAIL: 0.5 accepts the 0.6 set gesla-fit-{letter}")
+        sys.exit(1)
+print("ok: 0.5 rejects every annotated 0.6 set of OTC-EXAMPLE-0005")
+
+must_fail("time base without a code", lambda d: fjord(d, "a")["time_base"].pop("code"))
+must_fail("unknown time-base code", lambda d: fjord(d, "a")["time_base"].__setitem__("code", "probably"))
+must_fail("corrected without from/to", lambda d: fjord(d, "a")["time_base"].pop("correction"))
+must_fail("corrected with from but no to", lambda d: fjord(d, "a")["time_base"]["correction"].pop("to"))
+must_fail("corrected without evidence", lambda d: fjord(d, "a")["time_base"].__setitem__("evidence", []))
+must_fail("verified with a correction",
+          lambda d: first_set(d)["time_base"].__setitem__("correction", {"from": "utc_instant", "to": "utc_plus_1"}))
+must_fail("verified without evidence", lambda d: first_set(d)["time_base"].pop("evidence"))
+must_fail("time base without a reason", lambda d: first_set(d)["time_base"].pop("reason"))
+must_fail("time base without decided_in", lambda d: first_set(d)["time_base"].pop("decided_in"))
+must_fail("time-base label that is not a class", lambda d: first_set(d)["time_base"].__setitem__("declared", "UTC"))
+must_fail("evidence without comparator_id", lambda d: first_set(d)["time_base"]["evidence"][0].pop("comparator_id"))
+must_fail("unknown comparator kind",
+          lambda d: first_set(d)["time_base"]["evidence"][0].__setitem__("comparator_kind", "guess"))
+must_fail("gauge set without a time base", lambda d: first_set(d).pop("time_base"))
+must_fail("time base still only in provenance (0.5 style)",
+          lambda d: first_set(d).__setitem__("provenance", {"time_base": first_set(d).pop("time_base")}))
+for i, label in enumerate(("gesla-fit (ok)", "kartverket (ok)")):
+    must_fail(f"qc_status excluded on {label}",
+              lambda d, i=i: d["stations"][0]["constant_sets"][i].__setitem__("qc_status", "excluded"))
+must_fail("qc_status excluded on a current set", lambda d: current_set(d).__setitem__("qc_status", "excluded"))
+for letter in "bcde":
+    must_fail(f"qc_status excluded on gesla-fit-{letter}", lambda d, l=letter: fjord(d, l).__setitem__("qc_status", "excluded"))
+must_fail("no_constants carrying constants",
+          lambda d: fjord(d, "d")["constituents"].append(copy.deepcopy(fjord(d, "a")["constituents"][0])))
+must_fail("no_constants without no_constants_reason", lambda d: fjord(d, "d").pop("no_constants_reason"))
+must_fail("no_constants without a flag", lambda d: fjord(d, "d").pop("qc_flags"))
+must_fail("no_constants with expected_accuracy",
+          lambda d: fjord(d, "d").__setitem__("expected_accuracy", copy.deepcopy(fjord(d, "c")["expected_accuracy"])))
+must_fail("no_constants_reason on a set with constants", lambda d: fjord(d, "c").__setitem__("no_constants_reason", "too_short"))
+must_fail("fit_unusable without record_issues",
+          lambda d: [fjord(d, "e").pop("record_issues"), fjord(d, "e").__setitem__("qc_flags", fjord(d, "e")["qc_flags"][1:])])
+must_fail("water-level set ok with no constants", lambda d: fjord(d, "a").__setitem__("constituents", []))
+must_fail("ok with a flag", lambda d: fjord(d, "a").__setitem__("qc_flags", [{"flag": "microtidal", "reason": "x"}]))
+must_fail("flagged without flags", lambda d: fjord(d, "c").pop("qc_flags"))
+must_fail("unverified time base on an ok set",
+          lambda d: [fjord(d, "b").__setitem__("qc_status", "ok"), fjord(d, "b").pop("qc_flags"),
+                     fjord(d, "b").pop("record_issues"), fjord(d, "b").pop("fit_segment")])
+must_fail("disputed time base without a time_base flag",
+          lambda d: fjord(d, "c").__setitem__("qc_flags", fjord(d, "c")["qc_flags"][:1]))
+must_fail("broken_record flag without record_issues",
+          lambda d: [fjord(d, "b").pop("record_issues"), fjord(d, "b").pop("fit_segment")])
+must_fail("record_issues without the broken_record flag", lambda d: fjord(d, "b").__setitem__("qc_flags", fjord(d, "b")["qc_flags"][1:]))
+must_fail("fit_segment without record_issues",
+          lambda d: fjord(d, "a").__setitem__("fit_segment", {"start": "2007-01-01T00:00:00Z", "end": "2010-01-01T00:00:00Z"}))
+must_fail("unknown record issue", lambda d: fjord(d, "b")["record_issues"][0].__setitem__("issue", "gremlins"))
+must_fail("short record without good_hours", lambda d: fjord(d, "c")["record_span"].pop("good_hours"))
+must_fail("short record with constants but no expected_accuracy", lambda d: fjord(d, "c").pop("expected_accuracy"))
+must_fail("expected_accuracy without uncertainty or error",
+          lambda d: fjord(d, "c").__setitem__("expected_accuracy", {"cut_to_days": 39, "calibration_records": 25}))
+must_fail("rayleigh drop without not_separable_from", lambda d: fjord(d, "c")["dropped_constituents"][0].pop("not_separable_from"))
+must_fail("not_separable_from on a non-rayleigh drop",
+          lambda d: first_set(d)["dropped_constituents"][0].__setitem__("not_separable_from", "SSA"))
+must_fail("release.doi as a version DOI", lambda d: d["release"].__setitem__("doi", "10.5281/zenodo.1234567"))
+
+must_pass("a corrected time base to local time with daylight saving",
+          lambda d: [fjord(d, "a")["time_base"].__setitem__("published", "local_dst:Europe/Oslo"),
+                     fjord(d, "a")["time_base"]["correction"].__setitem__("to", "local_dst:Europe/Oslo")])
+must_pass("a corrected time base with a step and dropped months",
+          lambda d: fjord(d, "a")["time_base"].update(
+              published="step:2010-03-01", correction={"from": "utc_instant", "to": "step:2010-03-01"},
+              months_dropped=["2011-02"]))
+must_pass("an unverified time base that lists the weak checks tried",
+          lambda d: fjord(d, "d")["time_base"].__setitem__(
+              "evidence", [{"comparator_kind": "model", "comparator_id": "eot20", "distance_km": None}]))
+must_pass("deprecated qc_status accepted and fallback (0.5 writers)",
+          lambda d: [d["stations"][0]["constant_sets"][1].__setitem__("qc_status", "accepted"),
+                     current_set(d).__setitem__("qc_status", "fallback")])
+must_pass("deprecated qc_flags verdict and provenance.time_base alongside the 0.6 fields",
+          lambda d: [fjord(d, "b")["qc_flags"][1].__setitem__("verdict", "unverified"),
+                     fjord(d, "b")["provenance"].__setitem__("time_base", {"verdict": "utc_instant", "correction": "none"})])
+must_pass("a concept DOI with a null release.doi",
+          lambda d: d["release"].update(doi=None, concept_doi="10.5281/zenodo.1234566"))
+must_pass("a release without release.doi", lambda d: d["release"].pop("doi"))

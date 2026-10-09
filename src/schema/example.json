@@ -1,5 +1,5 @@
 {
-  "format_version": "0.5",
+  "format_version": "0.6",
   "release": {
     "datestamp": "20991231",
     "created": "2099-12-31T00:00:00Z",
@@ -60,7 +60,9 @@
     { "constituent_table_version": "example", "name": "N2", "doodson": "245 655", "speed_deg_per_hour": 28.4397295, "nodal_formula_id": "M2" },
     { "constituent_table_version": "example", "name": "K1", "doodson": "165 555", "speed_deg_per_hour": 15.0410686, "nodal_formula_id": "K1" },
     { "constituent_table_version": "example", "name": "O1", "doodson": "145 555", "speed_deg_per_hour": 13.9430356, "nodal_formula_id": "O1" },
-    { "constituent_table_version": "example", "name": "SA", "doodson": "056 555", "speed_deg_per_hour": 0.0410686 }
+    { "constituent_table_version": "example", "name": "SA", "doodson": "056 555", "speed_deg_per_hour": 0.0410686 },
+    { "constituent_table_version": "example", "name": "P1", "doodson": "163 555", "speed_deg_per_hour": 14.9589314, "nodal_formula_id": "P1" },
+    { "constituent_table_version": "example", "name": "K2", "doodson": "275 555", "speed_deg_per_hour": 30.0821373, "nodal_formula_id": "K2" }
   ],
   "stations": [
     {
@@ -82,20 +84,26 @@
           "quantity": "water_level",
           "source_record_id": "example-file-id",
           "source_version": "4.1",
-          "record_span": { "start": "2007-01-01T00:00:00Z", "end": "2026-01-01T00:00:00Z", "good_samples": 160000 },
+          "record_span": { "start": "2007-01-01T00:00:00Z", "end": "2026-01-01T00:00:00Z", "good_samples": 160000, "good_hours": 160000 },
           "datum": { "msl_offset_m": 1.0 },
           "convention_id": "otc-greenwich-schureman-v1",
           "licence_id": "gesla-derived",
-          "qc_status": "accepted",
-          "qc_flags": [{ "flag": "time_base", "verdict": "utc_instant" }],
+          "qc_status": "ok",
           "constituents": [
             { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 0.5, "phase_deg": 100.0, "amp_uncertainty_m": 0.001, "phase_uncertainty_deg": 0.1, "kept_reason": "snr" },
             { "name": "K1", "speed_deg_per_hour": 15.0410686, "amplitude_m": 0.05, "phase_deg": 200.0 }
           ],
           "dropped_constituents": [{ "name": "SA", "dropped_reason": "long_period_rule" }],
+          "time_base": {
+            "code": "verified",
+            "reason": "declared utc_instant confirmed by official predictions (kartverket:EXA)",
+            "declared": "utc_instant",
+            "published": "utc_instant",
+            "decided_in": "20991231",
+            "evidence": [{ "comparator_kind": "official_predictions", "comparator_id": "kartverket:EXA", "distance_km": 0.0, "lag_min": 0.4 }]
+          },
           "provenance": {
             "build_commit": "0000000",
-            "time_base": { "verdict": "utc_instant", "correction": "none" },
             "selection_reason": "only eligible record",
             "decision": { "tier": "rule", "outcome": "accept" }
           }
@@ -109,7 +117,7 @@
           "source_version": "20991231",
           "convention_id": "kartverket-utc1-v1",
           "licence_id": "kartverket",
-          "qc_status": "accepted",
+          "qc_status": "ok",
           "constituents": [
             { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 0.5, "phase_deg": 100.2 }
           ],
@@ -124,7 +132,7 @@
       "station_id": "OTC-EXAMPLE-0002",
       "status": "removed",
       "removed_in": "20991231",
-      "removed_reason": "Example tombstone: the only input record contained no tide."
+      "removed_reason": "Example tombstone: merged into OTC-EXAMPLE-0001, the same gauge under a second id."
     },
     {
       "station_id": "OTC-EXAMPLE-0003",
@@ -148,7 +156,7 @@
           "source_version": "20991231",
           "convention_id": "noaa-greenwich-schureman-v1",
           "licence_id": "noaa",
-          "qc_status": "accepted",
+          "qc_status": "ok",
           "constituents": [],
           "current_bins": [
             {
@@ -201,6 +209,196 @@
           "flood_amp_ratio": 1.2,
           "ebb_amp_ratio": 1.1,
           "licence_id": "noaa"
+        }
+      ]
+    },
+    {
+      "station_id": "OTC-EXAMPLE-0005",
+      "status": "active",
+      "name": "Example Fjord (illustrative values, not data)",
+      "country": "NOR",
+      "lat": 61.0,
+      "lon": 5.5,
+      "timezone": "Europe/Oslo",
+      "type": "reference",
+      "aliases": { "gesla": ["example-fjord-a", "example-fjord-b", "example-fjord-c", "example-fjord-d", "example-fjord-e"] },
+      "recommended_set_id": "OTC-EXAMPLE-0005/gesla-fit-a",
+      "constant_sets": [
+        {
+          "set_id": "OTC-EXAMPLE-0005/gesla-fit-a",
+          "source": "gesla-fit",
+          "source_type": "gauge",
+          "quantity": "water_level",
+          "source_version": "4.1",
+          "convention_id": "otc-greenwich-schureman-v1",
+          "licence_id": "gesla-derived",
+          "source_record_id": "example-fjord-a",
+          "record_span": { "start": "2007-01-01T00:00:00Z", "end": "2026-01-01T00:00:00Z", "good_samples": 158000, "good_hours": 158000 },
+          "datum": { "msl_offset_m": 1.1 },
+          "qc_status": "ok",
+          "time_base": {
+            "code": "corrected",
+            "reason": "declared utc_instant corrected to utc_mean_start60 by official predictions (kartverket:EXF) and a sibling record (example-fjord-b)",
+            "declared": "utc_instant",
+            "published": "utc_mean_start60",
+            "correction": { "from": "utc_instant", "to": "utc_mean_start60" },
+            "decided_in": "20991130",
+            "evidence": [
+              { "comparator_kind": "official_predictions", "comparator_id": "kartverket:EXF", "distance_km": 0.3, "lag_min": 29.6 },
+              { "comparator_kind": "sibling_record", "comparator_id": "example-fjord-b", "distance_km": 0.0, "lag_min": 30.2 }
+            ]
+          },
+          "constituents": [
+            { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 0.62, "phase_deg": 110.0 },
+            { "name": "S2", "speed_deg_per_hour": 30.0, "amplitude_m": 0.21, "phase_deg": 150.0 },
+            { "name": "N2", "speed_deg_per_hour": 28.4397295, "amplitude_m": 0.13, "phase_deg": 92.0 },
+            { "name": "K1", "speed_deg_per_hour": 15.0410686, "amplitude_m": 0.06, "phase_deg": 210.0 },
+            { "name": "O1", "speed_deg_per_hour": 13.9430356, "amplitude_m": 0.04, "phase_deg": 190.0 }
+          ],
+          "provenance": { "build_commit": "0000000", "selection_reason": "longest good record at the gauge", "decision": { "tier": "rule", "outcome": "accept" } }
+        },
+        {
+          "set_id": "OTC-EXAMPLE-0005/gesla-fit-b",
+          "source": "gesla-fit",
+          "source_type": "gauge",
+          "quantity": "water_level",
+          "source_version": "4.1",
+          "convention_id": "otc-greenwich-schureman-v1",
+          "licence_id": "gesla-derived",
+          "source_record_id": "example-fjord-b",
+          "record_span": { "start": "2000-01-01T00:00:00Z", "end": "2012-01-01T00:00:00Z", "good_samples": 220000, "good_hours": 55000 },
+          "qc_status": "flagged",
+          "qc_flags": [
+            { "flag": "broken_record", "reason": "datum step on 2006-05-14; constants are fitted to the segment before it" },
+            { "flag": "time_base", "reason": "time base unverified: no comparator covers 2000-2006" }
+          ],
+          "record_issues": [
+            {
+              "issue": "datum_step",
+              "start": "2006-05-14T00:00:00Z",
+              "reason": "the mean level drops 0.31 m and stays down; the neighbour shows no step",
+              "values": { "step_m": -0.31 }
+            },
+            { "issue": "gaps", "start": "2003-02-01T00:00:00Z", "end": "2003-06-30T00:00:00Z", "reason": "no data for 5 months" }
+          ],
+          "fit_segment": { "start": "2000-01-01T00:00:00Z", "end": "2006-05-14T00:00:00Z", "reason": "the longest segment without an issue" },
+          "time_base": {
+            "code": "unverified",
+            "reason": "declared utc_instant kept; no comparator overlaps the fitted segment",
+            "declared": "utc_instant",
+            "published": "utc_instant",
+            "decided_in": "20991231",
+            "evidence": []
+          },
+          "constituents": [
+            { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 0.61, "phase_deg": 110.4 },
+            { "name": "S2", "speed_deg_per_hour": 30.0, "amplitude_m": 0.21, "phase_deg": 150.3 },
+            { "name": "K1", "speed_deg_per_hour": 15.0410686, "amplitude_m": 0.06, "phase_deg": 209.0 },
+            { "name": "O1", "speed_deg_per_hour": 13.9430356, "amplitude_m": 0.04, "phase_deg": 191.0 }
+          ],
+          "provenance": { "build_commit": "0000000" }
+        },
+        {
+          "set_id": "OTC-EXAMPLE-0005/gesla-fit-c",
+          "source": "gesla-fit",
+          "source_type": "gauge",
+          "quantity": "water_level",
+          "source_version": "4.1",
+          "convention_id": "otc-greenwich-schureman-v1",
+          "licence_id": "gesla-derived",
+          "source_record_id": "example-fjord-c",
+          "record_span": { "start": "2024-03-01T00:00:00Z", "end": "2024-04-10T00:00:00Z", "good_samples": 940, "good_hours": 940 },
+          "qc_status": "flagged",
+          "qc_flags": [
+            { "flag": "short_record", "reason": "39.2 days of good data: P1 and K2 cannot be separated from K1 and S2" },
+            { "flag": "time_base", "reason": "time base disputed: the model lag of 41 min fits no class" }
+          ],
+          "time_base": {
+            "code": "disputed",
+            "reason": "declared utc_instant kept; evidence disagrees: EOT20 lag 41 min fits no class",
+            "declared": "utc_instant",
+            "published": "utc_instant",
+            "decided_in": "20991231",
+            "evidence": [
+              { "comparator_kind": "model", "comparator_id": "eot20", "distance_km": 2.1, "lag_min": 41.0 },
+              { "comparator_kind": "dst_selftest", "comparator_id": "example-fjord-c", "detail": "no daylight-saving step found" }
+            ]
+          },
+          "constituents": [
+            { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 0.6, "phase_deg": 112.0 },
+            { "name": "S2", "speed_deg_per_hour": 30.0, "amplitude_m": 0.2, "phase_deg": 151.0 },
+            { "name": "N2", "speed_deg_per_hour": 28.4397295, "amplitude_m": 0.12, "phase_deg": 95.0 },
+            { "name": "K1", "speed_deg_per_hour": 15.0410686, "amplitude_m": 0.07, "phase_deg": 205.0 },
+            { "name": "O1", "speed_deg_per_hour": 13.9430356, "amplitude_m": 0.04, "phase_deg": 188.0 }
+          ],
+          "dropped_constituents": [
+            { "name": "P1", "dropped_reason": "rayleigh", "not_separable_from": "K1" },
+            { "name": "K2", "dropped_reason": "rayleigh", "not_separable_from": "S2" }
+          ],
+          "expected_accuracy": {
+            "cut_to_days": 39,
+            "calibration_records": 25,
+            "amp_uncertainty_m": 0.012,
+            "phase_uncertainty_deg": 2.5,
+            "time_mae_min": 9.0,
+            "height_mae_m": 0.05
+          },
+          "provenance": { "build_commit": "0000000" }
+        },
+        {
+          "set_id": "OTC-EXAMPLE-0005/gesla-fit-d",
+          "source": "gesla-fit",
+          "source_type": "gauge",
+          "quantity": "water_level",
+          "source_version": "4.1",
+          "convention_id": "otc-greenwich-schureman-v1",
+          "licence_id": "gesla-derived",
+          "source_record_id": "example-fjord-d",
+          "record_span": { "start": "2025-07-01T00:00:00Z", "end": "2025-07-10T00:00:00Z", "good_samples": 216, "good_hours": 216 },
+          "qc_status": "no_constants",
+          "no_constants_reason": "too_short",
+          "qc_flags": [
+            { "flag": "short_record", "reason": "9.0 days of good data, under the 15-day minimum for a fit" },
+            { "flag": "time_base", "reason": "time base unverified: no comparator" }
+          ],
+          "time_base": {
+            "code": "unverified",
+            "reason": "declared utc_instant kept; no comparator",
+            "declared": "utc_instant",
+            "published": "utc_instant",
+            "decided_in": "20991231"
+          },
+          "constituents": [],
+          "provenance": { "build_commit": "0000000" }
+        },
+        {
+          "set_id": "OTC-EXAMPLE-0005/gesla-fit-e",
+          "source": "gesla-fit",
+          "source_type": "gauge",
+          "quantity": "water_level",
+          "source_version": "4.1",
+          "convention_id": "otc-greenwich-schureman-v1",
+          "licence_id": "gesla-derived",
+          "source_record_id": "example-fjord-e",
+          "record_span": { "start": "2015-01-01T00:00:00Z", "end": "2016-01-01T00:00:00Z", "good_samples": 8760, "good_hours": 8760 },
+          "qc_status": "no_constants",
+          "no_constants_reason": "fit_unusable",
+          "qc_flags": [
+            { "flag": "broken_record", "reason": "flat line for the whole record: no tide in the input" },
+            { "flag": "time_base", "reason": "time base unverified: a flat line has no lag to measure" }
+          ],
+          "record_issues": [
+            { "issue": "flatline", "start": "2015-01-01T00:00:00Z", "end": "2016-01-01T00:00:00Z", "reason": "the same value, 1.234 m, at every time stamp" }
+          ],
+          "time_base": {
+            "code": "unverified",
+            "reason": "declared utc_instant kept; a flat line has no lag to measure",
+            "declared": "utc_instant",
+            "published": "utc_instant",
+            "decided_in": "20991231"
+          },
+          "constituents": [],
+          "provenance": { "build_commit": "0000000" }
         }
       ]
     }
