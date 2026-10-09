@@ -159,6 +159,11 @@
       }
     },
     "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$(?![\\s\\S])" },
+    "status_like_name": {
+      "description": "A key name that would carry a status (excluded, removed, status, qc_status, state, suppressed, withheld; any case). qc_status is the only status of a set, so free-form objects (tool_versions, qc_flags values, record_issues values) reject these names.",
+      "type": "string",
+      "pattern": "^([Ee][Xx][Cc][Ll][Uu][Dd][Ee][Dd]?|[Rr][Ee][Mm][Oo][Vv][Ee][Dd]?|([Qq][Cc]_)?[Ss][Tt][Aa][Tt][Uu][Ss]|[Ss][Tt][Aa][Tt][Ee]|[Ss][Uu][Pp][Pp][Rr][Ee][Ss][Ss][Ee][Dd]|[Ww][Ii][Tt][Hh][Hh][Ee][Ll][Dd])$(?![\\s\\S])"
+    },
     "station": {
       "type": "object",
       "required": ["station_id", "status"],
@@ -573,7 +578,7 @@
         "start": { "type": "string", "format": "date-time" },
         "end": { "type": "string", "format": "date-time" },
         "reason": { "type": "string", "pattern": "\\S" },
-        "values": { "description": "The numbers behind the issue, e.g. {\"step_m\": -0.31}.", "type": "object" }
+        "values": { "description": "The numbers behind the issue, e.g. {\"step_m\": -0.31}. No key may name a status.", "type": "object", "propertyNames": { "not": { "$ref": "#/$defs/status_like_name" } } }
       }
     },
     "expected_accuracy": {
@@ -685,12 +690,13 @@
       "properties": {
         "flag": { "enum": ["time_base", "broken_record", "microtidal", "non_tidal_signal", "short_record", "sibling_disagreement", "carried_over"] },
         "reason": { "description": "One line for people, not blank.", "type": "string", "pattern": "\\S" },
-        "values": { "type": "object" }
+        "values": { "description": "The numbers behind the flag. No key may name a status.", "type": "object", "propertyNames": { "not": { "$ref": "#/$defs/status_like_name" } } }
       }
     },
     "provenance": {
-      "description": "Where the set came from and what was done to it. A closed list of keys: qc_status is the only status of a set, so no provenance key can carry one. A new source-specific key is added here first. Keys for every set: adapter_version, input_sha256, tcd_sha256, selection_reason, decision, carried_from_release, build (the build-only fields). JMA: owner, redistribution, phase_reference_longitude_deg, jma_station_code, analysis_years, source_constituents_not_published. LINZ: member, position, header_dropped.",
+      "description": "Where the set came from and what was done to it. A closed list of keys: qc_status is the only status of a set, so no provenance key can carry one. A new source-specific key is added here first. Keys for every set: adapter_version, input_sha256, tcd_sha256, selection_reason, decision, carried_from_release, build (the build-only fields, required on every set). JMA: owner, redistribution, phase_reference_longitude_deg, jma_station_code, analysis_years, source_constituents_not_published. LINZ: member, position, header_dropped.",
       "type": "object",
+      "required": ["build"],
       "additionalProperties": false,
       "properties": {
         "analysis_years": {
@@ -739,7 +745,7 @@
           ]
         },
         "build": {
-          "description": "Build-only fields. They change on every rebuild, so the release content digest (content_sha256) leaves this whole object out.",
+          "description": "Build-only fields. Every set has this object. They change on every rebuild, so the release content digest (content_sha256) leaves this whole object out.",
           "type": "object",
           "additionalProperties": false,
           "properties": {
@@ -752,7 +758,7 @@
               "type": "object",
               "propertyNames": {
                 "pattern": "^[a-z0-9][a-z0-9_.-]{0,63}$(?![\\s\\S])",
-                "not": { "pattern": "^([Ee][Xx][Cc][Ll][Uu][Dd][Ee][Dd]?|[Rr][Ee][Mm][Oo][Vv][Ee][Dd]?|([Qq][Cc]_)?[Ss][Tt][Aa][Tt][Uu][Ss]|[Ss][Tt][Aa][Tt][Ee]|[Ss][Uu][Pp][Pp][Rr][Ee][Ss][Ss][Ee][Dd]|[Ww][Ii][Tt][Hh][Hh][Ee][Ll][Dd])$(?![\\s\\S])" }
+                "not": { "$ref": "#/$defs/status_like_name" }
               },
               "additionalProperties": { "type": "string", "pattern": "^v?[0-9][0-9A-Za-z.+_-]{0,63}$(?![\\s\\S])" }
             }

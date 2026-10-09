@@ -528,7 +528,14 @@ print("ok: left to the build check: good_hours above the record span")
 
 prov_validator = sub_validator("provenance")
 real = json.loads((root / "scripts/fixtures/adapter-sets.json").read_text())["sets"]
-bad = [(r["adapter"], r["source_record_id"], e.message[:120]) for r in real for e in prov_validator.iter_errors(r["provenance"])]
+# provenance.build is required in 1.0 and the fixtures predate it, so a missing build is listed as
+# a writer follow-up below, not counted as a rejection.
+def missing_build(e):
+    return e.validator == "required" and not e.path and "'build'" in e.message
+
+
+bad = [(r["adapter"], r["source_record_id"], e.message[:120]) for r in real
+       for e in prov_validator.iter_errors(r["provenance"]) if not missing_build(e)]
 if bad:
     for b in bad:
         print("FAIL: real provenance rejected:", *b)
@@ -540,6 +547,9 @@ print(f"ok: accepted the provenance of {len(real)} real sets from "
 old_status = sorted({r["adapter"] for r in real if r.get("qc_status") not in (None, "ok", "flagged", "no_constants")})
 if old_status:
     print(f"note: fixtures record a qc_status that 1.0 does not have (writer follow-up): {', '.join(old_status)}")
+no_build = sorted({r["adapter"] for r in real if "build" not in r["provenance"]})
+if no_build:
+    print(f"note: fixtures without the required provenance.build (writer follow-up): {', '.join(no_build)}")
 
 
 def official(d):
@@ -551,9 +561,13 @@ def jma(d):
 
 
 def as_source(source, prov):
+    """Put a real adapter's provenance on the official set. The fixtures predate the required
+    provenance.build, so the build object of the example set is kept."""
     def f(d):
         official(d)["source"] = source
+        build = official(d)["provenance"]["build"]
         official(d)["provenance"] = copy.deepcopy(prov)
+        official(d)["provenance"].setdefault("build", build)
     return f
 
 
@@ -563,6 +577,8 @@ must_pass("the real JMA provenance on a jma set", as_source("jma", real_jma))
 must_pass("the real LINZ provenance (position from the station list) on a linz set", as_source("linz", real_linz))
 must_pass("a LINZ header position that could not be read (null)",
           lambda d: [as_source("linz", real_linz)(d), jma(d)["position"].update(header_lat=None, header_lon=None)])
+must_fail("a set without provenance.build", lambda d: fjord(d, "a")["provenance"].pop("build"))
+must_fail("an official set without provenance.build", lambda d: official(d)["provenance"].pop("build"))
 must_pass("build-only fields in provenance.build",
           lambda d: jma(d).__setitem__("build", {"build_commit": "0123abc", "built_at": "2099-12-31T00:00:00Z",
                                                  "fetched_at": "2099-12-30T00:00:00Z", "run_id": "123456",
@@ -602,5 +618,15 @@ must_fail("LINZ header latitude null, from the header",
                      jma(d).__setitem__("position", {"header_lat": None, "header_lon": 174.0, "from": "header"})])
 for name in ("excluded", "removed", "status", "qc_status", "state", "suppressed", "withheld"):
     must_fail(f"tool_versions name {name}", lambda d, n=name: jma(d).__setitem__("build", {"tool_versions": {n: "1"}}))
+for name in ("excluded", "Removed", "STATUS", "qc_status", "state", "suppressed", "withheld"):
+    must_fail(f"qc_flags values key {name}",
+              lambda d, n=name: fjord(d, "b")["qc_flags"][0].__setitem__("values", {n: True}))
+    must_fail(f"record_issues values key {name}",
+              lambda d, n=name: fjord(d, "b")["record_issues"][0]["values"].__setitem__(n, True))
+must_fail("qc_flags values {excluded: true, status: removed}",
+          lambda d: fjord(d, "b")["qc_flags"][0].__setitem__("values", {"excluded": True, "status": "removed"}))
+must_pass("ordinary values keys (step_m, lag_min, days)",
+          lambda d: [fjord(d, "b")["qc_flags"][0].__setitem__("values", {"lag_min": -29.6, "days": 39.2}),
+                     fjord(d, "b")["record_issues"][0]["values"].__setitem__("step_m", -0.31)])
 must_pass("tool_versions with ordinary names (python, uv, numpy)",
           lambda d: jma(d).__setitem__("build", {"tool_versions": {"python": "3.12.7", "uv": "0.4.18", "numpy": "2.1.2"}}))
