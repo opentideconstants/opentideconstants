@@ -72,7 +72,7 @@ pipeline/pegelonline/  the daily PEGELONLINE harvest (see its README)
 
 ### Schema changes
 
-The format is defined by `src/schema/otc-1.0.schema.json` and `src/schema/otc-index-1.0.schema.json`. A schema change goes through a pull request and review. In the same pull request, update the examples in `src/schema/` and the [Data format](https://opentideconstants.org/data-format/) page (`src/pages/data-format.html`), so that the docs match the schema. `scripts/check_schema.py` checks the examples against the schema. The SDK conformance fixtures and the pipeline's copy of the schema pin it by commit and SHA-256, so after a schema change is merged, those pins move to the new commit.
+The format is defined by `src/schema/otc-1.0.schema.json` and `src/schema/otc-index-1.0.schema.json`. A schema change goes through a pull request and review. In the same pull request, update the examples in `src/schema/` and the [Data format](https://opentideconstants.org/data-format/) page (`src/pages/data-format.html`), so that the docs match the schema. `scripts/check_schema.py` checks the examples against the schema. The SDK conformance fixtures (in the SDK repository) and the pipeline's copy of the schema pin it by commit and SHA-256. After a schema change is merged, update those pins to the new commit and SHA-256.
 
 ## Pull requests
 

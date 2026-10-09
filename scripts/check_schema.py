@@ -12,8 +12,14 @@ r"""Check the JSON Schema and the example document.
    convention_id or quantity, a local convention without utc_offset_hours, a
    bad datestamp, a constituent name over 15 characters, duplicate aliases,
    a release (or .meta.json) with no astro_tables while a convention uses
-   f_u_at_prediction, such a convention without astro_table_id, a
-   datum.named key chart, mean_level or zero, a datum.zero outside its enum,
+   f_u_at_prediction, an empty astro_tables, an unknown key in a table or
+   a row, a table without (or with a malformed) tables_sha256 or with a key
+   that is not a constituent name, a row without f, a v0u_deg outside
+   [0, 360), a negative f, a convention without (or with an empty)
+   astro_table_id, a datum.named key chart, mean_level or zero, a
+   datum.zero outside its enum, an empty datum.chart_datum,
+   a licence without commercial_use, a non-commercial licence without
+   restriction or terms_url,
    a current set without current_bins (or with water-level constituents),
    current offsets without a reference bin, a mean current written as a
    constituent Z0 or as a string, and a value with a trailing
@@ -456,22 +462,93 @@ must_fail("no astro_tables while a convention uses f_u_at_prediction", no_astro_
 meta_must_fail("no astro_tables while a convention uses f_u_at_prediction", no_astro_tables)
 must_fail("an f_u_at_prediction convention without astro_table_id", no_astro_table_id)
 meta_must_fail("an f_u_at_prediction convention without astro_table_id", no_astro_table_id)
+must_fail("an empty astro_tables", lambda d: d.__setitem__("astro_tables", []))
+meta_must_fail("an empty astro_tables", lambda d: d.__setitem__("astro_tables", []))
+must_fail("an unknown key in an astro table", lambda d: d["astro_tables"][0].__setitem__("note", "x"))
+must_fail("an unknown key in an astro table row (constituents.M2.u)",
+          lambda d: d["astro_tables"][0]["constituents"]["M2"].__setitem__("u", 1))
+
+
+def astro_table(d):
+    return d["astro_tables"][0]
+
+
+def m2_row(d):
+    return astro_table(d)["constituents"]["M2"]
+
+
+must_fail("v0u_deg 360.0", lambda d: m2_row(d)["v0u_deg"].__setitem__(0, 360.0))
+must_fail("v0u_deg -0.01", lambda d: m2_row(d)["v0u_deg"].__setitem__(0, -0.01))
+must_fail("a negative f", lambda d: m2_row(d)["f"].__setitem__(0, -0.5))
+must_fail("an astro table row without f", lambda d: m2_row(d).pop("f"))
+must_fail("an astro table without tables_sha256", lambda d: astro_table(d).pop("tables_sha256"))
+must_fail("an astro table with a malformed tables_sha256", lambda d: astro_table(d).__setitem__("tables_sha256", "33f97cb7"))
+must_fail("an astro table constituent key that is not a constituent name (M2(KS)2)",
+          lambda d: astro_table(d)["constituents"].__setitem__("M2(KS)2", m2_row(d)))
+must_fail("an empty convention.astro_table_id", lambda d: d["conventions"][0].__setitem__("astro_table_id", ""))
+meta_must_fail("an invalid table in astro_tables (no constituents)", lambda d: astro_table(d).pop("constituents"))
 for key in ("chart", "mean_level", "zero"):
     must_fail(f"datum.named key {key}", lambda d, k=key: named_datums(d, {k: 0.0}))
 must_fail("datum.zero lat (not a kind of zero)", lambda d: first_set(d)["datum"].__setitem__("zero", "lat"))
 for zero in ("chart_datum", "gauge_zero", "msl", "unknown"):
     must_pass(f"datum.zero {zero}", lambda d, z=zero: first_set(d)["datum"].__setitem__("zero", z))
-must_pass("datum.chart_datum naming a key of datum.named",
-          lambda d: first_set(d)["datum"].update(chart_datum="mllw", named={"mllw": 0.0, "mhhw": 1.2}))
-must_pass("every convention with nodal_handling none, no astro_table_id and no astro_tables",
-          lambda d: [[c.__setitem__("nodal_handling", "none"), c.pop("astro_table_id", None)] for c in d["conventions"]]
-          + [d.pop("astro_tables", None)])
+must_fail("an empty datum.chart_datum", lambda d: first_set(d)["datum"].update(chart_datum="", named={"mllw": 0.0}))
+
+
+def all_conventions_none(d):
+    for convention in d["conventions"]:
+        convention["nodal_handling"] = "none"
+        convention.pop("astro_table_id", None)
+    no_astro_tables(d)
+
+
+def meta_must_pass(label, mutate):
+    doc = copy.deepcopy(example)
+    mutate(doc)
+    doc.pop("stations")
+    errors = [e.message for e in meta_validator.iter_errors(doc)]
+    if errors:
+        print(f"FAIL: {label} as .meta.json: {errors[0]}")
+        sys.exit(1)
+    print(f"ok: accepted as .meta.json: {label}")
+
+
+must_pass("every convention with nodal_handling none, no astro_table_id and no astro_tables", all_conventions_none)
+meta_must_pass("every convention with nodal_handling none, no astro_table_id and no astro_tables", all_conventions_none)
+
+# Licences: commercial_use, and the restriction and terms_url of a non-commercial licence.
+NON_COMMERCIAL = {
+    "licence_id": "nc-control",
+    "spdx": "CC-BY-NC-4.0",
+    "provider": "Example provider via GESLA",
+    "attribution": "Example attribution text.",
+    "commercial_use": False,
+    "restriction": "Non-commercial use only: example restriction.",
+    "terms_url": "https://example.org/terms",
+}
+
+
+def with_nc_licence(d, **changes):
+    licence = dict(NON_COMMERCIAL, **changes)
+    for key in [k for k, v in changes.items() if v is None]:
+        licence.pop(key)
+    d["licences"].append(licence)
+
+
+must_fail("a licence without commercial_use", lambda d: d["licences"][0].pop("commercial_use", None))
+must_fail("commercial_use false without restriction", lambda d: with_nc_licence(d, restriction=None))
+must_fail("commercial_use false without terms_url", lambda d: with_nc_licence(d, terms_url=None))
+must_pass("a non-commercial licence with spdx CC-BY-NC-4.0", lambda d: with_nc_licence(d))
+must_pass("a non-commercial licence with spdx LicenseRef-GESLA-Research",
+          lambda d: with_nc_licence(d, spdx="LicenseRef-GESLA-Research"))
 
 # Numbers that depend on the build (the ~15-day minimum, the ranking by good_hours) are build
 # checks, listed in the schema's top description. These instances are valid JSON Schema on purpose.
 for label, mutate in (
         ("too_short with 10000 good hours", lambda d: fjord(d, "d")["record_span"].__setitem__("good_hours", 10000)),
-        ("constants fitted from 24 good hours", lambda d: fjord(d, "a")["record_span"].__setitem__("good_hours", 24))):
+        ("constants fitted from 24 good hours", lambda d: fjord(d, "a")["record_span"].__setitem__("good_hours", 24)),
+        ("datum.chart_datum naming a key that is not in datum.named",
+         lambda d: first_set(d)["datum"].update(chart_datum="mllw", named={"msl": 1.0}))):
     doc = copy.deepcopy(example)
     mutate(doc)
     if problems(doc):

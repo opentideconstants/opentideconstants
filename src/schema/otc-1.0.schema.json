@@ -57,7 +57,7 @@
       "then": { "required": ["astro_tables"] }
     },
     "astro_tables": {
-      "description": "The predictor's per-year astronomical tables: V0+u and the node factor f for each constituent the release uses, computed with congen (XTide, David Flater) after Schureman, Manual of Harmonic Analysis and Prediction of Tides, US C&GS Special Publication 98. A convention with nodal_handling f_u_at_prediction names its table by astro_table_id. Published under the release's licence.",
+      "description": "The predictor's per-year astronomical tables: V0+u and the node factor f for each constituent the release uses, computed with congen (XTide, David Flater) after Schureman, Manual of Harmonic Analysis and Prediction of Tides, US C&GS Special Publication 98. A convention with nodal_handling f_u_at_prediction names its table by astro_table_id. Published under CC BY 4.0, like the constants OTC derives.",
       "type": "array",
       "minItems": 1,
       "items": { "$ref": "#/$defs/astro_table" }
@@ -92,13 +92,13 @@
       "properties": {
         "speed_deg_per_hour": { "type": "number", "minimum": 0 },
         "v0u_deg": {
-          "description": "v0u_deg[i] is V0+u in degrees at (first_year + i)-01-01T00:00:00Z, rounded to 0.01 and reduced to [0, 360).",
+          "description": "v0u_deg[i] is V0 at (first_year + i)-01-01T00:00:00Z plus u at the middle of that year, in degrees, rounded to 0.01 and reduced to [0, 360). It holds for the whole year and steps at 00:00 UTC on 1 January.",
           "type": "array",
           "minItems": 1,
           "items": { "type": "number", "minimum": 0, "exclusiveMaximum": 360 }
         },
         "f": {
-          "description": "f[i] is the node factor for the year first_year + i, rounded to 0.0001.",
+          "description": "f[i] is the node factor at the middle of the year first_year + i, rounded to 0.0001. It holds for the whole year and steps at 00:00 UTC on 1 January.",
           "type": "array",
           "minItems": 1,
           "items": { "type": "number", "minimum": 0 }
@@ -197,7 +197,7 @@
     },
     "licence": {
       "type": "object",
-      "required": ["licence_id", "spdx", "provider", "attribution"],
+      "required": ["licence_id", "spdx", "provider", "attribution", "commercial_use"],
       "additionalProperties": false,
       "properties": {
         "licence_id": { "type": "string", "minLength": 1 },
@@ -209,8 +209,24 @@
         "provider": { "type": "string" },
         "citation": { "type": "string" },
         "attribution": { "type": "string" },
-        "url": { "type": "string", "format": "uri" }
-      }
+        "url": { "type": "string", "format": "uri" },
+        "commercial_use": {
+          "description": "true: the licence allows commercial use, on its own terms (for example attribution). false: non-commercial use only; restriction says why and terms_url gives the upstream terms.",
+          "type": "boolean"
+        },
+        "restriction": {
+          "description": "One line: what use is not allowed and why. Required when commercial_use is false.",
+          "type": "string",
+          "minLength": 1
+        },
+        "terms_url": {
+          "description": "The upstream page that sets the restriction. Required when commercial_use is false.",
+          "type": "string",
+          "format": "uri"
+        }
+      },
+      "if": { "required": ["commercial_use"], "properties": { "commercial_use": { "const": false } } },
+      "then": { "required": ["restriction", "terms_url"] }
     },
     "constituent_name": {
       "description": "OTC canonical constituent name. At most 15 characters, so that a C reader can hold it in char[16].",

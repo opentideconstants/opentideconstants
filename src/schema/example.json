@@ -43,19 +43,32 @@
       "licence_id": "gesla-derived",
       "spdx": "CC-BY-4.0",
       "provider": "Example provider via GESLA",
-      "attribution": "Example attribution text."
+      "attribution": "Example attribution text.",
+      "commercial_use": true
     },
     {
       "licence_id": "kartverket",
       "spdx": "CC-BY-4.0",
       "provider": "Kartverket",
-      "attribution": "Example attribution text."
+      "attribution": "Example attribution text.",
+      "commercial_use": true
     },
     {
       "licence_id": "noaa",
       "spdx": "LicenseRef-PublicDomain-USGov",
       "provider": "NOAA CO-OPS",
-      "attribution": "Example attribution text."
+      "attribution": "Example attribution text.",
+      "commercial_use": true
+    },
+    {
+      "licence_id": "gesla-cmems-nc",
+      "spdx": "CC-BY-NC-4.0",
+      "provider": "Copernicus Marine Service (CMEMS) via GESLA",
+      "attribution": "Generated using E.U. Copernicus Marine Service Information, via GESLA-4.1. CC BY-NC 4.0: non-commercial use only.",
+      "url": "https://creativecommons.org/licenses/by-nc/4.0/legalcode",
+      "commercial_use": false,
+      "restriction": "Non-commercial use only: the GESLA licence page lists CMEMS records for research use; commercial use needs the data owner's permission.",
+      "terms_url": "https://gesla787883612.wordpress.com/license/"
     }
   ],
   "constituents": [
@@ -291,7 +304,7 @@
           "quantity": "water_level",
           "source_version": "4.1",
           "convention_id": "otc-greenwich-schureman-v1",
-          "licence_id": "gesla-derived",
+          "licence_id": "gesla-cmems-nc",
           "source_record_id": "example-fjord-b",
           "record_span": { "start": "2000-01-01T00:00:00Z", "end": "2012-01-01T00:00:00Z", "good_samples": 220000, "good_hours": 55000 },
           "qc_status": "flagged",
