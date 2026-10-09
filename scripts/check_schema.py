@@ -1,7 +1,6 @@
 r"""Check the JSON Schema and the example document.
 
-1. The current schema (1.0), the index schema and the superseded pre-release
-   drafts (0.x) are valid draft 2020-12 schemas.
+1. The schema (1.0) and the index schema are valid draft 2020-12 schemas.
 2. src/schema/example.json validates. Its .meta.json form (no stations)
    validates against #/$defs/meta, and each station (one .jsonl line)
    validates against #/$defs/station.
@@ -19,7 +18,7 @@ r"""Check the JSON Schema and the example document.
    code or with an unknown one, corrected without from/to, no_constants
    with constants, and any qc_status excluded must fail; every annotation
    code, a broken record with a usable segment and a no-constants record
-   must pass. The values and fields that the 0.x drafts deprecated
+   must pass. Retired values and fields
    (qc_status accepted and fallback, qc_flags verdict, provenance.time_base,
    provenance.build_commit, release.doi, depth_type above_bottom) must fail. Python's re lets $ match before a
    final newline; ECMA-262 does not. The schema ends every pattern with
@@ -39,8 +38,8 @@ schema_dir = root / "src/schema"
 schema = json.loads((schema_dir / "otc-1.0.schema.json").read_text())
 example = json.loads((schema_dir / "example.json").read_text())
 
-for old in sorted(schema_dir.glob("otc-*.schema.json")):
-    Draft202012Validator.check_schema(json.loads(old.read_text()))
+for path in sorted(schema_dir.glob("otc-*.schema.json")):
+    Draft202012Validator.check_schema(json.loads(path.read_text()))
 validator = Draft202012Validator(schema)
 
 
