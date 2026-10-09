@@ -1,6 +1,6 @@
 r"""Check the draft JSON Schema and the example document.
 
-1. The current schema (0.6) and the older schemas are valid draft 2020-12 schemas.
+1. The current schema (0.6), the index schema and the older schemas are valid draft 2020-12 schemas.
 2. src/schema/example.json validates. Its .meta.json form (no stations)
    validates against #/$defs/meta, and each station (one .jsonl line)
    validates against #/$defs/station.
@@ -334,9 +334,153 @@ must_pass("an unverified time base that lists the weak checks tried",
 must_pass("deprecated qc_status accepted and fallback (0.5 writers)",
           lambda d: [d["stations"][0]["constant_sets"][1].__setitem__("qc_status", "accepted"),
                      current_set(d).__setitem__("qc_status", "fallback")])
-must_pass("deprecated qc_flags verdict and provenance.time_base alongside the 0.6 fields",
-          lambda d: [fjord(d, "b")["qc_flags"][1].__setitem__("verdict", "unverified"),
-                     fjord(d, "b")["provenance"].__setitem__("time_base", {"verdict": "utc_instant", "correction": "none"})])
+must_pass("deprecated qc_flags verdict next to reason", lambda d: fjord(d, "b")["qc_flags"][1].__setitem__("verdict", "unverified"))
+must_pass("deprecated provenance.time_base on an official set (no 0.6 time_base)",
+          lambda d: d["stations"][0]["constant_sets"][1]["provenance"].__setitem__(
+              "time_base", {"verdict": "utc_instant", "correction": "none"}))
 must_pass("a concept DOI with a null release.doi",
           lambda d: d["release"].update(doi=None, concept_doi="10.5281/zenodo.1234566"))
 must_pass("a release without release.doi", lambda d: d["release"].pop("doi"))
+
+
+# --- 0.6 gate review: holes found in review (S1-S7, D1, D9, C1, C3) ---------------------------
+
+def no_flag(cs, name):
+    cs["qc_flags"] = [f for f in cs["qc_flags"] if f["flag"] != name]
+
+
+def carried(cs):
+    cs["provenance"]["carried_from_release"] = "20991130"
+    cs.setdefault("qc_flags", []).append({"flag": "carried_over", "reason": "the source failed its check in this build"})
+    if cs["qc_status"] == "ok":
+        cs["qc_status"] = "flagged"
+
+
+must_fail("S1 too_short without the short_record flag",
+          lambda d: fjord(d, "d").__setitem__("qc_flags", [{"flag": "time_base", "reason": "time base unverified"}]))
+must_fail("S1 too_short with only a time_base flag and no record_span",
+          lambda d: [fjord(d, "d").__setitem__("qc_flags", [{"flag": "time_base", "reason": "x"}]), fjord(d, "d").pop("record_span")])
+must_fail("S2 short record with constants and no dropped_constituents", lambda d: fjord(d, "c").pop("dropped_constituents"))
+must_fail("S2 short record with constants and empty dropped_constituents",
+          lambda d: fjord(d, "c").__setitem__("dropped_constituents", []))
+must_fail("S3 accepted water-level set with no constants",
+          lambda d: [fjord(d, "a").__setitem__("qc_status", "accepted"), fjord(d, "a").__setitem__("constituents", [])])
+must_fail("S3 fallback water-level set with no constants",
+          lambda d: [fjord(d, "a").__setitem__("qc_status", "fallback"), fjord(d, "a").__setitem__("constituents", [])])
+must_fail("S3 accepted broken record without constants",
+          lambda d: [fjord(d, "b").__setitem__("qc_status", "accepted"), fjord(d, "b").__setitem__("constituents", []),
+                     fjord(d, "b").pop("fit_segment")])
+must_fail("S3 accepted with a disputed time base and no time_base flag",
+          lambda d: [fjord(d, "c").__setitem__("qc_status", "accepted"), no_flag(fjord(d, "c"), "time_base")])
+must_fail("S4 tombstone with a free-text reason",
+          lambda d: station(d, "OTC-EXAMPLE-0002").__setitem__("removed_reason", "short record"))
+must_fail("S4 tombstone without merged_into", lambda d: station(d, "OTC-EXAMPLE-0002").pop("merged_into"))
+must_fail("S4 tombstone merged into a non-OTC id",
+          lambda d: station(d, "OTC-EXAMPLE-0002").__setitem__("merged_into", "example-file-id"))
+
+
+def tombstone_fjord(d):
+    st = station(d, "OTC-EXAMPLE-0005")
+    for k in list(st):
+        if k != "station_id":
+            st.pop(k)
+    st.update(status="removed", removed_in="20991231", removed_reason="short record")
+
+
+must_fail("S4 a GESLA station tombstoned for a short record", tombstone_fjord)
+must_fail("S5 provenance key excluded", lambda d: fjord(d, "a")["provenance"].__setitem__("excluded", True))
+must_fail("S5 provenance key qc_status", lambda d: fjord(d, "a")["provenance"].__setitem__("qc_status", "excluded"))
+must_fail("S5 provenance.decision with an extra key",
+          lambda d: fjord(d, "a")["provenance"]["decision"].__setitem__("excluded", True))
+must_fail("S5 no_constants with decision outcome fallback",
+          lambda d: fjord(d, "d")["provenance"].__setitem__("decision", {"tier": "fallback", "outcome": "fallback"}))
+must_fail("S5 no_constants carried over", lambda d: carried(fjord(d, "d")))
+must_fail("S5 0.6 time_base and the deprecated provenance.time_base together",
+          lambda d: fjord(d, "a")["provenance"].__setitem__("time_base", {"verdict": "rejected", "correction": "none"}))
+must_fail("S5 deprecated provenance.time_base with an extra key",
+          lambda d: d["stations"][0]["constant_sets"][1]["provenance"].__setitem__("time_base", {"verdict": "x", "excluded": True}))
+must_fail("S6 time_base flag on a verified time base",
+          lambda d: [first_set(d).__setitem__("qc_status", "flagged"),
+                     first_set(d).__setitem__("qc_flags", [{"flag": "time_base", "reason": "x"}])])
+must_fail("S6 time_base flag on a set without a time base",
+          lambda d: [d["stations"][0]["constant_sets"][1].__setitem__("qc_status", "flagged"),
+                     d["stations"][0]["constant_sets"][1].__setitem__("qc_flags", [{"flag": "time_base", "reason": "x"}])])
+must_fail("D1 qc flag without a reason", lambda d: fjord(d, "c")["qc_flags"][0].pop("reason"))
+must_fail("D9 carried_from_release without the carried_over flag",
+          lambda d: fjord(d, "a")["provenance"].__setitem__("carried_from_release", "20991130"))
+must_fail("D9 carried_over flag without carried_from_release",
+          lambda d: [fjord(d, "a").__setitem__("qc_status", "flagged"),
+                     fjord(d, "a").__setitem__("qc_flags", [{"flag": "carried_over", "reason": "x"}])])
+must_fail("D9 decision outcome fallback without carried_from_release",
+          lambda d: fjord(d, "a")["provenance"].__setitem__("decision", {"tier": "fallback", "outcome": "fallback"}))
+must_fail("D9 carried-over set with qc_status ok",
+          lambda d: [carried(fjord(d, "a")), fjord(d, "a").__setitem__("qc_status", "ok")])
+must_fail("C1 release without min_reader_version", lambda d: d["release"].pop("min_reader_version"))
+must_fail("C3 gauge set without good_hours", lambda d: fjord(d, "a")["record_span"].pop("good_hours"))
+must_fail("C3 gauge set without record_span", lambda d: fjord(d, "a").pop("record_span"))
+must_fail("reference station with no constant sets",
+          lambda d: station(d, "OTC-EXAMPLE-0005").update(constant_sets=[], recommended_set_id=None))
+
+must_pass("D9 a set carried over from the previous release", lambda d: carried(fjord(d, "a")))
+must_pass("D9 a gate fallback carried over", lambda d: [carried(fjord(d, "a")), fjord(d, "a")["provenance"].__setitem__(
+    "decision", {"tier": "fallback", "outcome": "fallback", "reason": "the source failed its convention check"})])
+must_pass("a source's own provenance keys (JMA analysis_years, LINZ list_distance_km)",
+          lambda d: d["stations"][0]["constant_sets"][1]["provenance"].update(analysis_years=19, list_distance_km=0.4))
+must_pass("a duplicate tombstone", lambda d: station(d, "OTC-EXAMPLE-0002").__setitem__("removed_reason", "duplicate"))
+must_pass("an official set without record_span", lambda d: d["stations"][0]["constant_sets"][1].pop("record_span", None))
+must_pass("a reference station whose only sets have no constants (no recommended set)",
+          lambda d: station(d, "OTC-EXAMPLE-0005").update(
+              constant_sets=[fjord(d, "d"), fjord(d, "e")], recommended_set_id=None))
+
+# Numbers that depend on the build (the ~15-day minimum, the ranking by good_hours) are build
+# checks, listed in the schema's top description. These instances are valid JSON Schema on purpose.
+for label, mutate in (
+        ("too_short with 10000 good hours", lambda d: fjord(d, "d")["record_span"].__setitem__("good_hours", 10000)),
+        ("constants fitted from 24 good hours", lambda d: fjord(d, "a")["record_span"].__setitem__("good_hours", 24))):
+    doc = copy.deepcopy(example)
+    mutate(doc)
+    if problems(doc):
+        print(f"FAIL: {label} should be left to the build check")
+        sys.exit(1)
+    print(f"ok: left to the build check: {label}")
+
+
+# --- OTC_index.json and the latest pointers -----------------------------------------------------
+
+index_schema = json.loads((schema_dir / "otc-index-0.6.schema.json").read_text())
+Draft202012Validator.check_schema(index_schema)
+index_validator = Draft202012Validator(index_schema)
+pointer_validator = Draft202012Validator({"$schema": index_schema["$schema"], "$defs": index_schema["$defs"],
+                                          "$ref": "#/$defs/release_info"})
+index_example = json.loads((schema_dir / "index-example.json").read_text())
+errors = [e.message for e in index_validator.iter_errors(index_example)]
+if errors:
+    print("index-example.json:", errors[0])
+    sys.exit(1)
+print("ok: index-example.json is a valid OTC_index.json")
+for entry in index_example["releases"]:
+    if not pointer_validator.is_valid(entry):
+        print(f"FAIL: index entry {entry['datestamp']} is not a valid OTC_latest.json")
+        sys.exit(1)
+print("ok: each index entry is a valid OTC_latest.json")
+
+
+def index_must_fail(label, mutate):
+    doc = copy.deepcopy(index_example)
+    mutate(doc)
+    if index_validator.is_valid(doc):
+        print(f"FAIL: negative control passed validation: index {label}")
+        sys.exit(1)
+    print(f"ok: rejected index {label}")
+
+
+latest = lambda d: d["releases"][0]
+index_must_fail("entry with doi instead of zenodo_version_doi",
+                lambda d: latest(d).__setitem__("doi", latest(d).pop("zenodo_version_doi")))
+index_must_fail("entry without zenodo_version_doi", lambda d: latest(d).pop("zenodo_version_doi"))
+index_must_fail("entry without concept_doi", lambda d: latest(d).pop("concept_doi"))
+index_must_fail("entry without content_sha256", lambda d: latest(d).pop("content_sha256"))
+index_must_fail("entry without min_reader_version", lambda d: latest(d).pop("min_reader_version"))
+index_must_fail("file without sha256", lambda d: latest(d)["files"][0].pop("sha256"))
+index_must_fail("zenodo_version_doi that is not a DOI", lambda d: latest(d).__setitem__("zenodo_version_doi", "zenodo.1"))
+index_must_fail("bare list instead of {releases: [...]}", lambda d: d.__setitem__("releases", {}))

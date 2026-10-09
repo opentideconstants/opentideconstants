@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://opentideconstants.org/schema/otc-index-0.6.schema.json",
+  "title": "OpenTideConstants release index and latest pointers",
+  "description": "DRAFT, for releases of format_version 0.6. OTC_index.json validates against this schema: every release, newest first. OTC_latest.json and OTC_latest-f{MAJOR}.json each validate against #/$defs/release_info: the entry of the newest release, and of the newest release of that format major. These files change after a release is published (the month-end Zenodo deposit adds zenodo_version_doi), so the version DOI is here and never in the release files. The release build checks that the index is newest first, that every datestamp appears once, and that each entry's files and SHA-256 values match its OTC_{DATESTAMP}.sha256 file.",
+  "type": "object",
+  "required": ["releases"],
+  "additionalProperties": false,
+  "properties": {
+    "releases": { "type": "array", "items": { "$ref": "#/$defs/release_info" } }
+  },
+  "$defs": {
+    "doi": { "type": "string", "pattern": "^10\\.[0-9]{4,9}/\\S+$(?![\\s\\S])" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$(?![\\s\\S])" },
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$(?![\\s\\S])" },
+    "release_info": {
+      "description": "One release, without station data.",
+      "type": "object",
+      "required": ["datestamp", "format_version", "min_reader_version", "concept_doi", "zenodo_version_doi", "content_sha256", "files"],
+      "additionalProperties": false,
+      "properties": {
+        "datestamp": { "type": "string", "pattern": "^[0-9]{8}(\\.[2-9]|\\.[1-9][0-9]+)?$(?![\\s\\S])" },
+        "created": { "type": "string", "format": "date-time" },
+        "format_version": { "$ref": "#/$defs/version" },
+        "min_reader_version": { "description": "As release.min_reader_version in the release document.", "$ref": "#/$defs/version" },
+        "concept_doi": { "description": "The one DOI for all Zenodo versions. Cite a release by the concept DOI and its datestamp. Null only before the concept DOI exists.", "anyOf": [{ "$ref": "#/$defs/doi" }, { "type": "null" }] },
+        "zenodo_version_doi": { "description": "The DOI of this release's own Zenodo version, or null when it has none: Zenodo gets one version a month and one for each material change.", "anyOf": [{ "$ref": "#/$defs/doi" }, { "type": "null" }] },
+        "content_sha256": { "description": "SHA-256 of the release content without its build-identity fields. The pipeline publishes nothing when it equals the newest release's value.", "$ref": "#/$defs/sha256" },
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["name", "url", "size", "sha256"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string", "pattern": "^OTC_[0-9]{8}(\\.[0-9]+)?\\.[a-z0-9.]+$(?![\\s\\S])" },
+              "url": { "description": "Relative to the URL of the file that lists it, or absolute.", "type": "string", "minLength": 1 },
+              "size": { "type": "integer", "minimum": 0 },
+              "sha256": { "$ref": "#/$defs/sha256" }
+            }
+          }
+        },
+        "changes": { "description": "Short lines for the Downloads page.", "type": "array", "items": { "type": "string" } },
+        "source_versions": { "type": "object", "additionalProperties": { "type": "string" } },
+        "changelog_url": { "type": "string", "format": "uri" }
+      }
+    }
+  }
+}

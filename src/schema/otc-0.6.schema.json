@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://opentideconstants.org/schema/otc-0.6.schema.json",
   "title": "OpenTideConstants release document",
-  "description": "DRAFT, format_version 0.6. Schema for OTC_{YYYYMMDD}.json. Each line of OTC_{YYYYMMDD}.jsonl (and of the optional OTC_{YYYYMMDD}.jsonl.gz) is one station document, valid against #/$defs/station. OTC_{YYYYMMDD}.meta.json is the same document without `stations`, valid against #/$defs/meta, so a .jsonl reader can get the conventions, licences, constituent table and release metadata. Units: metres, metres per second (current amplitudes), degrees, degrees per hour, UTC. Every pattern ends with $(?![\\s\\S]) so that a validator whose $ also matches before a final newline (Python re) still rejects one. Cross-references (convention_id, licence_id, recommended_set_id, constituent names, default_current_bin, current_offsets reference_station_id and reference_bin) must resolve inside the same release, alias ids must be unique within each alias system across the release, and bin numbers must be unique within a set's current_bins and within a station's current_offsets. A station's recommended set is never a no_constants set, and never a short_record set when the station has a longer set with constants; a time_base correction has from different from to, and its to equals published; an unverified or disputed time_base has published equal to declared. JSON Schema cannot express these, so the release build checks them separately.",
+  "description": "DRAFT, format_version 0.6. Schema for OTC_{YYYYMMDD}.json. Each line of OTC_{YYYYMMDD}.jsonl (and of the optional OTC_{YYYYMMDD}.jsonl.gz) is one station document, valid against #/$defs/station. OTC_{YYYYMMDD}.meta.json is the same document without `stations`, valid against #/$defs/meta, so a .jsonl reader can get the conventions, licences, constituent table and release metadata. Units: metres, metres per second (current amplitudes), degrees, degrees per hour, UTC. Every pattern ends with $(?![\\s\\S]) so that a validator whose $ also matches before a final newline (Python re) still rejects one. Cross-references (convention_id, licence_id, recommended_set_id, constituent names, default_current_bin, current_offsets reference_station_id and reference_bin) must resolve inside the same release, alias ids must be unique within each alias system across the release, and bin numbers must be unique within a set's current_bins and within a station's current_offsets. JSON Schema cannot express these, so the release build checks them separately. The build also checks: (1) a no_constants set with too_short has fewer than the minimum hours of good data (about 15 days, 360 hours; the exact value is published with each release), and every set with constants fitted from a record has at least that many; (2) a station's recommended set is never a no_constants set, never a short_record set when the station has a set of the same quantity with constants and more good_hours, and always has the quantity of the station's kind; (3) a time_base correction has from different from to, its from equals declared and its to equals published, and an unverified or disputed time_base has published equal to declared; (4) a tombstone's merged_into names an active station whose aliases include every alias id the removed station had; (5) provenance.carried_from_release is earlier than the release datestamp and names a release that held the same set_id.",
   "type": "object",
   "required": ["format_version", "release", "conventions", "licences", "constituents", "stations"],
   "additionalProperties": false,
@@ -45,7 +45,7 @@
       }
     },
     "format_version": {
-      "description": "MAJOR.MINOR. A new field or enum value is a minor change, and so is removing an enum value that writers may no longer use, because a reader never meets a value it did not know. A removed or renamed field, or a changed unit or convention, is a major change. A deprecated field or value is still valid for one minor version, and writers stop using it.",
+      "description": "MAJOR.MINOR. A new optional field is a minor change. A removed or renamed field, or a changed unit or convention, is a major change. A change to an enum (a new value, or a value that is not valid any more) is a minor change for the schema, but it can change what a reader does with a set, so it raises release.min_reader_version. A deprecated field or value is valid for one more minor version.",
       "type": "string",
       "pattern": "^[0-9]+\\.[0-9]+$(?![\\s\\S])"
     },
@@ -56,10 +56,14 @@
     },
     "release": {
       "type": "object",
-      "required": ["datestamp", "created", "source_versions"],
+      "required": ["datestamp", "created", "source_versions", "min_reader_version"],
       "additionalProperties": false,
       "properties": {
         "datestamp": { "$ref": "#/$defs/datestamp" },
+        "min_reader_version": {
+          "description": "The oldest format version a reader must understand to use this release safely, MAJOR.MINOR. A reader that supports only an older version must not use the release, and stays on its last release (the latest pointer per format major and OTC_index.json carry the same value). 0.6 sets it to 0.6: a 0.5 reader filters out only qc_status excluded, so it would treat a no_constants set as usable. Readers before 0.6 do not read this field; for them the publish gate holds: no 0.6 release is published until the SDK releases that read 0.6 are out.",
+          "$ref": "#/$defs/format_version"
+        },
         "created": { "type": "string", "format": "date-time" },
         "doi": {
           "description": "Deprecated in 0.6, and always null. A Zenodo version DOI is minted after the release files are fixed, and not every release gets one, so a release file never carries it. The version DOI, when a release has one, is only in OTC_index.json and the latest pointers, as zenodo_version_doi. Writers may leave this field out.",
@@ -171,16 +175,21 @@
       ]
     },
     "tombstone": {
-      "description": "A removed station keeps a row with its reason. A station is never removed because its records are short or broken: those records stay as constant sets with their annotations.",
+      "description": "A station id that is not used any more, because the station was merged into another station or was a duplicate of one. The row keeps the id from being reused and points to the station that holds its records. These are the only reasons: a station is never removed because its records are short, broken or from a source that failed a check. Those records stay as constant sets with their annotations. The release build checks that merged_into is an active station whose aliases include every alias id of the removed station.",
       "type": "object",
-      "required": ["station_id", "status", "removed_in", "removed_reason"],
+      "required": ["station_id", "status", "removed_in", "removed_reason", "merged_into"],
       "additionalProperties": false,
       "properties": {
         "station_id": true,
         "status": { "const": "removed" },
         "name": { "type": "string" },
         "removed_in": { "$ref": "#/$defs/datestamp" },
-        "removed_reason": { "type": "string", "minLength": 1 }
+        "removed_reason": {
+          "description": "merged: the station and another one are the same gauge, and its records now belong to merged_into. duplicate: the station repeated merged_into.",
+          "enum": ["merged", "duplicate"]
+        },
+        "merged_into": { "description": "The OTC station id that holds this station's records.", "type": "string", "pattern": "^OTC-[A-Za-z0-9_-]+$(?![\\s\\S])" },
+        "detail": { "type": "string", "minLength": 1 }
       }
     },
     "active_station": {
@@ -224,7 +233,7 @@
           }
         },
         "recommended_set_id": {
-          "description": "The set_id of the set chosen by the published recommendation rule, or null for a subordinate station with offsets only. The recommended set is never a no_constants set. A set flagged short_record never outranks a set at the same station that has constants and more hours of good data (record_span.good_hours). The release build checks both.",
+          "description": "The set_id of the set chosen by the published recommendation rule, or null for a subordinate station with offsets only, or for a station whose every set is no_constants. Only sets of one quantity compete: water-level sets for a tide station, current sets for a current station. The recommended set is never a no_constants set. A set flagged short_record never outranks a set of the same quantity at the same station that has constants and more hours of good data (record_span.good_hours). The release build checks these.",
           "type": ["string", "null"]
         },
         "constant_sets": { "type": "array", "items": { "$ref": "#/$defs/constant_set" } },
@@ -241,7 +250,9 @@
           "items": { "$ref": "#/$defs/current_offset" }
         },
         "validation": { "type": "array", "items": { "$ref": "#/$defs/validation" } }
-      }
+      },
+      "if": { "properties": { "type": { "const": "reference" } } },
+      "then": { "properties": { "constant_sets": { "minItems": 1 } } }
     },
     "constant_set": {
       "type": "object",
@@ -269,7 +280,7 @@
             "end": { "type": "string", "format": "date-time" },
             "good_samples": { "type": "integer", "minimum": 0 },
             "good_hours": {
-              "description": "Hours of good data in the record, after quality control. This is the record length that decides which constituents can be fitted, and how a short record ranks. start and end give the span.",
+              "description": "Hours of good data in the record, after quality control. Required on every set fitted from a gauge record. This is the record length that decides which constituents can be fitted, whether constants are fitted at all, and how a set ranks. start and end give the span.",
               "type": "number",
               "minimum": 0
             }
@@ -290,7 +301,7 @@
         "convention_id": { "type": "string", "minLength": 1 },
         "licence_id": { "type": "string", "minLength": 1 },
         "qc_status": {
-          "description": "ok: constants are published and qc_flags is empty. flagged: constants are published and qc_flags says what to know about them. no_constants: the set is listed but no constants were fitted; no_constants_reason says why. No value means removed: every record stays listed. 0.5's excluded is not allowed. accepted and fallback are deprecated in 0.6 (read accepted as ok or flagged, by qc_flags; fallback is provenance.decision.outcome fallback) and are removed in the next minor version.",
+          "description": "ok: constants are published and qc_flags is empty. flagged: constants are published and qc_flags says what to know about them. no_constants: the set is listed but no constants were fitted; no_constants_reason says why, and qc_flags has at least one flag. No status marks a record as removed: every record stays listed. excluded is not valid in 0.6. accepted and fallback are deprecated: read accepted as ok, or as flagged when qc_flags has a flag; read fallback as a set carried over from an earlier release (provenance.carried_from_release). A writer uses ok, flagged or no_constants.",
           "enum": ["ok", "flagged", "no_constants", "accepted", "fallback"]
         },
         "qc_flags": { "type": "array", "items": { "$ref": "#/$defs/qc_flag" } },
@@ -314,7 +325,7 @@
         },
         "expected_accuracy": { "$ref": "#/$defs/expected_accuracy" },
         "no_constants_reason": {
-          "description": "Only with qc_status no_constants. too_short: less than about 15 days of good data. fit_unusable: the record is broken and no segment gives a usable fit; record_issues says what is wrong.",
+          "description": "Only with qc_status no_constants. too_short: less than about 15 days of good data (needs the short_record flag). fit_unusable: the record is broken and no segment gives a usable fit; record_issues says what is wrong.",
           "enum": ["too_short", "fit_unusable"]
         },
         "constituents": {
@@ -365,9 +376,9 @@
           "else": { "not": { "required": ["current_bins"] } }
         },
         {
-          "description": "Every set fitted from a gauge record carries a time-base annotation.",
+          "description": "Every set fitted from a gauge record carries a time-base annotation and its hours of good data.",
           "if": { "properties": { "source_type": { "const": "gauge" } } },
-          "then": { "required": ["time_base"] }
+          "then": { "required": ["time_base", "record_span"], "properties": { "record_span": { "required": ["good_hours"] } } }
         },
         {
           "description": "ok: constants and no flags.",
@@ -380,9 +391,9 @@
           "then": { "required": ["qc_flags"], "properties": { "qc_flags": { "minItems": 1 } } }
         },
         {
-          "description": "A water-level set with qc_status ok or flagged has constants.",
+          "description": "A water-level set with qc_status ok or flagged (or the deprecated accepted or fallback) has constants.",
           "if": {
-            "properties": { "quantity": { "const": "water_level" }, "qc_status": { "enum": ["ok", "flagged"] } },
+            "properties": { "quantity": { "const": "water_level" }, "qc_status": { "enum": ["ok", "flagged", "accepted", "fallback"] } },
             "required": ["quantity", "qc_status"]
           },
           "then": { "properties": { "constituents": { "minItems": 1 } } }
@@ -392,7 +403,13 @@
           "if": { "properties": { "qc_status": { "const": "no_constants" } } },
           "then": {
             "required": ["no_constants_reason", "qc_flags"],
-            "properties": { "constituents": { "maxItems": 0 }, "qc_flags": { "minItems": 1 } },
+            "properties": {
+              "constituents": { "maxItems": 0 },
+              "qc_flags": { "minItems": 1 },
+              "provenance": {
+                "not": { "anyOf": [{ "required": ["carried_from_release"] }, { "required": ["decision"], "properties": { "decision": { "required": ["outcome"], "properties": { "outcome": { "const": "fallback" } } } } }] }
+              }
+            },
             "not": { "anyOf": [{ "required": ["expected_accuracy"] }, { "required": ["fit_segment"] }] }
           },
           "else": { "not": { "required": ["no_constants_reason"] } }
@@ -401,6 +418,11 @@
           "description": "fit_unusable needs record_issues to say what is wrong.",
           "if": { "properties": { "no_constants_reason": { "const": "fit_unusable" } }, "required": ["no_constants_reason"] },
           "then": { "required": ["record_issues"] }
+        },
+        {
+          "description": "too_short is a short record: it has the short_record flag, which brings in good_hours.",
+          "if": { "properties": { "no_constants_reason": { "const": "too_short" } }, "required": ["no_constants_reason"] },
+          "then": { "required": ["qc_flags"], "properties": { "qc_flags": { "contains": { "properties": { "flag": { "const": "short_record" } } } } } }
         },
         {
           "description": "record_issues and the broken_record flag go together.",
@@ -418,7 +440,7 @@
             "required": ["record_span"],
             "properties": { "record_span": { "required": ["good_hours"] } },
             "if": { "properties": { "qc_status": { "const": "no_constants" } } },
-            "else": { "required": ["expected_accuracy"] }
+            "else": { "required": ["expected_accuracy", "dropped_constituents"], "properties": { "dropped_constituents": { "minItems": 1 } } }
           }
         },
         {
@@ -428,12 +450,32 @@
             "properties": { "time_base": { "required": ["code"], "properties": { "code": { "enum": ["unverified", "disputed"] } } } }
           },
           "then": {
-            "properties": { "qc_status": { "not": { "const": "ok" } } },
-            "anyOf": [
-              { "properties": { "qc_status": { "enum": ["accepted", "fallback"] } } },
-              { "properties": { "qc_flags": { "contains": { "properties": { "flag": { "const": "time_base" } } } } } }
-            ]
+            "required": ["qc_flags"],
+            "properties": { "qc_status": { "not": { "const": "ok" } }, "qc_flags": { "contains": { "properties": { "flag": { "const": "time_base" } } } } }
           }
+        },
+        {
+          "description": "A time_base flag means the set's time base is unverified or disputed.",
+          "if": { "required": ["qc_flags"], "properties": { "qc_flags": { "contains": { "properties": { "flag": { "const": "time_base" } } } } } },
+          "then": { "required": ["time_base"], "properties": { "time_base": { "properties": { "code": { "enum": ["unverified", "disputed"] } } } } }
+        },
+        {
+          "description": "A carried-over set has the carried_over flag, and the flag has the release it came from. A gate fallback is a carry-over.",
+          "if": { "required": ["provenance"], "properties": { "provenance": { "required": ["carried_from_release"] } } },
+          "then": { "required": ["qc_flags"], "properties": { "qc_flags": { "contains": { "properties": { "flag": { "const": "carried_over" } } } } } }
+        },
+        {
+          "if": { "required": ["qc_flags"], "properties": { "qc_flags": { "contains": { "properties": { "flag": { "const": "carried_over" } } } } } },
+          "then": { "properties": { "provenance": { "required": ["carried_from_release"] } } }
+        },
+        {
+          "if": { "required": ["provenance"], "properties": { "provenance": { "required": ["decision"], "properties": { "decision": { "required": ["outcome"], "properties": { "outcome": { "const": "fallback" } } } } } } },
+          "then": { "properties": { "provenance": { "required": ["carried_from_release"] } } }
+        },
+        {
+          "description": "The 0.6 time_base replaces provenance.time_base: a set has one or the other.",
+          "if": { "required": ["time_base"] },
+          "then": { "properties": { "provenance": { "not": { "required": ["time_base"] } } } }
         }
       ]
     },
@@ -463,13 +505,13 @@
           }
         },
         "months_dropped": {
-          "description": "Isolated bad months left out of the fit (YYYY-MM).",
+          "description": "Isolated bad months left out of the fit (YYYY-MM). A field of the annotation, not a time-base class: it goes with any code.",
           "type": "array",
           "uniqueItems": true,
           "items": { "type": "string", "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$(?![\\s\\S])" }
         },
         "decided_in": { "description": "Datestamp of the build that decided this annotation. A later build reuses the decision while the evidence is unchanged.", "$ref": "#/$defs/datestamp" },
-        "decided_build_commit": { "type": "string", "pattern": "^[0-9a-f]{7,40}$(?![\\s\\S])" },
+        "decided_build_commit": { "description": "The build commit of the build that decided the annotation (decided_in).", "type": "string", "pattern": "^[0-9a-f]{7,40}$(?![\\s\\S])" },
         "evidence": { "type": "array", "items": { "$ref": "#/$defs/time_base_evidence" } }
       },
       "allOf": [
@@ -494,8 +536,8 @@
         "comparator_kind": { "enum": ["official_predictions", "official_constants", "sibling_record", "provider", "model", "served_constants", "dst_selftest"] },
         "comparator_id": { "description": "e.g. kartverket:EXA, a GESLA file id, eot20. For dst_selftest, the record's own id.", "type": "string", "minLength": 1 },
         "distance_km": { "description": "Distance from the gauge to the comparator, or null where it has none (a self-test).", "type": ["number", "null"], "minimum": 0 },
-        "lag_min": { "description": "The measured lag or offset in minutes, record minus comparator.", "type": "number" },
-        "detail": { "type": "string" }
+        "lag_min": { "description": "The measured lag or offset in minutes: the record's time stamp of an event minus the comparator's time of the same event. Negative when the record's stamps are early. An hourly mean stamped at the start of its hour is about -30, and its correction moves the stamps by +30 min.", "type": "number" },
+        "detail": { "description": "Free text for people: what was measured or why a check gave no number.", "type": "string" }
       }
     },
     "record_issue": {
@@ -613,27 +655,35 @@
       }
     },
     "qc_flag": {
-      "description": "Something a user of the set needs to know. time_base: the time base is unverified or disputed (see the set's time_base). broken_record: see record_issues. short_record: the record is too short to resolve every candidate constituent; see record_span.good_hours, dropped_constituents and expected_accuracy.",
+      "description": "Something a user of the set needs to know. time_base: the time base is unverified or disputed (see the set's time_base). broken_record: see record_issues. short_record: the record is too short to resolve every candidate constituent; see record_span.good_hours, dropped_constituents and expected_accuracy. carried_over: the source failed a check in this build, so the set keeps its constants from provenance.carried_from_release.",
       "type": "object",
-      "required": ["flag"],
+      "required": ["flag", "reason"],
       "additionalProperties": false,
       "properties": {
-        "flag": { "enum": ["time_base", "broken_record", "microtidal", "non_tidal_signal", "short_record", "sibling_disagreement"] },
+        "flag": { "enum": ["time_base", "broken_record", "microtidal", "non_tidal_signal", "short_record", "sibling_disagreement", "carried_over"] },
         "reason": { "description": "One line for people.", "type": "string", "minLength": 1 },
         "verdict": { "description": "Deprecated in 0.6: free text. Use reason, and the set's time_base for a time_base flag.", "type": "string" },
         "values": { "type": "object" }
       }
     },
     "provenance": {
+      "description": "Where the set came from and what was done to it. A source may add its own keys (e.g. analysis_years), but no key may carry a status: qc_status is the only status of a set.",
       "type": "object",
       "additionalProperties": true,
+      "propertyNames": { "not": { "pattern": "^(qc_status|status|excluded?|removed?|dropped|hidden|withheld|omitted)$" } },
       "properties": {
+        "carried_from_release": {
+          "description": "The datestamp of the earlier release whose constants this set keeps, because its source failed a check in this build. Goes with the carried_over flag.",
+          "$ref": "#/$defs/datestamp"
+        },
+        "tcd_sha256": { "$ref": "#/$defs/sha256" },
         "build_commit": { "type": "string" },
         "adapter_version": { "type": "string" },
         "input_sha256": { "type": "array", "items": { "$ref": "#/$defs/sha256" } },
         "time_base": {
-          "description": "Deprecated in 0.6: free-text verdict and correction from 0.5. Writers put the annotation in the set's time_base instead; if both are present, the set's time_base is the one that counts.",
+          "description": "Deprecated in 0.6: the free-text verdict and correction of 0.5. 0.6 replaces it with the set's time_base, and a set does not have both.",
           "type": "object",
+          "additionalProperties": false,
           "properties": {
             "verdict": { "type": "string" },
             "correction": { "type": "string" },
@@ -642,7 +692,9 @@
         },
         "selection_reason": { "type": "string" },
         "decision": {
+          "description": "How the release gate decided the set. outcome fallback means the set is carried over (carried_from_release).",
           "type": "object",
+          "additionalProperties": false,
           "properties": {
             "tier": { "enum": ["rule", "review", "fallback"] },
             "outcome": { "enum": ["accept", "fallback"] },
