@@ -23,7 +23,7 @@ src/assets/site.css       layout and element styles; uses only tokens
 src/assets/fonts/         self-hosted fonts (woff2, latin subset) and their SIL OFL licences
 src/assets/mode.js        day/night palette toggle, kept in localStorage
 src/assets/plot.js        plays the Home tide-curve animation when it scrolls into view
-src/schema/               draft JSON Schema and an example document, served at /schema/
+src/schema/               JSON Schema and an example document, served at /schema/
 src/CNAME, src/robots.txt copied to dist/
 scripts/check-links.mjs   internal link and fragment check (add --external to report external URLs)
 scripts/check_schema.py   schema and example check, with negative controls
@@ -61,7 +61,7 @@ Tokens: colours `--color-bg`, `-surface`, `-text`, `-text-muted`, `-border`, `-l
 
 - GitHub Pages, deployed by `.github/workflows/pages.yml` on every push to `main` (pull requests build and check only). In the repository settings, set Pages to "GitHub Actions".
 - Custom domain `opentideconstants.org` (`src/CNAME`), behind Cloudflare.
-- Data downloads are not served from this site. They will come from `data.opentideconstants.org` (Cloudflare R2), with `OTC_latest.json` as the pointer to the current release.
+- Data downloads are served from `data.opentideconstants.org` (Cloudflare R2), not from this site, with `OTC_latest.json` as the pointer to the current release.
 
 ## Licence
 
