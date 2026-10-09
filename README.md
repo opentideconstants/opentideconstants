@@ -30,7 +30,9 @@ scripts/check_schema.py   schema and example check, with negative controls
 scripts/screenshots.mjs   Playwright screenshots (3 sizes, day and night) and horizontal-overflow check (Playwright not a dependency)
 scripts/check-contrast.mjs  WCAG contrast of the colour pairs the site uses, in both palettes
 scripts/art/              generators for the chart sheet and the tide-curve plot in src/partials/
+pipeline/pegelonline/     daily PEGELONLINE harvest into the R2 work bucket (see its README)
 .github/workflows/pages.yml  build, checks, and deploy to GitHub Pages
+.github/workflows/pegelonline-harvest.yml  daily PEGELONLINE harvest, 04:23 UTC
 CITATION.cff
 ```
 

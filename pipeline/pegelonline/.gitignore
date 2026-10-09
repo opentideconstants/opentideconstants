@@ -1,0 +1,6 @@
+# Local runs with --root here. The data lives in the R2 work bucket, never in git.
+data/
+stations.json
+.pulled-days.json
+__pycache__/
+*.tmp
