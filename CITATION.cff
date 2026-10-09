@@ -12,6 +12,9 @@ abstract: >-
   every station.
 type: dataset
 authors:
+  - family-names: "Ritter"
+    given-names: "Jordan"
+    orcid: "https://orcid.org/0009-0005-6930-8040"
   - name: "OpenTideConstants contributors"
 url: "https://opentideconstants.org"
 repository-code: "https://github.com/opentideconstants/opentideconstants"
