@@ -128,13 +128,13 @@ The other SDKs use the same name: `otc.extremes(station, from:, to:)` in Ruby, `
 
 ## Licence and citation
 
-The constants that OTC derives are published under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). OTC publishes derived constants only and never redistributes the raw sea-level series. Constants from other providers keep their own licence (for example, NOAA data is in the public domain). Every constant set carries its own licence id and attribution text. The [Licence](https://opentideconstants.org/licence/) page gives the details.
+The data that OTC derives, and the documentation and site text, are under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The code in this repository (the site build, the scripts, `pipeline/` and the schema files) is under the [MIT licence](LICENSE). [LICENSE-DATA.md](LICENSE-DATA.md) gives the details. The SDK code is also MIT.
+
+OTC publishes derived constants only and never redistributes the raw sea-level series. Constants from other providers keep their own licence (for example, NOAA data is in the public domain). Every constant set carries its own licence id and attribution text. [Licence and attribution](https://opentideconstants.org/about/#licence) on About gives the details.
 
 When you use OTC data, credit OpenTideConstants and the upstream providers of the stations you use. The [attribution list on About](https://opentideconstants.org/about/#attribution) gives the citation text each provider requires.
 
 To cite a release, give the concept DOI (the one DOI for all versions) and the release datestamp, `OTC_{YYYYMMDD}`. If the release has its own Zenodo version, add its version DOI. The concept DOI is in the release files (`release.concept_doi`), in `OTC_index.json` and in the latest pointers. [CITATION.cff](CITATION.cff) gives the citation for GitHub and reference managers, and [How to cite](https://opentideconstants.org/about/#cite) gives the full form.
-
-The licence for this repository's site text and code is not chosen yet. The SDK code is MIT.
 
 ## Accuracy and method
 
