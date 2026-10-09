@@ -21,19 +21,25 @@ order: 5
 <h2 id="timestamps">Time-base checks</h2>
 <p>Every record is checked for a wrong or undeclared clock. OTC never removes a GESLA record for its time base: at worst, a record keeps the time base that GESLA declares for it. The metadata cannot be trusted for this: in GESLA-4.1, 6,681 of 6,682 records declare a time zone offset of 0, including records that are not UTC. <a href="/tide-mechanics/#s4">Phase and time base</a> in Tide Mechanics shows how a clock offset moves each phase.</p>
 <ol>
-  <li><strong>Comparators</strong>, in order of preference: official predictions near the gauge; NOAA harmonic constants for NOAA records; and other records at the same gauge from a different contributor, after their own correction.</li>
+  <li><strong>Comparators</strong>, in order of preference: official predictions near the gauge (<code>official_predictions</code>); official harmonic constants, such as NOAA's for NOAA records (<code>official_constants</code>); other records at the same gauge from a different contributor, after their own correction (<code>sibling_record</code>); the verdict of the provider's other records (<code>provider</code>). When none of these gives a verdict, three weak checks: a global tide model, EOT20 (<code>model</code>); the constants already served for the location (<code>served_constants</code>); and the record's own daylight-saving test (<code>dst_selftest</code>). Each comparison records its lag in minutes: the record's time stamp of an event minus the comparator's time of it.</li>
   <li><strong>Measurements:</strong> the monthly time lag at 1-min resolution, the lag per constituent, amplitude ratios, a direct test of instantaneous against averaged sampling, and the missing hour on daylight-saving change days.</li>
-  <li><strong>Verdict classes</strong>, each with a fixed correction: UTC instantaneous; UTC hourly mean stamped at the start of the hour (shift +30 min and correct the amplitudes); UTC plus a whole number of hours; local time with daylight saving; a step at a date; isolated bad months.</li>
+  <li><strong>Verdict classes</strong>, each with a fixed correction: UTC instantaneous; UTC hourly mean stamped at the start of the hour (shift +30 min and correct the amplitudes); UTC plus or minus a whole number of hours; local time with daylight saving; a step at a date. Isolated bad months are not a class: they are left out of the fit under any class, and the annotation lists them (<code>months_dropped</code>).</li>
   <li><strong>Pass rule:</strong> a correction is made only on positive evidence. After the correction, the residual M2 lag must be within ±3 min in every month used.</li>
-  <li><strong>Annotation:</strong> every record carries one of four time-base annotations. <em>Verified</em>: the evidence confirms the declared time base, and the evidence is listed. <em>Corrected</em>: the time base is changed, and the annotation states from what to what and the evidence. <em>Unverified</em>: no comparator exists, so GESLA's declared time base is kept. <em>Disputed</em>: the evidence disagrees with the declared time base but no class explains it, so GESLA's declared time base is kept.</li>
+  <li><strong>Annotation:</strong> every record carries one of four time-base annotations. <em>Verified</em>: the evidence confirms the declared time base, and the evidence is listed. <em>Corrected</em>: the time base is changed, and the annotation states from what to what and the evidence. <em>Unverified</em>: no comparator gives a verdict, so GESLA's declared time base is kept; the annotation can list the checks it tried. <em>Disputed</em>: the evidence disagrees with the declared time base but no class explains it, so GESLA's declared time base is kept.</li>
   <li><strong>Positive controls on every build:</strong> pinned GESLA-4.0 WSV files must come out as local time with daylight saving; a record shifted by +60 min must be detected; an hourly-averaged copy must be detected. If a control fails, the build stops.</li>
 </ol>
 
 <h2 id="broken-records">Broken-record checks</h2>
-<p>A record is excluded, and listed with its numbers, when its main constituents are not stable from year to year or between the two halves of the span, when it does not correlate with a nearby gauge that correlates with its own neighbours, or when its values are quantised or out of range. The Hirtshals record (no tide in the input) is the reference case. The thresholds are calibrated on the data and published with each release.</p>
+<p>A broken record is never removed. It stays listed, and its set states what is wrong. The checks look for a datum step, a flat line, spikes, gaps, a clock step, quantised or out-of-range values, main constituents that are not stable from year to year or between the two halves of the span, and a record that does not correlate with a nearby gauge that correlates with its own neighbours. Each finding is listed with where it is and its numbers.</p>
+<ul>
+  <li>When part of the record is usable, the constants are fitted to that segment, and the set names the segment.</li>
+  <li>Constants are withheld only when no segment gives a usable fit. The set is then listed with <em>no constants fitted</em> and the reason. The Hirtshals record (no tide in the input) is the reference case.</li>
+  <li>A set with a broken record is flagged, so it is easy to find and to leave out.</li>
+</ul>
+<p>The thresholds are calibrated on the data and published with each release. The fields are on <a href="/data-format/#fields">Data format</a>.</p>
 
 <h2 id="selection">Record selection</h2>
-<p>When several records exist at one gauge, the build picks one by fixed rules, in this order: the most good data in the 19-year span; recent records before records that ended long ago; the gauge operator's own record before a re-distribution of it; instantaneous before averaged; sub-hourly before hourly; then the lowest file id. When two eligible records disagree beyond their uncertainty, the record with the lower error against an official reference is chosen. Every choice and its reason is recorded.</p>
+<p>When several records exist at one gauge, the build picks one by fixed rules, in this order: the most good data in the 19-year span; recent records before records that ended long ago; the gauge operator's own record before a re-distribution of it; instantaneous before averaged; sub-hourly before hourly; then the lowest file id. A short record never comes before a record with constants and more hours of good data, and a record with no constants is never chosen. When two eligible records disagree beyond their uncertainty, the record with the lower error against an official reference is chosen. Every choice and its reason is recorded.</p>
 
 <h2 id="constituents">Constituent selection</h2>
 <ol>
@@ -49,13 +55,13 @@ order: 5
 <p>A record is never removed for being short.</p>
 <ul>
   <li>The fit solves only the constituents that the record's own good data can resolve, by the record-length rule in <a href="#constituents">Constituent selection</a>.</li>
-  <li>Each short record notes its length, the constituents left out, and an expected-accuracy indicator. The indicator is measured on long records cut down to the same length.</li>
-  <li>A record with less than about 15 days of good data is kept and annotated <em>no constants fitted</em>.</li>
-  <li>In the combined dataset, a short record never outranks a longer or better record at the same station. See <a href="#selection">Record selection</a>.</li>
+  <li>Each short record is flagged and notes its length (hours of good data, and the span), each constituent left out with its reason (for example P1, which a 40-day record cannot separate from K1), and an expected-accuracy indicator: the expected amplitude and phase error, or the expected error of high- and low-water times and heights. The indicator is measured on long records cut down to the same length.</li>
+  <li>A record with less than about 15 days of good data (<code>release.fit_min_good_hours</code>) is kept and annotated <em>no constants fitted</em>. It is still listed, with its length.</li>
+  <li>In the combined dataset, a short record never outranks a set at the same station that has constants and more hours of good data, and a set with no constants is never recommended. See <a href="#selection">Record selection</a>.</li>
 </ul>
 
 <h2 id="source-checks">Per-source convention check</h2>
-<p>Every source is compared on every build with an independent comparator at the same gauges: our own GESLA fit, predicted with the reference predictor. The pass rule is that the median M2, S2, K1 and O1 differences are within 1 cm and 2° over at least 3 overlapping gauges. A source that fails is not published in that release until its declared convention is fixed. A source with no overlapping gauge cannot be added.</p>
+<p>Every source is compared on every build with an independent comparator at the same gauges: our own GESLA fit, predicted with the reference predictor. The pass rule is that the median M2, S2, K1 and O1 differences are within 1 cm and 2° over at least 3 overlapping gauges. When a source fails its checks in a build, its stations stay listed with that source's last good constants, flagged <code>carried_over</code> and marked with the release they come from (<code>carried_from_release</code>), until its declared convention is fixed. No station disappears because a source failed, and GESLA records are never dropped. A source with no overlapping gauge cannot be added.</p>
 
 <h2 id="automation">Automation</h2>
 <ul>

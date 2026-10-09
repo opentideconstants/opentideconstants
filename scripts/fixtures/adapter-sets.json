@@ -1,0 +1,272 @@
+{
+ "description": "The provenance objects that real adapters write, one per distinct shape, captured from each adapter's fixture run on its branch (NOAA, NOAA currents, Kartverket, LINZ, JMA) and from gesla_sets.py on the 20261008 GESLA fit documents. Only provenance and the set's identity are kept, no constants. check_schema.py checks that 0.6 provenance accepts every one.",
+ "sets": [
+  {
+   "adapter": "A-NOAA",
+   "branch": "blitz/otc-adapters/A-NOAA",
+   "commit": "cf898df",
+   "source_record_id": "8443970",
+   "provenance": {
+    "adapter_version": "1.0.0",
+    "input_sha256": [
+     "8d09fc8cc9281f029ca1833b9dd5a39517efb87a8cae2dfeda577bb74f304a65",
+     "3a96109c469298b491f744d47a71ff780abcc10786054c6837ac4fd1188a7e42"
+    ],
+    "selection_reason": "unmodified NOAA CO-OPS harmonic constants"
+   },
+   "source": "noaa",
+   "source_type": "official",
+   "quantity": "water_level",
+   "qc_status": "accepted"
+  },
+  {
+   "adapter": "A-NOAAC",
+   "branch": "blitz/otc-adapters/A-NOAAC",
+   "commit": "0f25475",
+   "source_record_id": "ACT1616",
+   "provenance": {
+    "adapter_version": "1.0.0",
+    "input_sha256": [
+     "b0f1491ab201c05414b76c9ef1511429342dd4bbfa6d7181eb18ece7c79a8e66",
+     "8d3ef97077296e0192364c9f461589c2185d60446ebdcf499bfacc6cbdc225e3",
+     "4f42716367bb99906c6000f63b5dc75691f08fd58dc2712e2d31f93a8ed65f2d"
+    ],
+    "selection_reason": "unmodified NOAA CO-OPS current harmonic constants"
+   },
+   "source": "noaa-currents",
+   "source_type": "official",
+   "quantity": "current",
+   "qc_status": "accepted"
+  },
+  {
+   "adapter": "A-KV",
+   "branch": "blitz/otc-adapters/A-KV",
+   "commit": "9d25e5b",
+   "source_record_id": "BGO",
+   "provenance": {
+    "adapter_version": "1",
+    "input_sha256": [
+     "404c3d7265bf2ff47e660bbeac283d7df442c5aadcb48bec274ffb70636caf99",
+     "428b6132f83090b16c8764a83269ecfe7849d1d47d08cc2ea4bb12ed14c09e8a"
+    ]
+   },
+   "source": "kartverket",
+   "source_type": "official",
+   "quantity": "water_level",
+   "qc_status": "accepted"
+  },
+  {
+   "adapter": "A-LINZ",
+   "branch": "blitz/otc-adapters/A-LINZ",
+   "commit": "0c8fe30",
+   "source_record_id": "070AUCKLAND",
+   "provenance": {
+    "adapter_version": "1.0.0",
+    "input_sha256": [
+     "2f29c781fa4d715ec364ec6dbf3d4be03df234562c341844718857de6fbbb0c2",
+     "80bca63dba9a29b5b15c44f63151613136df7de6d2d4eb307e31a4bc2425401d"
+    ],
+    "member": "070AUCKLAND_Harm_2004-2025.txt",
+    "position": {
+     "header_lat": -36.85,
+     "header_lon": 174.76666666666668,
+     "list_port": 70,
+     "list_lat": -36.85,
+     "list_lon": 174.766667,
+     "list_distance_km": 0.0,
+     "from": "header"
+    },
+    "header_dropped": "station number, statistics (untrusted)"
+   },
+   "source": "linz",
+   "source_type": "official",
+   "quantity": "water_level",
+   "qc_status": "accepted"
+  },
+  {
+   "adapter": "A-LINZ",
+   "branch": "blitz/otc-adapters/A-LINZ",
+   "commit": "0c8fe30",
+   "source_record_id": "077NELSON",
+   "provenance": {
+    "adapter_version": "1.0.0",
+    "input_sha256": [
+     "2f29c781fa4d715ec364ec6dbf3d4be03df234562c341844718857de6fbbb0c2",
+     "a2efca6e698509641613129fe4488b3047fd350329135d92ff3e94a2b502d0ff",
+     "671eacb6517afd526c8e4a06c17d5663e2b6381781af76e84aa5547c3f0e9d38"
+    ],
+    "member": "077NELSON_Harm_2005-2025.txt",
+    "position": {
+     "header_lat": -14.266666666666667,
+     "header_lon": 173.26666666666668,
+     "list_port": 77,
+     "list_lat": -41.266667,
+     "list_lon": 173.266667,
+     "from": "station_list",
+     "replaced_because": "header position (-14.266666666666667, 173.26666666666668) is outside the NZ box"
+    },
+    "header_dropped": "station number, statistics (untrusted)"
+   },
+   "source": "linz",
+   "source_type": "official",
+   "quantity": "water_level",
+   "qc_status": "accepted"
+  },
+  {
+   "adapter": "A-LINZ",
+   "branch": "blitz/otc-adapters/A-LINZ",
+   "commit": "0c8fe30",
+   "source_record_id": "148MANAWATURIVER",
+   "provenance": {
+    "adapter_version": "1.0.0",
+    "input_sha256": [
+     "2f29c781fa4d715ec364ec6dbf3d4be03df234562c341844718857de6fbbb0c2",
+     "5f8853263de1e598278a260a6135c9b4ea1915e9a8d1e694a129e1dad372e4e9"
+    ],
+    "member": "148MANAWATURIVER-Harm_2006-2019.txt",
+    "position": {
+     "header_lat": -40.46666666666667,
+     "header_lon": 175.23333333333332,
+     "from": "header"
+    },
+    "header_dropped": "station number, statistics (untrusted)"
+   },
+   "source": "linz",
+   "source_type": "official",
+   "quantity": "water_level",
+   "qc_status": "accepted"
+  },
+  {
+   "adapter": "A-LINZ",
+   "branch": "blitz/otc-adapters/A-LINZ",
+   "commit": "0c8fe30",
+   "source_record_id": "210DARGAVILLE",
+   "provenance": {
+    "adapter_version": "1.0.0",
+    "input_sha256": [
+     "2f29c781fa4d715ec364ec6dbf3d4be03df234562c341844718857de6fbbb0c2",
+     "e7580b35b0677bdf647391e1e60f3470045a899b6fcac8f149eaeb5822f99d95",
+     "302c4e35a2609e32a9a7e007bb4ee60a19d62f62e51413f5b93ac51eea18a16d"
+    ],
+    "member": "210DARGAVILLE_Harm_2009-2023.txt",
+    "position": {
+     "header_lat": -36.93333333333333,
+     "header_lon": 173.86666666666667,
+     "list_port": 210,
+     "list_lat": -35.933333,
+     "list_lon": 173.866667,
+     "list_distance_km": 111.195,
+     "from": "station_list",
+     "replaced_because": "header position is 111.2 km from LINZ port 210 on the station list (> 5 km)"
+    },
+    "header_dropped": "station number, statistics (untrusted)"
+   },
+   "source": "linz",
+   "source_type": "official",
+   "quantity": "water_level",
+   "qc_status": "accepted"
+  },
+  {
+   "adapter": "A-LINZ",
+   "branch": "blitz/otc-adapters/A-LINZ",
+   "commit": "0c8fe30",
+   "source_record_id": "070AUCKLAND",
+   "provenance": {
+    "adapter_version": "1.0.0",
+    "input_sha256": [
+     "2f29c781fa4d715ec364ec6dbf3d4be03df234562c341844718857de6fbbb0c2",
+     "80bca63dba9a29b5b15c44f63151613136df7de6d2d4eb307e31a4bc2425401d"
+    ],
+    "member": "070AUCKLAND_Harm_2004-2025.txt",
+    "position": {
+     "header_lat": -36.85,
+     "header_lon": 174.76666666666668,
+     "list_port": 70,
+     "list_lat": -36.85,
+     "list_lon": 174.766667,
+     "from": "header",
+     "checked": false
+    },
+    "header_dropped": "station number, statistics (untrusted)"
+   },
+   "source": "linz",
+   "source_type": "official",
+   "quantity": "water_level",
+   "qc_status": "accepted"
+  },
+  {
+   "adapter": "A-LINZ",
+   "branch": "blitz/otc-adapters/A-LINZ",
+   "commit": "0c8fe30",
+   "source_record_id": "148MANAWATURIVER",
+   "provenance": {
+    "adapter_version": "1.0.0",
+    "input_sha256": [
+     "2f29c781fa4d715ec364ec6dbf3d4be03df234562c341844718857de6fbbb0c2",
+     "5f8853263de1e598278a260a6135c9b4ea1915e9a8d1e694a129e1dad372e4e9"
+    ],
+    "member": "148MANAWATURIVER-Harm_2006-2019.txt",
+    "position": {
+     "header_lat": -40.46666666666667,
+     "header_lon": 175.23333333333332,
+     "from": "header",
+     "checked": false
+    },
+    "header_dropped": "station number, statistics (untrusted)"
+   },
+   "source": "linz",
+   "source_type": "official",
+   "quantity": "water_level",
+   "qc_status": "accepted"
+  },
+  {
+   "adapter": "A-JMA-a",
+   "branch": "blitz/otc-adapters/A-JMA-a",
+   "commit": "b55fcbd",
+   "source_record_id": "OS",
+   "provenance": {
+    "adapter_version": "1",
+    "input_sha256": [
+     "4b533249ac62c40ecabca60a21d56bac9d15c52f15ac7814c5a0702e64c8e870",
+     "3ceb77deac64e7232ccf747c408708d44645182524784b54614ffbd24f269fbf"
+    ],
+    "owner": "jma",
+    "redistribution": "redistribute",
+    "phase_reference_longitude_deg": 135.432778,
+    "jma_station_code": "OS",
+    "analysis_years": {
+     "long_period": "2011-20",
+     "short_period": "2011-20"
+    },
+    "source_constituents_not_published": [
+     {
+      "source_name": "OQ2",
+      "speed_deg_per_hour": 27.3416964,
+      "amplitude_m": 0.0027,
+      "reason": "JMA OQ2 is 27.3416964 deg/h; the TCD's OQ2 is 27.3509801 and its twin OQ2-HORN is not a valid OTC constituent name"
+     }
+    ]
+   },
+   "source": "jma",
+   "source_type": "official",
+   "quantity": "water_level",
+   "qc_status": "accepted"
+  },
+  {
+   "adapter": "gesla",
+   "branch": "blitz/otc-adapters/A-JMA-a gesla_sets.py on the 20261008 fit documents",
+   "commit": "b55fcbd",
+   "source_record_id": "bergen-bgo-nor-nhs",
+   "provenance": {
+    "input_sha256": [
+     "f7d0cdae7e3e1fc8f16143cf12d7fb9d76fbf5a67a9f0138d49d51fb823686ec"
+    ],
+    "tcd_sha256": "33f97cb73ac25a0fec273950c0b85ff55ddbe7edf4448e80ea8d5b3d59b0aeb1"
+   },
+   "source": "gesla-fit",
+   "source_type": "gauge",
+   "quantity": "water_level",
+   "qc_status": "accepted"
+  }
+ ]
+}

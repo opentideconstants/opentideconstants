@@ -24,6 +24,8 @@ docs-label: LINZ
   <dd>56 New Zealand sites. About 39 of them are not in GESLA.</dd>
   <dt>Rank</dt>
   <dd>Official constants.</dd>
+  <dt>Provenance keys</dt>
+  <dd>Each LINZ set adds to its <code>provenance</code>: <code>member</code> (the <code>*_Harm_*</code> file in the zip), <code>header_dropped</code> (which header fields are not used, and why), and <code>position</code>: the header position (<code>header_lat</code>, <code>header_lon</code>; null when the header position cannot be read; the station list then gives the position), the station-list position when the port is listed (<code>list_port</code>, <code>list_lat</code>, <code>list_lon</code>, <code>list_distance_km</code>), where the published position comes from (<code>from</code>: <code>header</code> or <code>station_list</code>), <code>checked</code> (false when the check was not run), and <code>replaced_because</code> when the station list replaced the header. See <a href="/data-format/#fields">Data format</a>.</dd>
 </dl>
 
 <p><a href="/sources/">All sources and how they rank</a></p>

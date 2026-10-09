@@ -1,7 +1,8 @@
 // Downloads page: renders the release list from OTC_index.json on the data host, newest
 // first, one entry per release in the style of a GitHub release: the release stem and date,
 // what changed, and the files with their sizes and SHA-256 checksums.
-// Index entries carry: datestamp, created, format_version, doi, files (a list of
+// Index entries carry: datestamp, created, format_version, concept_doi, zenodo_version_doi
+// (null when the release has no Zenodo version of its own), files (a list of
 // { url, size, sha256 }, or an object keyed by file name), and optionally changes (a list of
 // short strings), source_versions ({ source: version }) and changelog_url.
 // Everything from the index is written with textContent; links must be http(s).
@@ -56,7 +57,12 @@
       const meta = el("p", "rel-meta");
       const bits = [day(r), r.format_version ? `format ${r.format_version}` : ""].filter(Boolean);
       meta.append(bits.join(" · "));
-      if (r.doi) { meta.append(bits.length ? " · " : "", link(`https://doi.org/${r.doi}`, `doi:${r.doi}`)); }
+      // The release's own Zenodo version DOI; without one, the concept DOI, labelled as such.
+      if (typeof r.zenodo_version_doi === "string") {
+        meta.append(bits.length ? " · " : "", link(`https://doi.org/${r.zenodo_version_doi}`, `doi:${r.zenodo_version_doi}`));
+      } else if (typeof r.concept_doi === "string") {
+        meta.append(bits.length ? " · " : "", link(`https://doi.org/${r.concept_doi}`, `concept doi:${r.concept_doi}`));
+      }
       art.append(meta);
 
       const changes = Array.isArray(r.changes) ? r.changes : [];
