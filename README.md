@@ -55,7 +55,7 @@ The SDKs are not published to the package registries. The `opentideconstants` pa
 
 Each snippet below opens the latest release, finds the reference stations within 25 km of a point, prints the M2 constituent of each station's recommended constant set, and prints the attribution text for those stations. The snippets were run against the SDK's conformance fixtures.
 
-The SDKs do not predict tides. They give you the constants; a tide predictor turns them into heights and times. [Tide Mechanics](https://opentideconstants.org/tide-mechanics/) shows how.
+The SDKs read a release and predict tides and currents from it. [Tide Mechanics](https://opentideconstants.org/tide-mechanics/) shows how the constants turn into a prediction.
 
 **Python**
 
