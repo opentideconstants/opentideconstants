@@ -4,6 +4,8 @@ Contributions are welcome from anyone. You do not need to write code to help: a 
 
 ## Ways to contribute
 
+[Not included](https://opentideconstants.org/not-included/) lists what OTC leaves out and why; each item has a link that opens a request.
+
 ### Report a data problem
 
 If a station has a wrong position, a wrong time base, or constants that do not match what you see, open an issue in the [issue tracker](https://github.com/opentideconstants/opentideconstants/issues). Include:

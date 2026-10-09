@@ -162,6 +162,8 @@ Every release publishes, for every station with an official reference, how well 
 
 Contributions are welcome from anyone. [CONTRIBUTING.md](CONTRIBUTING.md) lists the ways to help.
 
+[Not included](https://opentideconstants.org/not-included/) lists what OTC and its SDKs leave out, and why. To ask for one of them, use the [request form](https://github.com/opentideconstants/opentideconstants/issues/new?template=request.yml).
+
 Report a problem with a station, the data or the site in the [issue tracker](https://github.com/opentideconstants/opentideconstants/issues). For a station, include its `station_id`, the release date, and what you compared it with. Issues about the SDKs go to the [SDK issue tracker](https://github.com/opentideconstants/sdk/issues).
 
 ## Working on this repository
