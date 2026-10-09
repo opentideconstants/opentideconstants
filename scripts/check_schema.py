@@ -21,6 +21,7 @@ r"""Check the JSON Schema and the example document.
    a licence without commercial_use (or with a string), a non-commercial
    licence without restriction or terms_url, an empty or non-string
    restriction, a terms_url that is not a string or not a URI,
+   a record_span.start that is a date and not a date-time,
    a current set without current_bins (or with water-level constituents),
    current offsets without a reference bin, a mean current written as a
    constituent Z0 or as a string, and a value with a trailing
@@ -548,6 +549,8 @@ def with_nc_licence(d, **changes):
 must_fail("a licence without commercial_use", lambda d: d["licences"][0].pop("commercial_use", None))
 must_fail("commercial_use false without restriction", lambda d: with_nc_licence(d, restriction=None))
 must_fail("commercial_use false without terms_url", lambda d: with_nc_licence(d, terms_url=None))
+must_fail("a record_span.start that is not a date-time (2007-01-01)",
+          lambda d: first_set(d)["record_span"].__setitem__("start", "2007-01-01"))
 must_fail("commercial_use as the string \"false\", without restriction",
           lambda d: with_nc_licence(d, commercial_use="false", restriction=None))
 must_fail("an empty restriction", lambda d: with_nc_licence(d, restriction=""))
