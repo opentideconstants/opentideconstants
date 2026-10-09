@@ -1,5 +1,6 @@
-// Render the link-preview images and the PNG icons from the HTML/SVG below. The PNGs are
-// committed under src/assets/og/ and src/assets/icons/; run this again after a change here:
+// Render the link-preview images, the PNG icons and the SVG favicon from the HTML/SVG below.
+// The output is committed under src/assets/og/, src/assets/icons/ and src/assets/favicon.svg;
+// run this again after a change here:
 //   npx playwright install chromium   (once)
 //   node scripts/og-images.mjs
 // PLAYWRIGHT_PATH may point at a global install, e.g. "$(npm root -g)/playwright/index.mjs".
@@ -7,7 +8,7 @@
 // Mechanics image uses that page's fonts, from Google Fonts, so this needs the network.
 // Each preview is 1200x630, the size Open Graph and X recommend for a large card.
 const { chromium } = await import(process.env.PLAYWRIGHT_PATH ?? "playwright");
-import { readFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 
 const src = new URL("../src/", import.meta.url);
 const font = (file) => `url(data:font/woff2;base64,${readFileSync(new URL(`assets/fonts/${file}`, src)).toString("base64")}) format("woff2")`;
@@ -18,7 +19,9 @@ const siteFonts = `
 // The logo mark from the site header (src/layout.html), in the day palette.
 const INK = "oklch(0.2 0.02 260)";
 const ACCENT = "oklch(0.5 0.21 345)";
-const mark = (size, stroke = 1.6) => `<svg width="${size}" height="${size}" viewBox="0 0 22 22"><path d="M11 1 L21 11 L11 21 L1 11 Z" fill="none" stroke="${INK}" stroke-width="${stroke}"/><path d="M11 1 L21 11 L11 11 Z M11 21 L1 11 L11 11 Z" fill="${ACCENT}"/></svg>`;
+const MARK_OUTLINE = "M11 1 L21 11 L11 21 L1 11 Z";
+const MARK_FILL = "M11 1 L21 11 L11 11 Z M11 21 L1 11 L11 11 Z";
+const mark = (size, stroke = 1.6) => `<svg width="${size}" height="${size}" viewBox="0 0 22 22"><path d="${MARK_OUTLINE}" fill="none" stroke="${INK}" stroke-width="${stroke}"/><path d="${MARK_FILL}" fill="${ACCENT}"/></svg>`;
 
 // A polyline of f(t) over [t0, t1], mapped into a box.
 function curve(f, t0, t1, x0, x1, yMid, yScale, n = 400) {
@@ -118,6 +121,18 @@ function iconHtml(size) {
   return `<!DOCTYPE html><html><head><style>html, body { margin: 0; } body { width: ${size}px; height: ${size}px; background: #fff; display: grid; place-items: center; }</style></head>
 <body>${mark(size - 2 * pad, stroke)}</body></html>`;
 }
+
+// The SVG favicon: the same mark on a rounded tile, so it stands out on any tab bar. The tile
+// and colours follow the site's palettes (src/assets/tokens.css): day by default, night under
+// prefers-color-scheme: dark. The stroke is heavier than in the header so it holds at 16px.
+function faviconSvg() {
+  const BG_NIGHT = "oklch(0.15 0.005 250)";
+  const INK_NIGHT = "oklch(0.86 0.008 250)";
+  const ACCENT_NIGHT = "oklch(0.68 0.12 158)";
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-2 -2 26 26"><style>.t{fill:#fff}.o{stroke:${INK}}.a{fill:${ACCENT}}@media (prefers-color-scheme:dark){.t{fill:${BG_NIGHT}}.o{stroke:${INK_NIGHT}}.a{fill:${ACCENT_NIGHT}}}</style><rect class="t" x="-2" y="-2" width="26" height="26" rx="5"/><path class="o" d="${MARK_OUTLINE}" fill="none" stroke-width="2.4" stroke-linejoin="round"/><path class="a" d="${MARK_FILL}"/></svg>\n`;
+}
+writeFileSync(new URL("assets/favicon.svg", src), faviconSvg());
+console.log("wrote src/assets/favicon.svg");
 
 const targets = [
   { file: "assets/og/default.png", w: 1200, h: 630, html: defaultHtml() },
