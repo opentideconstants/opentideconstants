@@ -30,10 +30,16 @@ order: 5
 </ol>
 
 <h2 id="broken-records">Broken-record checks</h2>
-<p>A record is excluded, and listed with its numbers, when its main constituents are not stable from year to year or between the two halves of the span, when it does not correlate with a nearby gauge that correlates with its own neighbours, or when its values are quantised or out of range. The Hirtshals record (no tide in the input) is the reference case. The thresholds are calibrated on the data and published with each release.</p>
+<p>A broken record is never removed. It stays listed, and its set states what is wrong. The checks look for a datum step, a flat line, spikes, gaps, a clock step, quantised or out-of-range values, main constituents that are not stable from year to year or between the two halves of the span, and a record that does not correlate with a nearby gauge that correlates with its own neighbours. Each finding is listed with where it is and its numbers.</p>
+<ul>
+  <li>When part of the record is usable, the constants are fitted to that segment, and the set names the segment.</li>
+  <li>Constants are withheld only when no segment gives a usable fit. The set is then listed with <em>no constants fitted</em> and the reason. The Hirtshals record (no tide in the input) is the reference case.</li>
+  <li>A set with a broken record is flagged, so it is easy to find and to leave out.</li>
+</ul>
+<p>The thresholds are calibrated on the data and published with each release. The fields are on <a href="/data-format/#fields">Data format</a>.</p>
 
 <h2 id="selection">Record selection</h2>
-<p>When several records exist at one gauge, the build picks one by fixed rules, in this order: the most good data in the 19-year span; recent records before records that ended long ago; the gauge operator's own record before a re-distribution of it; instantaneous before averaged; sub-hourly before hourly; then the lowest file id. When two eligible records disagree beyond their uncertainty, the record with the lower error against an official reference is chosen. Every choice and its reason is recorded.</p>
+<p>When several records exist at one gauge, the build picks one by fixed rules, in this order: the most good data in the 19-year span; recent records before records that ended long ago; the gauge operator's own record before a re-distribution of it; instantaneous before averaged; sub-hourly before hourly; then the lowest file id. A short record never comes before a longer record that has constants, and a record with no constants is never chosen. When two eligible records disagree beyond their uncertainty, the record with the lower error against an official reference is chosen. Every choice and its reason is recorded.</p>
 
 <h2 id="constituents">Constituent selection</h2>
 <ol>
@@ -49,9 +55,9 @@ order: 5
 <p>A record is never removed for being short.</p>
 <ul>
   <li>The fit solves only the constituents that the record's own good data can resolve, by the record-length rule in <a href="#constituents">Constituent selection</a>.</li>
-  <li>Each short record notes its length, the constituents left out, and an expected-accuracy indicator. The indicator is measured on long records cut down to the same length.</li>
-  <li>A record with less than about 15 days of good data is kept and annotated <em>no constants fitted</em>.</li>
-  <li>In the combined dataset, a short record never outranks a longer or better record at the same station. See <a href="#selection">Record selection</a>.</li>
+  <li>Each short record is flagged and notes its length (hours of good data, and the span), each constituent left out with its reason (for example P1, which a 40-day record cannot separate from K1), and an expected-accuracy indicator: the expected amplitude and phase error, or the expected error of high- and low-water times and heights. The indicator is measured on long records cut down to the same length.</li>
+  <li>A record with less than about 15 days of good data is kept and annotated <em>no constants fitted</em>. It is still listed, with its length.</li>
+  <li>In the combined dataset, a short record never outranks a set at the same station that has constants and more hours of good data, and a set with no constants is never recommended. See <a href="#selection">Record selection</a>.</li>
 </ul>
 
 <h2 id="source-checks">Per-source convention check</h2>
