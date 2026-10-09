@@ -20,15 +20,18 @@
 //                        It is left out of the navigation and the sitemap; its body is ignored.)
 //   ---
 // The page body is inserted into src/layout.html. Placeholders: {{title}},
-// {{description}}, {{canonical_tag}}, {{nav}}, {{content}}, {{year}}, and any key of
+// {{description}}, {{canonical_tag}}, {{social_tags}}, {{nav}}, {{content}}, {{year}}, and any key of
 // src/site.json as {{site.<key>}} (also usable inside page bodies). {{page}} is the page name.
 // Every /assets/*.css and /assets/*.js URL in a page gets ?v=<hash of the file>, so a deploy
 // reaches visitors at once even though the host lets browsers cache assets for hours.
+// {{social_tags}} is the Open Graph and X card tags for link previews. The preview image is
+// src/assets/og/<page>.png when that file exists, else src/assets/og/default.png. Those PNGs
+// and the icons come from scripts/og-images.mjs; their URLs carry no hash, so they stay stable.
 // A page body can inline a file from src/partials/ with {{include <file>}} (used for SVG artwork).
 // Everything else under src/ (except pages/, partials/ and layout.html) is copied as is.
 
 import { createHash } from "node:crypto";
-import { readFileSync, writeFileSync, mkdirSync, rmSync, readdirSync, statSync, copyFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, rmSync, readdirSync, statSync, copyFileSync, existsSync } from "node:fs";
 import { join, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -102,6 +105,43 @@ function versionAssets(html) {
     if (!assetHash.has(name)) assetHash.set(name, createHash("sha256").update(readFileSync(join(src, "assets", name))).digest("hex").slice(0, 10));
     return `${attr}/assets/${name}?v=${assetHash.get(name)}"`;
   });
+}
+
+// Link previews (Open Graph, read by Slack, iMessage, LinkedIn, Discord, Facebook; and the
+// X card tags). The width and height come from the PNG header, so they match the file.
+const OG_ALT = {
+  default: "OpenTideConstants: open tide data, combined into one dataset.",
+  "tide-mechanics": "Tide Mechanics: five constituent waves (M2, S2, N2, K1, O1) and the tide that is their sum.",
+};
+function pngSize(file) {
+  const b = readFileSync(file);
+  if (b.toString("ascii", 12, 16) !== "IHDR") throw new Error(`${file}: not a PNG`);
+  return { width: b.readUInt32BE(16), height: b.readUInt32BE(20) };
+}
+const attr = (s) => String(s).replaceAll('"', "&quot;");
+function socialTags(page, title) {
+  const key = existsSync(join(src, "assets", "og", `${page.name}.png`)) ? page.name : "default";
+  if (!OG_ALT[key]) throw new Error(`assets/og/${key}.png: add its alt text to OG_ALT in build.mjs`);
+  const { width, height } = pngSize(join(src, "assets", "og", `${key}.png`));
+  const image = `${site.url}/assets/og/${key}.png`;
+  const tags = [
+    ["property", "og:type", page.name === "index" ? "website" : "article"],
+    ["property", "og:site_name", site.name],
+    ["property", "og:title", title],
+    ["property", "og:description", page.meta.description],
+    ...(page.name === "404" ? [] : [["property", "og:url", `${site.url}${page.path}`]]),
+    ["property", "og:image", image],
+    ["property", "og:image:width", width],
+    ["property", "og:image:height", height],
+    ["property", "og:image:alt", OG_ALT[key]],
+    ["property", "og:locale", "en_GB"],
+    ["name", "twitter:card", "summary_large_image"],
+    ["name", "twitter:title", title],
+    ["name", "twitter:description", page.meta.description],
+    ["name", "twitter:image", image],
+    ["name", "twitter:image:alt", OG_ALT[key]],
+  ];
+  return tags.map(([k, n, v]) => `<meta ${k}="${n}" content="${attr(v)}">`).join("\n  ");
 }
 
 function redirectPage(page) {
@@ -198,6 +238,7 @@ for (const page of pages) {
       .replaceAll("{{docs_toggle}}", page.meta.layout === "docs" ? '<button class="sidebar-toggle" type="button" aria-label="Documentation menu" aria-controls="docs-sidebar" aria-expanded="false">☰</button>' : "")
       .replaceAll("{{page}}", page.name)
       .replaceAll("{{nav}}", nav)
+      .replaceAll("{{social_tags}}", socialTags(page, page.name === "index" ? `${site.name}: open tidal harmonic constants` : page.meta.title))
       .replaceAll("{{title}}", page.name === "index" ? `${site.name}: open tidal harmonic constants` : `${page.meta.title} · ${site.name}`)
       .replaceAll("{{description}}", page.meta.description)
       .replaceAll("{{canonical_tag}}", page.name === "404" ? "<meta name=\"robots\" content=\"noindex\">" : `<link rel="canonical" href="${site.url}${page.path}">`)
