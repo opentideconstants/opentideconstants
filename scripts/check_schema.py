@@ -796,8 +796,14 @@ OTC_EPOCH = {"start": "2002-01-01", "end": "2020-12-31", "name": "OTC 2002-2020"
 LAT_WINDOW = {"start": "2020-01-01", "end": "2038-12-31", "name": "OTC LAT 2020-2038"}
 
 
+def unalias(obj):
+    """A copy with no shared sub-objects, so that a control that edits one basis in place cannot
+    also change another basis (copy.deepcopy keeps sharing)."""
+    return json.loads(json.dumps(obj))
+
+
 def noaa_published(name, **extra):
-    return dict({"kind": "published", "method": "source", "source_name": name}, **extra)
+    return unalias(dict({"kind": "published", "method": "source", "source_name": name}, **extra))
 
 
 # NOAA's ctrlStation is "id name", e.g. "8443970 Boston, MA"; source_id keeps the id. A primary
@@ -806,7 +812,7 @@ BOSTON_CONTROL = {"source_id": "8443970"}
 
 # A NOAA reference set modelled on a primary station: zero MLLW, published levels with no control
 # (lat and hat with no epoch: NOAA computes them over a 40-year window, currently 2000-2040, not
-# stated per station), and OTC's computed LAT and HAT next to NOAA's as otc_lat and otc_hat.
+# stated per station; a few stations still carry older values), and OTC's computed LAT and HAT next to NOAA's as otc_lat and otc_hat.
 NOAA_DATUM = {
     "msl_offset_m": 1.554,
     "zero": "chart_datum",
@@ -828,10 +834,10 @@ NOAA_DATUM = {
 
 
 def gesla_observed(**extra):
-    return dict({"kind": "observed", "method": "modified_range_ratio", "epoch": OTC_EPOCH,
+    return unalias({"kind": "observed", "method": "modified_range_ratio", "epoch": OTC_EPOCH,
                  "data_span": {"start": "2007-01-01", "end": "2025-12-31", "months": 214},
                  "control": {"station_id": "OTC-EXAMPLE-0001", "set_id": "OTC-EXAMPLE-0001/gesla-fit"},
-                 "uncertainty_m": 0.008, "uncertainty_basis": "calibrated"}, **extra)
+                 "uncertainty_m": 0.008, "uncertainty_basis": "calibrated", **extra})
 
 
 # A GESLA set reduced to the OTC epoch through a control station by the modified range ratio method.
@@ -937,6 +943,10 @@ GESLA_CD_DATUM = {
     "named": {"cd": 0.0},
     "basis": {"cd": {"kind": "published", "method": "source", "source_name": "Admiralty Chart Datum (ACD)"}},
 }
+
+for _name in ("NOAA_DATUM", "GESLA_OBSERVED_DATUM", "PRIMARY_DATUM", "SUBORDINATE_DATUM", "RWS_DATUM",
+              "KARTVERKET_DATUM", "SMHI_DATUM", "FMI_OLDER_DATUM", "GESLA_CD_DATUM"):
+    globals()[_name] = unalias(globals()[_name])
 
 datum_failures = []
 
@@ -1140,8 +1150,9 @@ def leaves(error):
         yield error
 
 
-def datum_error_paths(doc):
-    """The schema path of every leaf error of every datum in doc, relative to its container."""
+def datum_error_paths(doc, with_keys=False):
+    """The schema path of every leaf error of every datum in doc, relative to its container.
+    With with_keys, (path, basis key) pairs; the key is None for an error not inside one basis."""
     found = []
     for st in doc["stations"]:
         datums = [("constant_set", cs["datum"]) for cs in st.get("constant_sets", []) if "datum" in cs]
@@ -1149,8 +1160,27 @@ def datum_error_paths(doc):
             datums.append(("subordinate_offsets", st["subordinate_offsets"]["datum"]))
         for container, datum in datums:
             for error in container_validators[container].iter_errors(datum):
-                found += ["/".join(map(str, leaf.absolute_schema_path)) for leaf in leaves(error)]
-    return found
+                for leaf in leaves(error):
+                    where = list(leaf.absolute_path)
+                    key = where[1] if len(where) > 1 and where[0] == "basis" else None
+                    found.append(("/".join(map(str, leaf.absolute_schema_path)), key))
+    return found if with_keys else [path for path, _ in found]
+
+
+def datum_rule_problem(doc, rule):
+    """None when every leaf datum error is under rule and on at most one basis key; else why not.
+    One key: the controls change one basis each, so errors on other keys mean the control is
+    rejected by the same rule elsewhere (a mask the rule check alone cannot see)."""
+    found = datum_error_paths(doc, with_keys=True)
+    if not found:
+        return "no datum error"
+    other = [path for path, _ in found if not re.search(rule, path)]
+    if other:
+        return f"rejected by another rule: {other[:2]}"
+    keys = sorted({key for _, key in found if key is not None})
+    if len(keys) > 1:
+        return f"rejected on several basis keys: {keys}"
+    return None
 
 
 def datum_must_fail(label, mutate, rule=None):
@@ -1160,16 +1190,15 @@ def datum_must_fail(label, mutate, rule=None):
         datum_failures.append(f"must fail, was accepted: {label}")
         print(f"FAIL: must fail, was accepted: {label}")
         return
-    paths = datum_error_paths(doc)
     rule = rule or EXPECTED_RULES.get(label)
     if rule is None:
         datum_failures.append(f"must fail without a rule: {label}")
-        print(f"RULE? {label} :: {sorted(set(paths))}")
+        print(f"RULE? {label} :: {sorted(set(datum_error_paths(doc)))}")
         return
-    other = [p for p in paths if not re.search(rule, p)]
-    if not paths or other:
-        datum_failures.append(f"must fail, rejected by another rule: {label}")
-        print(f"FAIL: must fail, rejected by another rule: {label}: {other[:2] or 'no datum error'}")
+    why = datum_rule_problem(doc, rule)
+    if why:
+        datum_failures.append(f"must fail, {why}: {label}")
+        print(f"FAIL: must fail, {why}: {label}")
     else:
         print(f"ok: rejected {label}")
 
@@ -1245,9 +1274,9 @@ def on_subordinate(key, change):
     return f
 
 
-OBSERVED_228 = {"kind": "observed", "method": "first_reduction", "epoch": OTC_EPOCH,
-                "data_span": {"start": "2002-01-01", "end": "2020-12-31", "months": 228},
-                "uncertainty_m": 0.004, "uncertainty_basis": "propagated"}
+OBSERVED_228 = unalias({"kind": "observed", "method": "first_reduction", "epoch": OTC_EPOCH,
+                        "data_span": {"start": "2002-01-01", "end": "2020-12-31", "months": 228},
+                        "uncertainty_m": 0.004, "uncertainty_basis": "propagated"})
 
 
 
@@ -1413,7 +1442,14 @@ datum_must_pass("an otc_msl of kind observed next to a published msl",
                            first_set(d)["datum"]["basis"].__setitem__("otc_msl", copy.deepcopy(OBSERVED_228))])
 # A-F7 and round 2: by the direct method (with truncated_lows), only mhw and mhhw, by allow-list.
 DIRECT = {"method": "direct", "flags": ["truncated_lows"]}
-for key in ("mllw", "mlw", "mtl", "dtl", "msl", "lat", "hat", "mlws", "mhws", "mllws", "otc_lat", "otc_mllw", "lmsl"):
+# Every key but mhw and mhhw (and their otc_ forms): the canonical names, their otc_ forms, the
+# source names of build check 10, and a few that differ from mhw or mhhw by one part.
+HIGH_ONLY_REJECTED = (["lat", "hat", "msl", "mtl", "dtl", "mlw", "mllw"]
+                      + ["otc_" + k for k in ("lat", "hat", "msl", "mtl", "dtl", "mlw", "mllw")]
+                      + ["mhws", "mlws", "mhwn", "mlwn", "mllws", "stnd", "navd88", "nn2000", "nhn", "n2000",
+                         "rh2000", "dvr90", "mw", "cd", "tide_table_datum", "tp", "lmsl",
+                         "otc_otc_mhw", "mhw2", "xmhw", "mhhws", "otc_mhws"])
+for key in HIGH_ONLY_REJECTED:
     datum_must_fail(f"{key} by the direct method with truncated_lows",
                     lambda d, k=key: [put(gauge_a, GESLA_OBSERVED_DATUM)(d),
                                       gauge_a(d)["datum"]["named"].__setitem__(k, 0.5),
@@ -1532,9 +1568,6 @@ datum_must_fail("an own-month average of 11 months without short_record",
                 own_months("2024-01-01", "2024-11-30", 11), R_SHORT)
 datum_must_fail("mhw by modified_range_ratio with truncated_lows",
                 edit(observed_on_a, "mhw", set_flags("truncated_lows")), R_FLAG_DIRECT)
-datum_must_fail("a 19-year determination of mhw with truncated_lows",
-                lambda d: [put(first_set, PRIMARY_DATUM)(d), first_set(d)["datum"]["basis"]["mhw"].__setitem__("flags", ["truncated_lows"])],
-                R_FLAG_DIRECT)
 datum_must_fail("a comparison of 214 months with short_record", edit(observed_on_a, "msl", set_flags("short_record")), R_SHORT)
 datum_must_fail("a 19-year determination with short_record",
                 lambda d: [put(first_set, PRIMARY_DATUM)(d), first_set(d)["datum"]["basis"]["msl"].__setitem__("flags", ["short_record"])],
@@ -1556,6 +1589,48 @@ datum_must_fail("a published control with station_id and set_id (comparison styl
 datum_must_pass("a subordinate's published level with no control",
                 on_subordinate("mllw", lambda b: b.pop("control")))
 
+# --- PR #47 review round 3 ---------------------------------------------------------------------
+
+# The empty-paths guard: a document rejected only outside every datum is not a datum control.
+_outside = copy.deepcopy(example)
+station(_outside, "OTC-EXAMPLE-0001").pop("timezone")
+if not problems(_outside) or datum_rule_problem(_outside, R_DEP) != "no datum error":
+    datum_failures.append("the which-rule check accepts a document rejected outside every datum")
+    print("FAIL: the which-rule check accepts a document rejected outside every datum")
+else:
+    print("ok: the which-rule check reports a document rejected outside every datum")
+
+# Orchestrator decision 2026-10-09 (PR #47 round 3, A-F1): truncated_lows also goes with a first
+# reduction (own-month or 19-year); with the flag, only mhw and mhhw (and otc_ forms).
+OWN_MONTH_MHW = {"msl_offset_m": 1.1, "zero": "gauge_zero", "named": {"mhw": 1.8, "mhhw": 1.9},
+                 "basis": {k: {"kind": "observed", "method": "first_reduction",
+                               "epoch": {"start": "2023-01-01", "end": "2024-12-31"},
+                               "data_span": {"start": "2023-01-01", "end": "2024-12-31", "months": 24},
+                               "uncertainty_m": 0.03, "uncertainty_basis": "calibrated",
+                               "flags": ["no_qualified_control", "truncated_lows"]} for k in ("mhw", "mhhw")}}
+datum_must_pass("a 19-year determination of mhw with truncated_lows",
+                lambda d: [put(first_set, PRIMARY_DATUM)(d), first_set(d)["datum"]["basis"]["mhw"].__setitem__("flags", ["truncated_lows"])])
+datum_must_pass("own-month averages of mhw and mhhw with truncated_lows", put(gauge_a, OWN_MONTH_MHW))
+datum_must_pass("a 19-year determination of mhhw with truncated_lows",
+                lambda d: [put(first_set, PRIMARY_DATUM)(d), first_set(d)["datum"]["basis"]["mhhw"].__setitem__("flags", ["truncated_lows"])])
+datum_must_fail("an own-month average of mlw with truncated_lows",
+                lambda d: [put(gauge_a, OWN_MONTH_MHW)(d), gauge_a(d)["datum"]["named"].__setitem__("mlw", 0.4),
+                           gauge_a(d)["datum"]["basis"].__setitem__("mlw", copy.deepcopy(OWN_MONTH_MHW["basis"]["mhw"]))],
+                R_HIGH_ONLY)
+for key in ("mlw", "mllw", "msl", "mtl", "dtl", "otc_mlw"):
+    datum_must_fail(f"a 19-year determination of {key} with truncated_lows",
+                    lambda d, k=key: [put(first_set, PRIMARY_DATUM)(d),
+                                      first_set(d)["datum"]["named"].__setitem__(k, 0.5),
+                                      first_set(d)["datum"]["basis"].__setitem__(k, dict(copy.deepcopy(OBSERVED_228), flags=["truncated_lows"]))],
+                    R_HIGH_ONLY)
+datum_must_fail("an own-month average of msl with truncated_lows",
+                own_months("2023-01-01", "2024-12-31", 24, flags=("no_qualified_control", "truncated_lows")), R_HIGH_ONLY)
+# Reviewer C round 3: no_qualified_control with each comparison method.
+datum_must_fail("no_qualified_control on a comparison (method standard)",
+                edit(observed_on_a, "msl", lambda b: b.update(method="standard", flags=["no_qualified_control"])), R_OWN_MONTH)
+datum_must_fail("no_qualified_control on a comparison (method direct)",
+                edit(observed_on_a, "mhw", lambda b: b.update(method="direct", flags=["truncated_lows", "no_qualified_control"])), R_OWN_MONTH)
+
 # Build checks 9-14 of the schema's description: valid JSON Schema on purpose, the release build stops them.
 datum_left_to_build("named and basis with different keys (check 9)",
                     lambda d: noaa_on_first(d)["basis"].pop("hat"))
@@ -1576,6 +1651,22 @@ datum_left_to_build("an own-month average with a primary's coverage (228 months 
 datum_left_to_build("an own-month average of 13 months, not whole years (check 14)", own_months("2024-01-01", "2025-01-31", 13))
 datum_left_to_build("a data_span of 300 months over 19 years (check 14)",
                     edit(observed_on_a, "msl", lambda b: b["data_span"].__setitem__("months", 300)))
+def high_only_primary(d):
+    """The control 0001/gesla-fit holds a truncated primary: only MHW and MHHW."""
+    put(first_set, PRIMARY_DATUM)(d)
+    datum = first_set(d)["datum"]
+    for k in [k for k in datum["named"] if k not in ("mhw", "mhhw")]:
+        datum["named"].pop(k)
+        datum["basis"].pop(k)
+    for k in ("mhw", "mhhw"):
+        datum["basis"][k]["flags"] = ["truncated_lows"]
+
+
+datum_left_to_build("a modified_range_ratio comparison whose control's primary has only MHW and MHHW (check 11)",
+                    lambda d: [high_only_primary(d), observed_on_a(d)])
+datum_left_to_build("a standard comparison whose control's primary has only MHW and MHHW (check 11)",
+                    lambda d: [high_only_primary(d), observed_on_a(d),
+                               [b.__setitem__("method", "standard") for b in gauge_a(d)["datum"]["basis"].values()]])
 datum_left_to_build("a data_span with end before start (check 13)",
                     edit(observed_on_a, "msl", lambda b: b["data_span"].update(start="2025-12-31", end="2007-01-01")))
 datum_left_to_build("an own-month average whose epoch is not its data_span (check 14)",
@@ -1607,7 +1698,7 @@ for label, station_id, set_suffix, block in (
         ("the Kartverket set with a basis", "OTC-EXAMPLE-0001", "kartverket", KARTVERKET_DATUM),
         ("the SMHI set in RH 2000", "OTC-EXAMPLE-0009", "smhi", SMHI_DATUM),
         ("the FMI set with the older chart datum mw", "OTC-EXAMPLE-0010", "fmi", FMI_OLDER_DATUM),
-        ("the GESLA record whose zero is the chart datum", "OTC-EXAMPLE-0005", "gesla-fit-b", GESLA_CD_DATUM)):
+        ("the UK GESLA record on Admiralty Chart Datum", "OTC-EXAMPLE-0011", "gesla-fit", GESLA_CD_DATUM)):
     if example_datum(station_id, set_suffix) != block:
         datum_failures.append(f"example.json does not show {label}")
         print(f"FAIL: example.json does not show {label} ({station_id})")
