@@ -35,9 +35,11 @@ r"""Check the JSON Schema and the example document.
    final newline; ECMA-262 does not. The schema ends every pattern with
    $(?![\s\S]) so both reject it.
 6. Datums: every named level has a basis (published, computed or observed)
-   whose fields match its kind and method. example.json holds one of each
-   must-pass datum shape, and the script checks that those blocks equal the
-   controls' blocks.
+   whose fields match its kind and method. example.json holds one block for
+   each valid datum shape of the format; the script checks that each block
+   equals the copy here and that every datum in the example is compared.
+   Most copies also drive must-pass controls; the others are valid because
+   the whole example validates and each is also run as a must-pass.
    Datum checks that only the release build can make (checks 9-14 of the
    schema's description) are left to it on purpose. Each must-fail
    datum control names the rule that rejects it, and the script checks
@@ -788,8 +790,9 @@ must_pass("tool_versions with ordinary names (python, uv, numpy)",
 
 
 # --- datums: named levels with a basis (published, computed, observed) ---------------------------
-# Every must-pass datum shape is also in example.json, and this section checks that those blocks
-# equal the ones below, so the example and the controls cannot drift apart. Every failure in this section is
+# example.json holds one block for each valid datum shape; this section checks that each block
+# equals its copy here and that every datum in the example has a copy, so neither side can change
+# alone. Every failure in this section is
 # printed before the script stops, so a run shows the whole picture.
 
 NTDE = {"start": "1983-01-01", "end": "2001-12-31", "name": "NTDE 1983-2001"}
@@ -1030,7 +1033,7 @@ def either(*rules):
 # has its own single-rule control elsewhere, or removing it changes nothing because the other rule
 # of the pair always rejects the same documents.
 EXPECTED_RULES = {
-    "named without basis (the PR #45 shape: zero, chart_datum and named only)": R_DEP,
+    "named without basis (the shape of the earlier 1.0 schema: zero, chart_datum and named only)": R_DEP,
     "named without basis": R_DEP,
     "basis without named": R_DEP,
     "subordinate_offsets.datum named without basis": R_DEP,
@@ -1347,7 +1350,7 @@ datum_must_pass("a short own-month reduction (under 12 months, short_record)",
 datum_must_pass("datum.zero vertical_datum", lambda d: first_set(d)["datum"].__setitem__("zero", "vertical_datum"))
 
 # Must fail: each one change from a block that passes.
-datum_must_fail("named without basis (the PR #45 shape: zero, chart_datum and named only)",
+datum_must_fail("named without basis (the shape of the earlier 1.0 schema: zero, chart_datum and named only)",
                 put(first_set, {"zero": "chart_datum", "chart_datum": "mllw", "named": {"mllw": 0.0, "msl": 1.554}}))
 datum_must_fail("named without basis", lambda d: noaa_on_first(d).pop("basis"))
 datum_must_fail("basis without named", lambda d: noaa_on_first(d).pop("named"))
@@ -1888,16 +1891,19 @@ datum_left_to_build("a 19-year determination whose data_span is outside the epoc
 datum_left_to_build("an otc_lat with kind computed and no published lat (check 10)",
                     lambda d: [noaa_on_first(d)["named"].pop("lat"), first_set(d)["datum"]["basis"].pop("lat")])
 
-# The spec's other must-pass shapes, each in its own set of example.json (each truncated_lows case
-# alone in its set's datum, with no computed or observed level beside it but mhw, mhhw and hat).
+# More valid datum shapes, each in its own set of example.json (each truncated_lows case alone in its
+# set's datum, with no computed or observed level beside it but mhw, mhhw and hat). The example's
+# stations make each choice of method and control hold: a comparison has a control of its tide class
+# within 250 km, and a no_qualified_control set has none.
 EX_CONTROL = {"station_id": "OTC-EXAMPLE-0001", "set_id": "OTC-EXAMPLE-0001/gesla-fit"}
+EX_CONTROL_MIXED = {"station_id": "OTC-EXAMPLE-0015", "set_id": "OTC-EXAMPLE-0015/gesla-fit"}
 
 
-def observed(method, start, end, months, epoch=None, flags=None, **extra):
+def observed(method, start, end, months, epoch=None, flags=None, control=EX_CONTROL, **extra):
     b = {"kind": "observed", "method": method, "epoch": epoch or {"start": start, "end": end},
          "data_span": {"start": start, "end": end, "months": months}}
     if method in ("standard", "modified_range_ratio", "direct"):
-        b["control"] = dict(EX_CONTROL)
+        b["control"] = dict(control)
     b.update(uncertainty_m=0.02, uncertainty_basis="calibrated")
     if flags:
         b["flags"] = list(flags)
@@ -1907,9 +1913,6 @@ def observed(method, start, end, months, epoch=None, flags=None, **extra):
 
 EX_DIRECT_MHW = unalias({"msl_offset_m": 1.2, "zero": "gauge_zero", "named": {"mhw": 1.95},
                          "basis": {"mhw": observed("direct", "2023-01-01", "2024-12-31", 24, epoch=OTC_EPOCH, flags=["truncated_lows"])}})
-EX_OWN_MONTH_2015 = unalias({"msl_offset_m": 1.2, "zero": "gauge_zero", "named": {"mhw": 1.94},
-                             "basis": {"mhw": observed("first_reduction", "2015-01-01", "2015-12-31", 12,
-                                                       flags=["no_qualified_control", "truncated_lows"])}})
 EX_MHHW_19 = unalias({"msl_offset_m": 1.2, "zero": "gauge_zero", "named": {"mhhw": 2.01},
                       "basis": {"mhhw": observed("first_reduction", "2002-01-01", "2020-12-31", 228, epoch=OTC_EPOCH,
                                                  flags=["truncated_lows"], uncertainty_basis="propagated")}})
@@ -1922,32 +1925,43 @@ EX_CD = unalias({"msl_offset_m": 1.2, "zero": "chart_datum", "zero_name": "CD", 
                  "named": {"cd": 0.0, "mhw": 1.95},
                  "basis": {"cd": {"kind": "published", "method": "source", "source_name": "Chart Datum (CD)"},
                            "mhw": observed("direct", "2023-01-01", "2024-12-31", 24, epoch=OTC_EPOCH, flags=["truncated_lows"])}})
-EX_NQC_7 = unalias({"msl_offset_m": 1.2, "zero": "gauge_zero", "named": {"msl": 1.21},
-                    "basis": {"msl": observed("first_reduction", "2024-01-01", "2024-07-31", 7,
-                                              flags=["no_qualified_control", "short_record"], uncertainty_m=0.06)}})
-EX_STANDARD_6 = unalias({"msl_offset_m": 1.2, "zero": "gauge_zero", "named": {"msl": 1.2},
-                         "basis": {"msl": observed("standard", "2024-01-01", "2024-06-30", 6, epoch=OTC_EPOCH,
-                                                   flags=["short_record"], uncertainty_m=0.03)}})
 EX_NQC_228 = unalias({"msl_offset_m": 1.15, "zero": "gauge_zero", "named": {"msl": 1.14},
                       "basis": {"msl": observed("first_reduction", "1950-01-01", "1968-12-31", 228,
                                                 flags=["no_qualified_control"], uncertainty_m=0.03)}})
+EX_OWN_MONTH_2015 = unalias({"msl_offset_m": 1.2, "zero": "gauge_zero", "named": {"mhw": 1.94},
+                             "basis": {"mhw": observed("first_reduction", "2015-01-01", "2015-12-31", 12,
+                                                       flags=["no_qualified_control", "truncated_lows"])}})
+EX_NQC_7 = unalias({"msl_offset_m": 1.2, "zero": "gauge_zero", "named": {"msl": 1.21},
+                    "basis": {"msl": observed("first_reduction", "2024-01-01", "2024-07-31", 7,
+                                              flags=["no_qualified_control", "short_record"], uncertainty_m=0.06)}})
+MIXED_KEYS = ("mhhw", "mhw", "dtl", "mtl", "msl", "mlw", "mllw")
+EX_MIXED_PRIMARY = unalias({"msl_offset_m": 1.3, "zero": "gauge_zero",
+                            "named": {"mhhw": 2.15, "mhw": 1.98, "dtl": 1.3, "mtl": 1.3, "msl": 1.31, "mlw": 0.62, "mllw": 0.45},
+                            "basis": {k: observed("first_reduction", "2002-01-01", "2020-12-31", 228, epoch=OTC_EPOCH,
+                                                  uncertainty_m=0.004, uncertainty_basis="propagated") for k in MIXED_KEYS}})
+EX_STANDARD_6 = unalias({"msl_offset_m": 1.25, "zero": "gauge_zero", "named": {"msl": 1.26},
+                         "basis": {"msl": observed("standard", "2024-01-01", "2024-06-30", 6, epoch=OTC_EPOCH,
+                                                   flags=["short_record"], uncertainty_m=0.03, control=EX_CONTROL_MIXED)}})
 EX_MSL_TIME_BASE = unalias({"msl_offset_m": 1.05, "zero": "gauge_zero", "named": {"msl": 1.06},
-                            "basis": {"msl": observed("modified_range_ratio", "2002-01-01", "2006-04-30", 52, epoch=OTC_EPOCH,
-                                                      flags=["time_base_unverified", "segment"])}})
+                            "basis": {"msl": observed("modified_range_ratio", "2002-01-01", "2006-04-30", 47, epoch=OTC_EPOCH,
+                                                      flags=["time_base_unverified", "gaps", "segment"])}})
 EXAMPLE_ONLY_BLOCKS = (
     ("an mhw by the direct method with truncated_lows", "OTC-EXAMPLE-0012", "gesla-fit-a", EX_DIRECT_MHW),
-    ("an mhw own-month first reduction of 12 months (2015) with no_qualified_control and truncated_lows", "OTC-EXAMPLE-0012", "gesla-fit-b", EX_OWN_MONTH_2015),
-    ("an mhhw 19-year first reduction with truncated_lows", "OTC-EXAMPLE-0012", "gesla-fit-c", EX_MHHW_19),
-    ("a truncated mhw and mhhw with a computed hat", "OTC-EXAMPLE-0012", "gesla-fit-d", EX_HAT),
-    ("a truncated mhw with a published cd = 0 as chart_datum", "OTC-EXAMPLE-0012", "gesla-fit-e", EX_CD),
-    ("a no_qualified_control first reduction of 7 months with short_record", "OTC-EXAMPLE-0012", "gesla-fit-f", EX_NQC_7),
-    ("a 6-month standard comparison with short_record", "OTC-EXAMPLE-0012", "gesla-fit-g", EX_STANDARD_6),
-    ("a no_qualified_control first reduction of exactly 228 months", "OTC-EXAMPLE-0012", "gesla-fit-h", EX_NQC_228),
+    ("an mhhw 19-year first reduction with truncated_lows", "OTC-EXAMPLE-0012", "gesla-fit-b", EX_MHHW_19),
+    ("a truncated mhw and mhhw with a computed hat", "OTC-EXAMPLE-0012", "gesla-fit-c", EX_HAT),
+    ("a truncated mhw with a published cd = 0 as chart_datum", "OTC-EXAMPLE-0012", "gesla-fit-d", EX_CD),
+    ("a no_qualified_control first reduction of exactly 228 months", "OTC-EXAMPLE-0012", "gesla-fit-e", EX_NQC_228),
+    ("an mhw own-month first reduction of 12 months (2015) with no_qualified_control and truncated_lows", "OTC-EXAMPLE-0014", "gesla-fit-a", EX_OWN_MONTH_2015),
+    ("a no_qualified_control first reduction of 7 months with short_record", "OTC-EXAMPLE-0014", "gesla-fit-b", EX_NQC_7),
+    ("a 19-year determination at a mixed-tide station (the control of the standard comparison)", "OTC-EXAMPLE-0015", "gesla-fit", EX_MIXED_PRIMARY),
+    ("a 6-month standard comparison with short_record", "OTC-EXAMPLE-0016", "gesla-fit", EX_STANDARD_6),
     ("an observed msl with time_base_unverified and no sampling_assumed", "OTC-EXAMPLE-0005", "gesla-fit-b", EX_MSL_TIME_BASE),
-    ("the PEGELONLINE-shape datum: published MThw and MTnw, an observed otc_mhw with truncated_lows", "OTC-EXAMPLE-0013", "pegelonline", "PEGEL_TRUNCATED"),
+    ("the PEGELONLINE-shape datum: published MThw and MTnw, an observed otc_mhw with truncated_lows", "OTC-EXAMPLE-0013", "pegelonline", PEGEL_TRUNCATED),
 )
+for label, _, _, block in EXAMPLE_ONLY_BLOCKS:
+    datum_must_pass(f"the example block: {label}", put(gauge_a, block))
 
-# example.json shows each must-pass block, unchanged.
+# example.json holds each block below, unchanged, and holds no datum that is not in this list.
 def example_datum(station_id, set_suffix=None):
     st = next((s for s in example["stations"] if s["station_id"] == station_id), None)
     if st is None:
@@ -1958,23 +1972,37 @@ def example_datum(station_id, set_suffix=None):
     return cs and cs.get("datum")
 
 
-for label, station_id, set_suffix, block in (
-        ("the NOAA-style set", "OTC-EXAMPLE-0006", "noaa", NOAA_DATUM),
-        ("the subordinate station's offsets datum", "OTC-EXAMPLE-0007", None, SUBORDINATE_DATUM),
-        ("the RWS set with zero NAP", "OTC-EXAMPLE-0008", "rws", RWS_DATUM),
-        ("the GESLA set with observed levels", "OTC-EXAMPLE-0005", "gesla-fit-a", GESLA_OBSERVED_DATUM),
-        ("the primary determination", "OTC-EXAMPLE-0001", "gesla-fit", PRIMARY_DATUM),
-        ("the Kartverket set with a basis", "OTC-EXAMPLE-0001", "kartverket", KARTVERKET_DATUM),
-        ("the SMHI set in RH 2000", "OTC-EXAMPLE-0009", "smhi", SMHI_DATUM),
-        ("the FMI set with the older chart datum mw", "OTC-EXAMPLE-0010", "fmi", FMI_OLDER_DATUM),
-        ("the UK GESLA record on Admiralty Chart Datum", "OTC-EXAMPLE-0011", "gesla-fit", GESLA_CD_DATUM),
-        *[(label, sid, suffix, PEGEL_TRUNCATED if block == "PEGEL_TRUNCATED" else block)
-          for label, sid, suffix, block in EXAMPLE_ONLY_BLOCKS]):
+COMPARED_BLOCKS = (
+    ("the NOAA-style set", "OTC-EXAMPLE-0006", "noaa", NOAA_DATUM),
+    ("the subordinate station's offsets datum", "OTC-EXAMPLE-0007", None, SUBORDINATE_DATUM),
+    ("the RWS set with zero NAP", "OTC-EXAMPLE-0008", "rws", RWS_DATUM),
+    ("the GESLA set with observed levels", "OTC-EXAMPLE-0005", "gesla-fit-a", GESLA_OBSERVED_DATUM),
+    ("the primary determination", "OTC-EXAMPLE-0001", "gesla-fit", PRIMARY_DATUM),
+    ("the Kartverket set with a basis", "OTC-EXAMPLE-0001", "kartverket", KARTVERKET_DATUM),
+    ("the SMHI set in RH 2000", "OTC-EXAMPLE-0009", "smhi", SMHI_DATUM),
+    ("the FMI set with the older chart datum mw", "OTC-EXAMPLE-0010", "fmi", FMI_OLDER_DATUM),
+    ("the UK GESLA record on Admiralty Chart Datum", "OTC-EXAMPLE-0011", "gesla-fit", GESLA_CD_DATUM),
+) + EXAMPLE_ONLY_BLOCKS
+for label, station_id, set_suffix, block in COMPARED_BLOCKS:
     if example_datum(station_id, set_suffix) != block:
         datum_failures.append(f"example.json does not show {label}")
         print(f"FAIL: example.json does not show {label} ({station_id})")
     else:
         print(f"ok: example.json shows {label}")
+compared = {(station_id, set_suffix) for _, station_id, set_suffix, _ in COMPARED_BLOCKS}
+in_example = set()
+for st in example["stations"]:
+    for cs in st.get("constant_sets", []):
+        if "datum" in cs:
+            in_example.add((st["station_id"], cs["set_id"].split("/", 1)[1]))
+    if "datum" in st.get("subordinate_offsets", {}):
+        in_example.add((st["station_id"], None))
+uncompared = sorted(in_example - compared, key=str)
+if uncompared:
+    datum_failures.append(f"example.json has datums that no entry compares: {uncompared}")
+    print(f"FAIL: example.json has datums that no entry compares: {uncompared}")
+else:
+    print(f"ok: every one of the {len(in_example)} datums in example.json is compared")
 
 if datum_failures:
     print(f"FAIL: {len(datum_failures)} datum checks failed")
