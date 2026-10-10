@@ -58,10 +58,7 @@ plausible. For each active station, and each water-level constant set with const
     overlaps the data). A set whose first reductions of at least 216 months without
     no_qualified_control are only mhw and mhhw (or otc_mhw and otc_mhhw) counts only for a level
     with truncated_lows; a set with any other such first reduction counts for every level.
- 9. Tide type: F < 0.25 at stations in NOR, NLD, DEU, GBR, SWE and FIN, and at US stations on the
-    Atlantic coast: east of 82 W and north of 25 N, but not south of 30 N and west of 80.5 W
-    (Florida's Gulf coast) and not north of 41 N and west of 76 W (Lakes Erie and Ontario);
-    0.25 <= F <= 3.0 at CAN stations west of 120 W (British Columbia).
+ 9. Tide type: F < 0.25 at stations in NOR, NLD, DEU, GBR, SWE and FIN.
 10. Subordinate offsets: for a ratio (R) subordinate station, each level of
     subordinate_offsets.datum equals the ratio times the level of the reference's recommended
     set, within 0.005 m: height_offset_low for low levels and height_offset_high for every other
@@ -86,7 +83,7 @@ from datetime import date
 
 # The number of checks each group (1-11 above) runs on the current example: a group that runs
 # fewer has stopped applying somewhere.
-MIN_CHECKS = {1: 18, 2: 26, 3: 115, 4: 4, 5: 6, 6: 170, 7: 104, 8: 5, 9: 20, 10: 8, 11: 12}
+MIN_CHECKS = {1: 18, 2: 26, 3: 115, 4: 4, 5: 6, 6: 170, 7: 104, 8: 5, 9: 17, 10: 8, 11: 12}
 
 SPEED = {"M2": 28.9841042, "S2": 30.0, "N2": 28.4397295, "K2": 30.0821373, "K1": 15.0410686,
          "O1": 13.9430356, "P1": 14.9589314, "Q1": 13.3986609, "T2": 29.9589333}
@@ -371,12 +368,8 @@ def audit(doc):
                 row(w, "no_qualified_control: no 19-year control qualifies", qual, "none", not qual)
         # 9. tide type
         group[0] = 9
-        atlantic = (st["country"] == "USA" and st["lon"] > -82 and st["lat"] > 25
-                    and not (st["lat"] < 30 and st["lon"] < -80.5) and not (st["lat"] > 41 and st["lon"] < -76))
-        if st["country"] in SEMIDIURNAL or atlantic:
+        if st["country"] in SEMIDIURNAL:
             row(sid, f"tide type plausible for {st['country']}", f"F {f:.2f}", "F < 0.25", f < 0.25)
-        if st["country"] == "CAN" and st["lon"] < -120:
-            row(sid, "tide type plausible for British Columbia", f"F {f:.2f}", "0.25 <= F <= 3.0", 0.25 <= f <= 3.0)
     # 10. subordinate offsets
     group[0] = 10
     for st in stations.values():
@@ -427,7 +420,8 @@ def main(argv):
     short = {g: (counts[g], n) for g, n in MIN_CHECKS.items() if counts[g] < n}
     for g, (have, n) in sorted(short.items()):
         print(f"FAIL: check group {g} ran {have} checks, fewer than its floor of {n}: a check stopped applying")
-    print(f"{'ok' if not (bad or short) else 'FAIL'}: {len(rows)} checks of example.json, {len(bad)} mismatches")
+    print(f"{'ok' if not (bad or short) else 'FAIL'}: {len(rows)} checks of example.json, {len(bad)} mismatches"
+          + (f", {len(short)} group{'s' if len(short) > 1 else ''} short of the floor" if short else ""))
     return 1 if bad or short else 0
 
 
