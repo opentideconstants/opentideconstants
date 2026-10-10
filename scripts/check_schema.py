@@ -1695,6 +1695,13 @@ for key in LOW_WATER_KEYS + ["otc_" + k for k in LOW_WATER_KEYS]:
                     lambda d, k=key: [put(gauge_a, GESLA_HIGH_DATUM)(d), gauge_a(d)["datum"]["named"].__setitem__(k, 0.4),
                                       gauge_a(d)["datum"]["basis"].__setitem__(k, gesla_observed())],
                     R_TRUNCATED_DATUM)
+# Keys that differ between named and basis are build check 9, so each half of the rule gets its own control.
+datum_must_fail("mlw in basis only (not in named) next to a truncated mhw in one datum",
+                lambda d: [put(gauge_a, GESLA_HIGH_DATUM)(d), gauge_a(d)["datum"]["basis"].__setitem__("mlw", gesla_observed())],
+                R_TRUNCATED_DATUM)
+datum_must_fail("mlw in named only (not in basis) next to a truncated mhw in one datum",
+                lambda d: [put(gauge_a, GESLA_HIGH_DATUM)(d), gauge_a(d)["datum"]["named"].__setitem__("mlw", 0.4)],
+                R_TRUNCATED_DATUM)
 datum_must_fail("a computed lat next to a truncated 19-year mhw in one datum",
                 lambda d: [put(first_set, PRIMARY_DATUM)(d),
                            [first_set(d)["datum"][part].pop(k) for k in ("mtl", "dtl", "msl", "mlw", "mllw") for part in ("named", "basis")],
