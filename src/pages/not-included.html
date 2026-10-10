@@ -57,5 +57,9 @@ order: 9
 <p>Harmonic constants describe the astronomical tide only, so these are not requests that OTC can take.</p>
 <ul>
   <li><strong>Storm surge, wind set-up, river flow, seiches and ice.</strong> They do not repeat with astronomy, so they stay in the residual. See <a href="/tide-mechanics/#s7">What it applies to</a> in Tide Mechanics.</li>
-  <li><strong>Heights above a datum that neither the source nor OTC gives</strong>, such as a geoid. A prediction gives heights only above a level that the constant set or the subordinate station's offsets list.</li>
+</ul>
+
+<h2 id="datum-ties">Outside what the sources tie</h2>
+<ul>
+  <li><strong>Heights above a datum that no source of the set ties it to</strong>, such as a geoid model. A prediction gives heights only above a level that the constant set or the subordinate station's offsets list, and those include the height systems a source ties its levels to, such as NOAA's NAVD88 or Kartverket's NN2000.</li>
 </ul>

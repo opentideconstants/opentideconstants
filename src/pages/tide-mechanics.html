@@ -10,7 +10,7 @@ layout: full
 <div class="top">
   <div class="kicker">OpenTideConstants · field guide</div>
   <h1>Tide Mechanics</h1>
-  <p class="lede">How a few numbers per station turn into a tide prediction, and which of those numbers OTC owns.</p>
+  <p class="lede">How a few numbers per station (per constant set) turn into a tide prediction, and which of those numbers OTC owns.</p>
   <ol class="toc">
     <li><a href="#s1">1 Sum of waves</a></li><li><a href="#s2">2 Constituents</a></li><li><a href="#s3">3 The formula</a></li>
     <li><a href="#s4">4 Phase and time base</a></li><li><a href="#s5">5 Analysis</a></li><li><a href="#s6">6 Record length</a></li>
@@ -64,7 +64,7 @@ layout: full
     <span>·cos(</span><button class="t" type="button" data-term="w" data-owner="fix" aria-pressed="false">ω</button><span>t + </span><button class="t" type="button" data-term="v0" data-owner="pred" aria-pressed="false">V<sub>0</sub></button>
     <span> + </span><button class="t" type="button" data-term="u" data-owner="pred" aria-pressed="false">u</button><span> − </span><button class="t" type="button" data-term="g" data-owner="pub" aria-pressed="false">g</button><span>)</span>
   </div>
-  <div class="btnrow"><span class="pill pub">OTC publishes per station</span><span class="pill pred">OTC publishes per year</span><span class="pill fix">fixed by astronomy</span></div>
+  <div class="btnrow"><span class="pill pub">OTC publishes per constant set</span><span class="pill pred">OTC publishes per year</span><span class="pill fix">fixed by astronomy</span></div>
   <ul class="terms" id="s3-terms">
     <li data-term="z0"><b>Z<sub>0</sub></b> Mean water level above the set's zero (see <a href="/data-format/#fields">Data format</a>). One number per constant set. <span class="pill pub">OTC</span></li>
     <li data-term="H"><b>H</b> Amplitude: half the crest-to-trough height of this constituent. <span class="pill pub">OTC</span></li>
