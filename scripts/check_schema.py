@@ -1487,9 +1487,10 @@ for key in HIGH_ONLY_REJECTED:
                     lambda d, k=key: [high_on_a(d),
                                       gauge_a(d)["datum"]["named"].__setitem__(k, 0.5),
                                       gauge_a(d)["datum"]["basis"].__setitem__(k, gesla_observed(**DIRECT))],
-                    # A low-water key that carries truncated_lows breaks both the key rule and the
-                    # datum rule of round 4 by design; the other keys test the key rule alone.
-                    either(R_HIGH_ONLY, R_TRUNCATED_DATUM) if re.match(r"^(otc_)?(mlw|mllw|mtl|dtl|msl|lat|mlws|mlwn|mllws)$", key) else R_HIGH_ONLY)
+                    # An observed key outside the truncated-datum allow-list (mhw, mhhw, hat and otc_
+                    # forms) that carries truncated_lows breaks both rules by design; hat and otc_hat
+                    # are the keys that test the key rule alone.
+                    R_HIGH_ONLY if key in ("hat", "otc_hat") else either(R_HIGH_ONLY, R_TRUNCATED_DATUM))
 for key in ("otc_mhw", "otc_mhhw"):
     datum_must_pass(f"{key} by the direct method with truncated_lows",
                     lambda d, k=key: [high_noaa(d)["named"].__setitem__(k, 3.0),
@@ -1663,13 +1664,14 @@ for key in ("mlw", "mllw", "msl", "mtl", "dtl", "otc_mlw"):
                                       first_set(d)["datum"]["named"].__setitem__(k, 0.5),
                                       first_set(d)["datum"]["basis"].__setitem__(k, dict(copy.deepcopy(OBSERVED_228), flags=["truncated_lows"]))],
                     either(R_HIGH_ONLY, R_TRUNCATED_DATUM))
-# Keys outside the low-water set reach only the key rule: a first reduction with truncated_lows on them.
+# hat and otc_hat are inside the truncated-datum allow-list, so a first reduction with truncated_lows
+# on them reaches only the key rule; mhws and cd reach both rules by design.
 for key in ("hat", "mhws", "cd", "otc_hat"):
     datum_must_fail(f"a 19-year determination of {key} with truncated_lows",
                     lambda d, k=key: [trim(put_and_get(first_set, PRIMARY_DATUM))(d),
                                       first_set(d)["datum"]["named"].__setitem__(k, 2.0),
                                       first_set(d)["datum"]["basis"].__setitem__(k, dict(copy.deepcopy(OBSERVED_228), flags=["truncated_lows"]))],
-                    R_HIGH_ONLY)
+                    R_HIGH_ONLY if key in ("hat", "otc_hat") else either(R_HIGH_ONLY, R_TRUNCATED_DATUM))
 datum_must_fail("an own-month average of msl with truncated_lows",
                 own_months("2023-01-01", "2024-12-31", 24, flags=("no_qualified_control", "truncated_lows")),
                 either(R_HIGH_ONLY, R_TRUNCATED_DATUM))
@@ -1689,9 +1691,9 @@ datum_must_fail("no_qualified_control on a comparison (method direct)",
 
 # --- PR #47 round 4 (orchestrator decisions on C-F4 and C-F8) -----------------------------------
 
-# C-F4 (spec 3.5 note (1), as revised in C-F4/C-F8 review 1): when any level of a datum carries
-# truncated_lows, every low-water key in basis has kind published (OTC's own observed and computed
-# lows are dropped; the publisher's are kept), and named has no otc_ low-water key.
+# C-F4 (spec 3.5 note (1), an allow-list since C-F4/C-F8 review 2): when any level of a datum
+# carries truncated_lows, its only computed or observed levels are mhw, mhhw, hat and their otc_
+# forms; a published level of any key is kept; named has no other otc_ key.
 GESLA_HIGH_DATUM = unalias({"msl_offset_m": 1.1, "zero": "gauge_zero",
                             "named": {"mhhw": 1.78, "mhw": 1.72},
                             "basis": {"mhhw": gesla_observed(method="direct", flags=["truncated_lows"]),
@@ -1731,6 +1733,20 @@ PEGEL_TRUNCATED = unalias({"msl_offset_m": 5.0, "zero": "gauge_zero", "zero_name
                                      "otc_mhw": OWN_MONTH_MHW["basis"]["mhw"]}})
 datum_must_pass("published mhw and mlw (PEGELONLINE MThw, MTnw) with an observed otc_mhw carrying truncated_lows",
                 put(gauge_a, PEGEL_TRUNCATED))
+datum_must_fail("the PEGELONLINE-shape truncated datum with an observed otc_mlw first reduction",
+                lambda d: [put(gauge_a, PEGEL_TRUNCATED)(d), gauge_a(d)["datum"]["named"].__setitem__("otc_mlw", 3.38),
+                           gauge_a(d)["datum"]["basis"].__setitem__("otc_mlw", dict(copy.deepcopy(OWN_MONTH_MHW["basis"]["mhw"]), flags=["no_qualified_control"]))],
+                R_TRUNCATED_DATUM)
+# Spec 3.8 must-passes not shown elsewhere in this section.
+datum_must_pass("an mhw own-month first reduction of 12 months (2015) with no_qualified_control and truncated_lows",
+                lambda d: [put(gauge_a, OWN_MONTH_MHW)(d), [gauge_a(d)["datum"][part].pop("mhhw") for part in ("named", "basis")],
+                           gauge_a(d)["datum"]["basis"]["mhw"].update(epoch={"start": "2015-01-01", "end": "2015-12-31"},
+                                                                    data_span={"start": "2015-01-01", "end": "2015-12-31", "months": 12})])
+datum_must_pass("a first reduction with no_qualified_control, 7 months, short_record, epoch equal to its data span",
+                own_months("2024-01-01", "2024-07-31", 7, flags=("no_qualified_control", "short_record")))
+datum_must_pass("a 6-month standard comparison with short_record",
+                edit(observed_on_a, "msl", lambda b: [b.update(method="standard", flags=["short_record"]),
+                                                      b["data_span"].update(start="2024-01-01", end="2024-06-30", months=6)]))
 datum_must_pass("a truncated mhw with a published cd = 0 as chart_datum",
                 lambda d: [put(gauge_a, GESLA_HIGH_DATUM)(d),
                            gauge_a(d)["datum"].update(zero="chart_datum", zero_name="CD", chart_datum="cd"),
@@ -1743,10 +1759,48 @@ datum_must_fail("a computed lat next to a truncated 19-year mhw in one datum",
                            first_set(d)["datum"]["named"].__setitem__("lat", -0.1),
                            first_set(d)["datum"]["basis"].__setitem__("lat", copy.deepcopy(NOAA_DATUM["basis"]["otc_lat"]))],
                 R_TRUNCATED_DATUM)
-datum_must_pass("high-water keys of other names (hat, mhws) next to a truncated mhw in one datum",
-                lambda d: [put(gauge_a, GESLA_HIGH_DATUM)(d)] + [
-                    [gauge_a(d)["datum"]["named"].__setitem__(k, 2.0),
-                     gauge_a(d)["datum"]["basis"].__setitem__(k, copy.deepcopy(NOAA_DATUM["basis"]["otc_lat"]))] for k in ("hat", "mhws")])
+datum_must_pass("a truncated mhw and mhhw with a computed hat in one datum",
+                lambda d: [put(gauge_a, GESLA_HIGH_DATUM)(d), gauge_a(d)["datum"]["named"].__setitem__("hat", 2.0),
+                           gauge_a(d)["datum"]["basis"].__setitem__("hat", copy.deepcopy(NOAA_DATUM["basis"]["otc_lat"]))])
+datum_must_pass("a truncated mhw with a computed otc_hat next to a published hat",
+                lambda d: [put(gauge_a, GESLA_HIGH_DATUM)(d),
+                           gauge_a(d)["datum"]["named"].update(hat=2.0, otc_hat=2.01),
+                           gauge_a(d)["datum"]["basis"].update(hat={"kind": "published", "method": "source", "source_name": "HAT"},
+                                                               otc_hat=copy.deepcopy(NOAA_DATUM["basis"]["otc_lat"]))])
+# Review 2 bypasses of the old deny-list: any other computed or observed key at a truncated set.
+OBS_FR = unalias({"kind": "observed", "method": "first_reduction", "epoch": OTC_EPOCH,
+                  "data_span": {"start": "2002-01-01", "end": "2020-12-31", "months": 228},
+                  "uncertainty_m": 0.01, "uncertainty_basis": "calibrated"})
+COMPUTED_CD = unalias({"kind": "computed", "method": "harmonic_extremes", "epoch": LAT_WINDOW,
+                       "uncertainty_m": 0.02, "uncertainty_basis": "calibrated"})
+datum_must_fail("a truncated mhw with an observed mw first reduction as chart_datum",
+                lambda d: [put(gauge_a, GESLA_HIGH_DATUM)(d), gauge_a(d)["datum"].__setitem__("chart_datum", "mw"),
+                           gauge_a(d)["datum"]["named"].__setitem__("mw", 0.9), gauge_a(d)["datum"]["basis"].__setitem__("mw", copy.deepcopy(OBS_FR))],
+                R_TRUNCATED_DATUM)
+datum_must_fail("a truncated mhw with a computed cd (harmonic_extremes) as chart_datum",
+                lambda d: [put(gauge_a, GESLA_HIGH_DATUM)(d), gauge_a(d)["datum"].__setitem__("chart_datum", "cd"),
+                           gauge_a(d)["datum"]["named"].__setitem__("cd", 0.2), gauge_a(d)["datum"]["basis"].__setitem__("cd", copy.deepcopy(COMPUTED_CD))],
+                R_TRUNCATED_DATUM)
+datum_must_fail("a truncated mhw with a published cd = 0 and an observed otc_cd",
+                lambda d: [put(gauge_a, GESLA_HIGH_DATUM)(d), gauge_a(d)["datum"].update(zero="chart_datum", chart_datum="cd"),
+                           gauge_a(d)["datum"]["named"].update(cd=0.0, otc_cd=0.05),
+                           gauge_a(d)["datum"]["basis"].update(cd={"kind": "published", "method": "source", "source_name": "CD"},
+                                                               otc_cd=copy.deepcopy(OBS_FR))],
+                R_TRUNCATED_DATUM)
+for key in ("elw", "mlhw", "mhws"):
+    datum_must_fail(f"a truncated mhw with an observed {key}",
+                    lambda d, k=key: [put(gauge_a, GESLA_HIGH_DATUM)(d), gauge_a(d)["datum"]["named"].__setitem__(k, 0.6),
+                                      gauge_a(d)["datum"]["basis"].__setitem__(k, copy.deepcopy(OBS_FR))],
+                    R_TRUNCATED_DATUM)
+datum_must_fail("a truncated mhw with a computed mhws",
+                lambda d: [put(gauge_a, GESLA_HIGH_DATUM)(d), gauge_a(d)["datum"]["named"].__setitem__("mhws", 2.1),
+                           gauge_a(d)["datum"]["basis"].__setitem__("mhws", copy.deepcopy(COMPUTED_CD))],
+                R_TRUNCATED_DATUM)
+datum_must_fail("a truncated mhw whose named has otc_elw (no basis.otc_elw)",
+                lambda d: [put(gauge_a, GESLA_HIGH_DATUM)(d), gauge_a(d)["datum"]["named"].__setitem__("otc_elw", 0.6)],
+                R_TRUNCATED_DATUM)
+datum_must_pass("a truncated mhw whose named has otc_hat (no basis.otc_hat; build check 9)",
+                lambda d: [put(gauge_a, GESLA_HIGH_DATUM)(d), gauge_a(d)["datum"]["named"].__setitem__("otc_hat", 2.0)])
 # C-F8: sampling_assumed is not allowed on msl or otc_msl (MSL is a mean of all samples).
 datum_must_fail("an observed msl with sampling_assumed", edit(observed_on_a, "msl", set_flags("sampling_assumed")), R_MSL_SAMPLING)
 datum_must_fail("an observed otc_msl with sampling_assumed",
