@@ -364,16 +364,6 @@
           "licence_id": "gesla-cmems-nc",
           "source_record_id": "example-fjord-b",
           "record_span": { "start": "2000-01-01T00:00:00Z", "end": "2012-01-01T00:00:00Z", "good_samples": 220000, "good_hours": 55000 },
-          "datum": {
-            "msl_offset_m": 1.1,
-            "zero": "chart_datum",
-            "zero_name": "ACD",
-            "chart_datum": "cd",
-            "named": { "cd": 0.0 },
-            "basis": {
-              "cd": { "kind": "published", "method": "source", "source_name": "Admiralty Chart Datum (ACD)" }
-            }
-          },
           "qc_status": "flagged",
           "qc_flags": [
             { "flag": "broken_record", "reason": "datum step on 2006-05-14; constants are fitted to the segment before it" },
@@ -727,6 +717,54 @@
             "published": "utc_instant",
             "decided_in": "20991231",
             "evidence": [{ "comparator_kind": "model", "comparator_id": "eot20", "distance_km": 1.0, "lag_min": 0.4 }]
+          },
+          "provenance": { "build": { "build_commit": "0000000" }, "selection_reason": "only eligible record", "decision": { "tier": "rule", "outcome": "accept" } }
+        }
+      ]
+    },
+    {
+      "station_id": "OTC-EXAMPLE-0011",
+      "status": "active",
+      "name": "Example Cove, Cornwall (illustrative values, not data)",
+      "country": "GBR",
+      "lat": 50.1,
+      "lon": -5.5,
+      "timezone": "Europe/London",
+      "type": "reference",
+      "aliases": { "gesla": ["example-uk-file-id"] },
+      "recommended_set_id": "OTC-EXAMPLE-0011/gesla-fit",
+      "constant_sets": [
+        {
+          "set_id": "OTC-EXAMPLE-0011/gesla-fit",
+          "source": "gesla-fit",
+          "source_type": "gauge",
+          "quantity": "water_level",
+          "source_record_id": "example-uk-file-id",
+          "source_version": "4.1",
+          "record_span": { "start": "2007-01-01T00:00:00Z", "end": "2026-01-01T00:00:00Z", "good_samples": 160000, "good_hours": 160000 },
+          "datum": {
+            "msl_offset_m": 1.1,
+            "zero": "chart_datum",
+            "zero_name": "ACD",
+            "chart_datum": "cd",
+            "named": { "cd": 0.0 },
+            "basis": {
+              "cd": { "kind": "published", "method": "source", "source_name": "Admiralty Chart Datum (ACD)" }
+            }
+          },
+          "convention_id": "otc-greenwich-schureman-v1",
+          "licence_id": "gesla-derived",
+          "qc_status": "ok",
+          "constituents": [
+            { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 1.7, "phase_deg": 140.0 }
+          ],
+          "time_base": {
+            "code": "verified",
+            "reason": "declared utc_instant confirmed by EOT20",
+            "declared": "utc_instant",
+            "published": "utc_instant",
+            "decided_in": "20991231",
+            "evidence": [{ "comparator_kind": "model", "comparator_id": "eot20", "distance_km": 1.0, "lag_min": 0.3 }]
           },
           "provenance": { "build": { "build_commit": "0000000" }, "selection_reason": "only eligible record", "decision": { "tier": "rule", "outcome": "accept" } }
         }
