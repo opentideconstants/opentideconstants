@@ -50,6 +50,7 @@ Needs the jsonschema package with its format checkers
 "date-time" are enforced. Without them jsonschema skips those formats, so
 this script stops if they are missing.
 """
+import collections
 import copy
 import json
 import re
@@ -1990,20 +1991,37 @@ for label, station_id, set_suffix, block in COMPARED_BLOCKS:
         print(f"FAIL: example.json does not show {label} ({station_id})")
     else:
         print(f"ok: example.json shows {label}")
-compared = {(station_id, set_suffix) for _, station_id, set_suffix, _ in COMPARED_BLOCKS}
-in_example = set()
+# Keyed on the full set_id (subordinate offsets on "<station_id>#offsets") and counted, so a duplicate
+# set_id, or a set whose set_id names another station, cannot hide a datum that nothing compares.
+compared = collections.Counter(f"{station_id}/{set_suffix}" if set_suffix else f"{station_id}#offsets"
+                               for _, station_id, set_suffix, _ in COMPARED_BLOCKS)
+in_example = collections.Counter()
+misplaced = []
 for st in example["stations"]:
     for cs in st.get("constant_sets", []):
         if "datum" in cs:
-            in_example.add((st["station_id"], cs["set_id"].split("/", 1)[1]))
+            in_example[cs["set_id"]] += 1
+            if not cs["set_id"].startswith(st["station_id"] + "/"):
+                misplaced.append(f"{cs['set_id']} under {st['station_id']}")
     if "datum" in st.get("subordinate_offsets", {}):
-        in_example.add((st["station_id"], None))
-uncompared = sorted(in_example - compared, key=str)
+        in_example[st["station_id"] + "#offsets"] += 1
+problems_found = []
+if misplaced:
+    problems_found.append(f"set_ids that name another station: {misplaced}")
+duplicates = sorted(k for k, n in in_example.items() if n > 1)
+if duplicates:
+    problems_found.append(f"datums under a repeated set_id: {duplicates}")
+uncompared = sorted(set(in_example) - set(compared))
 if uncompared:
-    datum_failures.append(f"example.json has datums that no entry compares: {uncompared}")
-    print(f"FAIL: example.json has datums that no entry compares: {uncompared}")
+    problems_found.append(f"datums that no entry compares: {uncompared}")
+if sum(in_example.values()) != sum(compared.values()):
+    problems_found.append(f"a datum count that differs from the compared list: {sum(in_example.values())} datums, {sum(compared.values())} compared")
+if problems_found:
+    for why in problems_found:
+        datum_failures.append(f"example.json has {why}")
+        print(f"FAIL: example.json has {why}")
 else:
-    print(f"ok: every one of the {len(in_example)} datums in example.json is compared")
+    print(f"ok: every one of the {sum(in_example.values())} datums in example.json is compared, each under its own set_id")
 
 if datum_failures:
     print(f"FAIL: {len(datum_failures)} datum checks failed")
