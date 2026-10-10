@@ -1625,6 +1625,14 @@ for key in ("mlw", "mllw", "msl", "mtl", "dtl", "otc_mlw"):
                     R_HIGH_ONLY)
 datum_must_fail("an own-month average of msl with truncated_lows",
                 own_months("2023-01-01", "2024-12-31", 24, flags=("no_qualified_control", "truncated_lows")), R_HIGH_ONLY)
+# A string flags makes every "contains" test pass, so with truncated_lows allowed on a first reduction
+# the only rule left to reject it, on an own-month mhw under 12 months, is the flags type.
+datum_must_fail("flags as a string on an own-month mhw of 6 months",
+                lambda d: [put(gauge_a, OWN_MONTH_MHW)(d), gauge_a(d)["datum"]["basis"].pop("mhhw"), gauge_a(d)["datum"]["named"].pop("mhhw"),
+                           gauge_a(d)["datum"]["basis"]["mhw"].update(flags="truncated_lows",
+                                                                    data_span={"start": "2024-01-01", "end": "2024-06-30", "months": 6},
+                                                                    epoch={"start": "2024-01-01", "end": "2024-06-30"})],
+                R_FLAGS)
 # Reviewer C round 3: no_qualified_control with each comparison method.
 datum_must_fail("no_qualified_control on a comparison (method standard)",
                 edit(observed_on_a, "msl", lambda b: b.update(method="standard", flags=["no_qualified_control"])), R_OWN_MONTH)
