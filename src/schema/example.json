@@ -168,7 +168,9 @@
           "licence_id": "gesla-derived",
           "qc_status": "ok",
           "constituents": [
-            { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 0.5, "phase_deg": 100.0, "amp_uncertainty_m": 0.001, "phase_uncertainty_deg": 0.1, "kept_reason": "snr" },
+            { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 0.5, "phase_deg": 100.0 },
+            { "name": "S2", "speed_deg_per_hour": 30.0, "amplitude_m": 0.18, "phase_deg": 140.0 },
+            { "name": "N2", "speed_deg_per_hour": 28.4397295, "amplitude_m": 0.1, "phase_deg": 82.0 },
             { "name": "K1", "speed_deg_per_hour": 15.0410686, "amplitude_m": 0.05, "phase_deg": 200.0 }
           ],
           "dropped_constituents": [{ "name": "SA", "dropped_reason": "long_period_rule" }],
@@ -209,7 +211,12 @@
           "licence_id": "kartverket",
           "qc_status": "ok",
           "constituents": [
-            { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 0.5, "phase_deg": 100.2 }
+            { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 0.5, "phase_deg": 100.0 },
+            { "name": "S2", "speed_deg_per_hour": 30.0, "amplitude_m": 0.18, "phase_deg": 140.0 },
+            { "name": "N2", "speed_deg_per_hour": 28.4397295, "amplitude_m": 0.1, "phase_deg": 82.0 },
+            { "name": "K2", "speed_deg_per_hour": 30.0821373, "amplitude_m": 0.05, "phase_deg": 138.0 },
+            { "name": "K1", "speed_deg_per_hour": 15.0410686, "amplitude_m": 0.05, "phase_deg": 200.0 },
+            { "name": "O1", "speed_deg_per_hour": 13.9430356, "amplitude_m": 0.03, "phase_deg": 185.0 }
           ],
           "provenance": { "adapter_version": "example", "build": { "build_commit": "0000000" } }
         }
@@ -376,7 +383,7 @@
             "zero": "gauge_zero",
             "named": { "msl": 1.06 },
             "basis": {
-              "msl": { "kind": "observed", "method": "modified_range_ratio", "epoch": { "start": "2002-01-01", "end": "2020-12-31", "name": "OTC 2002-2020" }, "data_span": { "start": "2002-01-01", "end": "2006-04-30", "months": 47 }, "control": { "station_id": "OTC-EXAMPLE-0001", "set_id": "OTC-EXAMPLE-0001/gesla-fit" }, "uncertainty_m": 0.02, "uncertainty_basis": "calibrated", "flags": ["time_base_unverified", "gaps", "segment"] }
+              "msl": { "kind": "observed", "method": "modified_range_ratio", "epoch": { "start": "2002-01-01", "end": "2020-12-31", "name": "OTC 2002-2020" }, "data_span": { "start": "2002-01-01", "end": "2006-04-30", "months": 47 }, "control": { "station_id": "OTC-EXAMPLE-0001", "set_id": "OTC-EXAMPLE-0001/gesla-fit" }, "uncertainty_m": 0.02, "uncertainty_basis": "calibrated", "flags": ["time_base_unverified", "gaps"] }
             }
           },
           "qc_status": "flagged",
@@ -422,7 +429,7 @@
           "record_span": { "start": "2024-03-01T00:00:00Z", "end": "2024-04-10T00:00:00Z", "good_samples": 940, "good_hours": 940 },
           "qc_status": "flagged",
           "qc_flags": [
-            { "flag": "short_record", "reason": "39.2 days of good data: P1 and K2 cannot be separated from K1 and S2" },
+            { "flag": "short_record", "reason": "39.2 days of good data: P1, K2 and T2 cannot be separated from K1 and S2" },
             { "flag": "time_base", "reason": "time base disputed: the model lag of 41 min fits no class" }
           ],
           "time_base": {
@@ -445,7 +452,8 @@
           ],
           "dropped_constituents": [
             { "name": "P1", "dropped_reason": "rayleigh", "not_separable_from": "K1" },
-            { "name": "K2", "dropped_reason": "rayleigh", "not_separable_from": "S2" }
+            { "name": "K2", "dropped_reason": "rayleigh", "not_separable_from": "S2" },
+            { "name": "T2", "dropped_reason": "rayleigh", "not_separable_from": "S2" }
           ],
           "expected_accuracy": {
             "cut_to_days": 39,
@@ -553,10 +561,13 @@
           "licence_id": "noaa",
           "qc_status": "ok",
           "constituents": [
-            { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 1.37, "phase_deg": 110.0 },
-            { "name": "S2", "speed_deg_per_hour": 30.0, "amplitude_m": 0.21, "phase_deg": 150.0 },
+            { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 1.37, "phase_deg": 100.0 },
+            { "name": "N2", "speed_deg_per_hour": 28.4397295, "amplitude_m": 0.31, "phase_deg": 82.0 },
+            { "name": "S2", "speed_deg_per_hour": 30.0, "amplitude_m": 0.21, "phase_deg": 140.0 },
+            { "name": "K2", "speed_deg_per_hour": 30.0821373, "amplitude_m": 0.06, "phase_deg": 138.0 },
             { "name": "K1", "speed_deg_per_hour": 15.0410686, "amplitude_m": 0.14, "phase_deg": 200.0 },
-            { "name": "O1", "speed_deg_per_hour": 13.9430356, "amplitude_m": 0.11, "phase_deg": 190.0 }
+            { "name": "O1", "speed_deg_per_hour": 13.9430356, "amplitude_m": 0.11, "phase_deg": 185.0 },
+            { "name": "P1", "speed_deg_per_hour": 14.9589314, "amplitude_m": 0.05, "phase_deg": 198.0 }
           ],
           "provenance": { "adapter_version": "example", "build": { "build_commit": "0000000" } }
         }
@@ -613,7 +624,7 @@
           "quantity": "water_level",
           "source_record_id": "example-rws",
           "source_version": "20991231",
-          "record_span": { "start": "2023-01-01T00:00:00Z", "end": "2025-01-01T00:00:00Z", "good_samples": 17000, "good_hours": 17000 },
+          "record_span": { "start": "2023-01-01T00:00:00Z", "end": "2025-01-01T00:00:00Z", "good_samples": 17520, "good_hours": 17520 },
           "datum": {
             "msl_offset_m": 0.071,
             "zero": "vertical_datum",
@@ -758,7 +769,7 @@
           "source_version": "4.1",
           "record_span": { "start": "2007-01-01T00:00:00Z", "end": "2026-01-01T00:00:00Z", "good_samples": 160000, "good_hours": 160000 },
           "datum": {
-            "msl_offset_m": 1.1,
+            "msl_offset_m": 3.05,
             "zero": "chart_datum",
             "zero_name": "ACD",
             "chart_datum": "cd",
@@ -771,7 +782,8 @@
           "licence_id": "gesla-derived",
           "qc_status": "ok",
           "constituents": [
-            { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 1.7, "phase_deg": 140.0 }
+            { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 1.7, "phase_deg": 100.0 },
+            { "name": "S2", "speed_deg_per_hour": 30.0, "amplitude_m": 0.58, "phase_deg": 140.0 }
           ],
           "time_base": {
             "code": "verified",
@@ -795,7 +807,7 @@
       "timezone": "Europe/Oslo",
       "type": "reference",
       "aliases": { "gesla": ["example-estuary-a", "example-estuary-b", "example-estuary-c", "example-estuary-d", "example-estuary-e"] },
-      "recommended_set_id": "OTC-EXAMPLE-0012/gesla-fit-e",
+      "recommended_set_id": "OTC-EXAMPLE-0012/gesla-fit-b",
       "constant_sets": [
         {
           "set_id": "OTC-EXAMPLE-0012/gesla-fit-a",
@@ -839,13 +851,13 @@
           "quantity": "water_level",
           "source_record_id": "example-estuary-b",
           "source_version": "4.1",
-          "record_span": { "start": "2002-01-01T00:00:00Z", "end": "2021-01-01T00:00:00Z", "good_samples": 160000, "good_hours": 160000 },
+          "record_span": { "start": "2002-01-01T00:00:00Z", "end": "2021-01-01T00:00:00Z", "good_samples": 166400, "good_hours": 166400 },
           "datum": {
             "msl_offset_m": 1.2,
             "zero": "gauge_zero",
             "named": { "mhhw": 2.01 },
             "basis": {
-              "mhhw": { "kind": "observed", "method": "first_reduction", "epoch": { "start": "2002-01-01", "end": "2020-12-31", "name": "OTC 2002-2020" }, "data_span": { "start": "2002-01-01", "end": "2020-12-31", "months": 228 }, "uncertainty_m": 0.02, "uncertainty_basis": "propagated", "flags": ["truncated_lows"] }
+              "mhhw": { "kind": "observed", "method": "first_reduction", "epoch": { "start": "2002-01-01", "end": "2020-12-31", "name": "OTC 2002-2020" }, "data_span": { "start": "2002-01-01", "end": "2020-12-31", "months": 228 }, "uncertainty_m": 0.005, "uncertainty_basis": "propagated", "flags": ["truncated_lows"] }
             }
           },
           "convention_id": "otc-greenwich-schureman-v1",
@@ -878,7 +890,7 @@
           "datum": {
             "msl_offset_m": 1.2,
             "zero": "gauge_zero",
-            "named": { "mhw": 1.95, "mhhw": 2.02, "hat": 2.41 },
+            "named": { "mhw": 1.95, "mhhw": 2.02, "hat": 2.24 },
             "basis": {
               "mhw": { "kind": "observed", "method": "direct", "epoch": { "start": "2002-01-01", "end": "2020-12-31", "name": "OTC 2002-2020" }, "data_span": { "start": "2023-01-01", "end": "2024-12-31", "months": 24 }, "control": { "station_id": "OTC-EXAMPLE-0001", "set_id": "OTC-EXAMPLE-0001/gesla-fit" }, "uncertainty_m": 0.02, "uncertainty_basis": "calibrated", "flags": ["truncated_lows"] },
               "mhhw": { "kind": "observed", "method": "direct", "epoch": { "start": "2002-01-01", "end": "2020-12-31", "name": "OTC 2002-2020" }, "data_span": { "start": "2023-01-01", "end": "2024-12-31", "months": 24 }, "control": { "station_id": "OTC-EXAMPLE-0001", "set_id": "OTC-EXAMPLE-0001/gesla-fit" }, "uncertainty_m": 0.02, "uncertainty_basis": "calibrated", "flags": ["truncated_lows"] },
@@ -949,13 +961,13 @@
           "quantity": "water_level",
           "source_record_id": "example-estuary-e",
           "source_version": "4.1",
-          "record_span": { "start": "1950-01-01T00:00:00Z", "end": "1969-01-01T00:00:00Z", "good_samples": 160000, "good_hours": 160000 },
+          "record_span": { "start": "1950-01-01T00:00:00Z", "end": "1969-01-01T00:00:00Z", "good_samples": 166400, "good_hours": 166400 },
           "datum": {
             "msl_offset_m": 1.15,
             "zero": "gauge_zero",
             "named": { "msl": 1.14 },
             "basis": {
-              "msl": { "kind": "observed", "method": "first_reduction", "epoch": { "start": "1950-01-01", "end": "1968-12-31" }, "data_span": { "start": "1950-01-01", "end": "1968-12-31", "months": 228 }, "uncertainty_m": 0.03, "uncertainty_basis": "calibrated", "flags": ["no_qualified_control"] }
+              "msl": { "kind": "observed", "method": "first_reduction", "epoch": { "start": "1950-01-01", "end": "1968-12-31" }, "data_span": { "start": "1950-01-01", "end": "1968-12-31", "months": 228 }, "uncertainty_m": 0.005, "uncertainty_basis": "calibrated", "flags": ["no_qualified_control"] }
             }
           },
           "convention_id": "otc-greenwich-schureman-v1",
@@ -1004,7 +1016,7 @@
             "basis": {
               "mhw": { "kind": "published", "method": "source", "source_name": "MThw", "epoch": { "start": "2010-11-01", "end": "2020-10-31" } },
               "mlw": { "kind": "published", "method": "source", "source_name": "MTnw", "epoch": { "start": "2010-11-01", "end": "2020-10-31" } },
-              "otc_mhw": { "kind": "observed", "method": "first_reduction", "epoch": { "start": "2011-01-01", "end": "2019-12-31" }, "data_span": { "start": "2011-01-01", "end": "2019-12-31", "months": 108 }, "uncertainty_m": 0.02, "uncertainty_basis": "calibrated", "flags": ["no_qualified_control", "truncated_lows"] }
+              "otc_mhw": { "kind": "observed", "method": "first_reduction", "epoch": { "start": "2011-01-01", "end": "2019-12-31" }, "data_span": { "start": "2011-01-01", "end": "2019-12-31", "months": 108 }, "uncertainty_m": 0.015, "uncertainty_basis": "calibrated", "flags": ["no_qualified_control", "truncated_lows"] }
             }
           },
           "convention_id": "otc-greenwich-schureman-v1",
@@ -1013,8 +1025,8 @@
           "qc_flags": [{ "flag": "broken_record", "reason": "low waters flat-lined: the gauge dries below 3.6 m above PNP" }],
           "record_issues": [{ "issue": "flatline", "start": "2010-11-01T00:00:00Z", "end": "2020-11-01T00:00:00Z", "reason": "low waters cut off at the gauge's lowest reading" }],
           "constituents": [
-            { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 0.8, "phase_deg": 120.0 },
-            { "name": "S2", "speed_deg_per_hour": 30.0, "amplitude_m": 0.25, "phase_deg": 160.0 }
+            { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 1.45, "phase_deg": 100.0 },
+            { "name": "S2", "speed_deg_per_hour": 30.0, "amplitude_m": 0.38, "phase_deg": 140.0 }
           ],
           "time_base": {
             "code": "verified",
@@ -1047,18 +1059,19 @@
           "quantity": "water_level",
           "source_record_id": "example-skerries-a",
           "source_version": "4.1",
-          "record_span": { "start": "2015-01-01T00:00:00Z", "end": "2016-01-01T00:00:00Z", "good_samples": 8500, "good_hours": 8500 },
+          "record_span": { "start": "2015-01-01T00:00:00Z", "end": "2016-01-01T00:00:00Z", "good_samples": 8755, "good_hours": 8755 },
           "datum": {
             "msl_offset_m": 1.2,
             "zero": "gauge_zero",
             "named": { "mhw": 1.94 },
             "basis": {
-              "mhw": { "kind": "observed", "method": "first_reduction", "epoch": { "start": "2015-01-01", "end": "2015-12-31" }, "data_span": { "start": "2015-01-01", "end": "2015-12-31", "months": 12 }, "uncertainty_m": 0.02, "uncertainty_basis": "calibrated", "flags": ["no_qualified_control", "truncated_lows"] }
+              "mhw": { "kind": "observed", "method": "first_reduction", "epoch": { "start": "2015-01-01", "end": "2015-12-31" }, "data_span": { "start": "2015-01-01", "end": "2015-12-31", "months": 12 }, "uncertainty_m": 0.04, "uncertainty_basis": "calibrated", "flags": ["no_qualified_control", "truncated_lows"] }
             }
           },
           "convention_id": "otc-greenwich-schureman-v1",
           "licence_id": "gesla-derived",
           "qc_status": "flagged",
+          "dropped_constituents": [{ "name": "T2", "dropped_reason": "rayleigh", "not_separable_from": "S2" }],
           "qc_flags": [{ "flag": "broken_record", "reason": "low waters flat-lined: the gauge dries below 0.4 m" }],
           "record_issues": [{ "issue": "flatline", "start": "2015-01-01T00:00:00Z", "end": "2016-01-01T00:00:00Z", "reason": "low waters cut off at the gauge's lowest reading" }],
           "constituents": [
@@ -1082,7 +1095,7 @@
           "quantity": "water_level",
           "source_record_id": "example-skerries-b",
           "source_version": "4.1",
-          "record_span": { "start": "2024-01-01T00:00:00Z", "end": "2024-08-01T00:00:00Z", "good_samples": 5000, "good_hours": 5000 },
+          "record_span": { "start": "2024-01-01T00:00:00Z", "end": "2024-08-01T00:00:00Z", "good_samples": 5100, "good_hours": 5100 },
           "datum": {
             "msl_offset_m": 1.2,
             "zero": "gauge_zero",
@@ -1094,9 +1107,9 @@
           "convention_id": "otc-greenwich-schureman-v1",
           "licence_id": "gesla-derived",
           "qc_status": "flagged",
-          "qc_flags": [{ "flag": "short_record", "reason": "208 days of good data: T2 cannot be separated from S2" }],
+          "qc_flags": [{ "flag": "short_record", "reason": "212 days of good data: T2 cannot be separated from S2" }],
           "dropped_constituents": [{ "name": "T2", "dropped_reason": "rayleigh", "not_separable_from": "S2" }],
-          "expected_accuracy": { "cut_to_days": 208, "calibration_records": 25, "amp_uncertainty_m": 0.006, "phase_uncertainty_deg": 1.2 },
+          "expected_accuracy": { "cut_to_days": 212, "calibration_records": 25, "amp_uncertainty_m": 0.006, "phase_uncertainty_deg": 1.2 },
           "constituents": [
             { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 0.8, "phase_deg": 120.0 },
             { "name": "S2", "speed_deg_per_hour": 30.0, "amplitude_m": 0.25, "phase_deg": 160.0 }
@@ -1116,11 +1129,11 @@
     {
       "station_id": "OTC-EXAMPLE-0015",
       "status": "active",
-      "name": "Example Mixed Sound (illustrative values, not data)",
-      "country": "NOR",
-      "lat": 63.4,
-      "lon": 10.4,
-      "timezone": "Europe/Oslo",
+      "name": "Example Strait, a mixed tide (illustrative values, not data)",
+      "country": "CAN",
+      "lat": 48.65,
+      "lon": -123.4,
+      "timezone": "America/Vancouver",
       "type": "reference",
       "aliases": { "gesla": ["example-mixed-sound"] },
       "recommended_set_id": "OTC-EXAMPLE-0015/gesla-fit",
@@ -1134,9 +1147,9 @@
           "source_version": "4.1",
           "record_span": { "start": "2002-01-01T00:00:00Z", "end": "2026-01-01T00:00:00Z", "good_samples": 210000, "good_hours": 210000 },
           "datum": {
-            "msl_offset_m": 1.3,
+            "msl_offset_m": 3.0,
             "zero": "gauge_zero",
-            "named": { "mhhw": 2.15, "mhw": 1.98, "dtl": 1.3, "mtl": 1.3, "msl": 1.31, "mlw": 0.62, "mllw": 0.45 },
+            "named": { "mhhw": 4.4, "mhw": 3.9, "dtl": 2.75, "mtl": 3.0, "msl": 3.01, "mlw": 2.1, "mllw": 1.1 },
             "basis": {
               "mhhw": { "kind": "observed", "method": "first_reduction", "epoch": { "start": "2002-01-01", "end": "2020-12-31", "name": "OTC 2002-2020" }, "data_span": { "start": "2002-01-01", "end": "2020-12-31", "months": 228 }, "uncertainty_m": 0.004, "uncertainty_basis": "propagated" },
               "mhw": { "kind": "observed", "method": "first_reduction", "epoch": { "start": "2002-01-01", "end": "2020-12-31", "name": "OTC 2002-2020" }, "data_span": { "start": "2002-01-01", "end": "2020-12-31", "months": 228 }, "uncertainty_m": 0.004, "uncertainty_basis": "propagated" },
@@ -1151,10 +1164,10 @@
           "licence_id": "gesla-derived",
           "qc_status": "ok",
           "constituents": [
-            { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 0.6, "phase_deg": 110.0 },
-            { "name": "S2", "speed_deg_per_hour": 30.0, "amplitude_m": 0.2, "phase_deg": 150.0 },
-            { "name": "K1", "speed_deg_per_hour": 15.0410686, "amplitude_m": 0.25, "phase_deg": 210.0 },
-            { "name": "O1", "speed_deg_per_hour": 13.9430356, "amplitude_m": 0.17, "phase_deg": 190.0 }
+            { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 0.9, "phase_deg": 100.0 },
+            { "name": "S2", "speed_deg_per_hour": 30.0, "amplitude_m": 0.25, "phase_deg": 140.0 },
+            { "name": "K1", "speed_deg_per_hour": 15.0410686, "amplitude_m": 0.85, "phase_deg": 200.0 },
+            { "name": "O1", "speed_deg_per_hour": 13.9430356, "amplitude_m": 0.5, "phase_deg": 185.0 }
           ],
           "time_base": {
             "code": "verified",
@@ -1171,11 +1184,11 @@
     {
       "station_id": "OTC-EXAMPLE-0016",
       "status": "active",
-      "name": "Example Mixed Cove (illustrative values, not data)",
-      "country": "NOR",
-      "lat": 63.5,
-      "lon": 10.6,
-      "timezone": "Europe/Oslo",
+      "name": "Example Cove, a mixed tide (illustrative values, not data)",
+      "country": "CAN",
+      "lat": 48.75,
+      "lon": -123.25,
+      "timezone": "America/Vancouver",
       "type": "reference",
       "aliases": { "gesla": ["example-mixed-cove"] },
       "recommended_set_id": "OTC-EXAMPLE-0016/gesla-fit",
@@ -1189,9 +1202,9 @@
           "source_version": "4.1",
           "record_span": { "start": "2024-01-01T00:00:00Z", "end": "2024-07-01T00:00:00Z", "good_samples": 4300, "good_hours": 4300 },
           "datum": {
-            "msl_offset_m": 1.25,
+            "msl_offset_m": 2.95,
             "zero": "gauge_zero",
-            "named": { "msl": 1.26 },
+            "named": { "msl": 2.96 },
             "basis": {
               "msl": { "kind": "observed", "method": "standard", "epoch": { "start": "2002-01-01", "end": "2020-12-31", "name": "OTC 2002-2020" }, "data_span": { "start": "2024-01-01", "end": "2024-06-30", "months": 6 }, "control": { "station_id": "OTC-EXAMPLE-0015", "set_id": "OTC-EXAMPLE-0015/gesla-fit" }, "uncertainty_m": 0.03, "uncertainty_basis": "calibrated", "flags": ["short_record"] }
             }
@@ -1199,14 +1212,18 @@
           "convention_id": "otc-greenwich-schureman-v1",
           "licence_id": "gesla-derived",
           "qc_status": "flagged",
-          "qc_flags": [{ "flag": "short_record", "reason": "179 days of good data: K2 cannot be separated from S2" }],
-          "dropped_constituents": [{ "name": "K2", "dropped_reason": "rayleigh", "not_separable_from": "S2" }],
+          "qc_flags": [{ "flag": "short_record", "reason": "179 days of good data: P1, K2 and T2 cannot be separated from K1 and S2" }],
+          "dropped_constituents": [
+            { "name": "P1", "dropped_reason": "rayleigh", "not_separable_from": "K1" },
+            { "name": "K2", "dropped_reason": "rayleigh", "not_separable_from": "S2" },
+            { "name": "T2", "dropped_reason": "rayleigh", "not_separable_from": "S2" }
+          ],
           "expected_accuracy": { "cut_to_days": 179, "calibration_records": 25, "amp_uncertainty_m": 0.006, "phase_uncertainty_deg": 1.2 },
           "constituents": [
-            { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 0.55, "phase_deg": 112.0 },
-            { "name": "S2", "speed_deg_per_hour": 30.0, "amplitude_m": 0.18, "phase_deg": 151.0 },
-            { "name": "K1", "speed_deg_per_hour": 15.0410686, "amplitude_m": 0.24, "phase_deg": 212.0 },
-            { "name": "O1", "speed_deg_per_hour": 13.9430356, "amplitude_m": 0.16, "phase_deg": 191.0 }
+            { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 0.85, "phase_deg": 100.0 },
+            { "name": "S2", "speed_deg_per_hour": 30.0, "amplitude_m": 0.24, "phase_deg": 140.0 },
+            { "name": "K1", "speed_deg_per_hour": 15.0410686, "amplitude_m": 0.82, "phase_deg": 200.0 },
+            { "name": "O1", "speed_deg_per_hour": 13.9430356, "amplitude_m": 0.48, "phase_deg": 185.0 }
           ],
           "time_base": {
             "code": "verified",

@@ -38,8 +38,8 @@ r"""Check the JSON Schema and the example document.
    whose fields match its kind and method. example.json holds one block for
    each valid datum shape of the format; the script checks that each block
    equals the copy here and that every datum in the example is compared.
-   Most copies also drive must-pass controls; the others are valid because
-   the whole example validates and each is also run as a must-pass.
+   Ten of the copies also drive the must-fail and must-pass controls; each of
+   the others is run as a must-pass on its own.
    Datum checks that only the release build can make (checks 9-14 of the
    schema's description) are left to it on purpose. Each must-fail
    datum control names the rule that rejects it, and the script checks
@@ -940,7 +940,7 @@ FMI_OLDER_DATUM = {
 # A GESLA record whose stated zero is the chart datum: Admiralty Chart Datum, published cd = 0,
 # with no epoch.
 GESLA_CD_DATUM = {
-    "msl_offset_m": 1.1,
+    "msl_offset_m": 3.05,
     "zero": "chart_datum",
     "zero_name": "ACD",
     "chart_datum": "cd",
@@ -1742,7 +1742,7 @@ PEGEL_TRUNCATED = unalias({"msl_offset_m": 5.0, "zero": "gauge_zero", "zero_name
                                      "otc_mhw": {"kind": "observed", "method": "first_reduction",
                                                  "epoch": {"start": "2011-01-01", "end": "2019-12-31"},
                                                  "data_span": {"start": "2011-01-01", "end": "2019-12-31", "months": 108},
-                                                 "uncertainty_m": 0.02, "uncertainty_basis": "calibrated",
+                                                 "uncertainty_m": 0.015, "uncertainty_basis": "calibrated",
                                                  "flags": ["no_qualified_control", "truncated_lows"]}}})
 datum_must_pass("published mhw and mlw (PEGELONLINE MThw, MTnw) with an observed otc_mhw carrying truncated_lows",
                 put(gauge_a, PEGEL_TRUNCATED))
@@ -1894,7 +1894,8 @@ datum_left_to_build("an otc_lat with kind computed and no published lat (check 1
 # More valid datum shapes, each in its own set of example.json (each truncated_lows case alone in its
 # set's datum, with no computed or observed level beside it but mhw, mhhw and hat). The example's
 # stations make each choice of method and control hold: a comparison has a control of its tide class
-# within 250 km, and a no_qualified_control set has none.
+# within 250 km whose record overlaps its data, and a no_qualified_control set has no control of its
+# class within 250 km whose record covers its data_span.
 EX_CONTROL = {"station_id": "OTC-EXAMPLE-0001", "set_id": "OTC-EXAMPLE-0001/gesla-fit"}
 EX_CONTROL_MIXED = {"station_id": "OTC-EXAMPLE-0015", "set_id": "OTC-EXAMPLE-0015/gesla-fit"}
 
@@ -1915,8 +1916,8 @@ EX_DIRECT_MHW = unalias({"msl_offset_m": 1.2, "zero": "gauge_zero", "named": {"m
                          "basis": {"mhw": observed("direct", "2023-01-01", "2024-12-31", 24, epoch=OTC_EPOCH, flags=["truncated_lows"])}})
 EX_MHHW_19 = unalias({"msl_offset_m": 1.2, "zero": "gauge_zero", "named": {"mhhw": 2.01},
                       "basis": {"mhhw": observed("first_reduction", "2002-01-01", "2020-12-31", 228, epoch=OTC_EPOCH,
-                                                 flags=["truncated_lows"], uncertainty_basis="propagated")}})
-EX_HAT = unalias({"msl_offset_m": 1.2, "zero": "gauge_zero", "named": {"mhw": 1.95, "mhhw": 2.02, "hat": 2.41},
+                                                 flags=["truncated_lows"], uncertainty_m=0.005, uncertainty_basis="propagated")}})
+EX_HAT = unalias({"msl_offset_m": 1.2, "zero": "gauge_zero", "named": {"mhw": 1.95, "mhhw": 2.02, "hat": 2.24},
                   "basis": {"mhw": observed("direct", "2023-01-01", "2024-12-31", 24, epoch=OTC_EPOCH, flags=["truncated_lows"]),
                             "mhhw": observed("direct", "2023-01-01", "2024-12-31", 24, epoch=OTC_EPOCH, flags=["truncated_lows"]),
                             "hat": {"kind": "computed", "method": "harmonic_extremes", "epoch": LAT_WINDOW,
@@ -1927,24 +1928,24 @@ EX_CD = unalias({"msl_offset_m": 1.2, "zero": "chart_datum", "zero_name": "CD", 
                            "mhw": observed("direct", "2023-01-01", "2024-12-31", 24, epoch=OTC_EPOCH, flags=["truncated_lows"])}})
 EX_NQC_228 = unalias({"msl_offset_m": 1.15, "zero": "gauge_zero", "named": {"msl": 1.14},
                       "basis": {"msl": observed("first_reduction", "1950-01-01", "1968-12-31", 228,
-                                                flags=["no_qualified_control"], uncertainty_m=0.03)}})
+                                                flags=["no_qualified_control"], uncertainty_m=0.005)}})
 EX_OWN_MONTH_2015 = unalias({"msl_offset_m": 1.2, "zero": "gauge_zero", "named": {"mhw": 1.94},
                              "basis": {"mhw": observed("first_reduction", "2015-01-01", "2015-12-31", 12,
-                                                       flags=["no_qualified_control", "truncated_lows"])}})
+                                                       flags=["no_qualified_control", "truncated_lows"], uncertainty_m=0.04)}})
 EX_NQC_7 = unalias({"msl_offset_m": 1.2, "zero": "gauge_zero", "named": {"msl": 1.21},
                     "basis": {"msl": observed("first_reduction", "2024-01-01", "2024-07-31", 7,
                                               flags=["no_qualified_control", "short_record"], uncertainty_m=0.06)}})
 MIXED_KEYS = ("mhhw", "mhw", "dtl", "mtl", "msl", "mlw", "mllw")
-EX_MIXED_PRIMARY = unalias({"msl_offset_m": 1.3, "zero": "gauge_zero",
-                            "named": {"mhhw": 2.15, "mhw": 1.98, "dtl": 1.3, "mtl": 1.3, "msl": 1.31, "mlw": 0.62, "mllw": 0.45},
+EX_MIXED_PRIMARY = unalias({"msl_offset_m": 3.0, "zero": "gauge_zero",
+                            "named": {"mhhw": 4.4, "mhw": 3.9, "dtl": 2.75, "mtl": 3.0, "msl": 3.01, "mlw": 2.1, "mllw": 1.1},
                             "basis": {k: observed("first_reduction", "2002-01-01", "2020-12-31", 228, epoch=OTC_EPOCH,
                                                   uncertainty_m=0.004, uncertainty_basis="propagated") for k in MIXED_KEYS}})
-EX_STANDARD_6 = unalias({"msl_offset_m": 1.25, "zero": "gauge_zero", "named": {"msl": 1.26},
+EX_STANDARD_6 = unalias({"msl_offset_m": 2.95, "zero": "gauge_zero", "named": {"msl": 2.96},
                          "basis": {"msl": observed("standard", "2024-01-01", "2024-06-30", 6, epoch=OTC_EPOCH,
                                                    flags=["short_record"], uncertainty_m=0.03, control=EX_CONTROL_MIXED)}})
 EX_MSL_TIME_BASE = unalias({"msl_offset_m": 1.05, "zero": "gauge_zero", "named": {"msl": 1.06},
                             "basis": {"msl": observed("modified_range_ratio", "2002-01-01", "2006-04-30", 47, epoch=OTC_EPOCH,
-                                                      flags=["time_base_unverified", "gaps", "segment"])}})
+                                                      flags=["time_base_unverified", "gaps"])}})
 EXAMPLE_ONLY_BLOCKS = (
     ("an mhw by the direct method with truncated_lows", "OTC-EXAMPLE-0012", "gesla-fit-a", EX_DIRECT_MHW),
     ("an mhhw 19-year first reduction with truncated_lows", "OTC-EXAMPLE-0012", "gesla-fit-b", EX_MHHW_19),
