@@ -840,7 +840,7 @@ NOAA_DATUM = {
 
 def gesla_observed(**extra):
     return unalias({"kind": "observed", "method": "modified_range_ratio", "epoch": OTC_EPOCH,
-                 "data_span": {"start": "2007-01-01", "end": "2025-12-31", "months": 214},
+                 "data_span": {"start": "2007-01-01", "end": "2025-12-31", "months": 228},
                  "control": {"station_id": "OTC-EXAMPLE-0001", "set_id": "OTC-EXAMPLE-0001/gesla-fit"},
                  "uncertainty_m": 0.008, "uncertainty_basis": "calibrated", **extra})
 
@@ -1615,7 +1615,7 @@ datum_must_fail("an own-month average of 11 months without short_record",
                 own_months("2024-01-01", "2024-11-30", 11), R_SHORT)
 datum_must_fail("mhw by modified_range_ratio with truncated_lows",
                 edit(high_on_a, "mhw", set_flags("truncated_lows")), R_FLAG_DIRECT)
-datum_must_fail("a comparison of 214 months with short_record", edit(observed_on_a, "msl", set_flags("short_record")), R_SHORT)
+datum_must_fail("a comparison of 228 months with short_record", edit(observed_on_a, "msl", set_flags("short_record")), R_SHORT)
 datum_must_fail("a 19-year determination with short_record",
                 lambda d: [put(first_set, PRIMARY_DATUM)(d), first_set(d)["datum"]["basis"]["msl"].__setitem__("flags", ["short_record"])],
                 R_SHORT)
