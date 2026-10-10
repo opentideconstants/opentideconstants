@@ -376,7 +376,7 @@
             "zero": "gauge_zero",
             "named": { "msl": 1.06 },
             "basis": {
-              "msl": { "kind": "observed", "method": "modified_range_ratio", "epoch": { "start": "2002-01-01", "end": "2020-12-31", "name": "OTC 2002-2020" }, "data_span": { "start": "2002-01-01", "end": "2006-04-30", "months": 52 }, "control": { "station_id": "OTC-EXAMPLE-0001", "set_id": "OTC-EXAMPLE-0001/gesla-fit" }, "uncertainty_m": 0.02, "uncertainty_basis": "calibrated", "flags": ["time_base_unverified", "segment"] }
+              "msl": { "kind": "observed", "method": "modified_range_ratio", "epoch": { "start": "2002-01-01", "end": "2020-12-31", "name": "OTC 2002-2020" }, "data_span": { "start": "2002-01-01", "end": "2006-04-30", "months": 47 }, "control": { "station_id": "OTC-EXAMPLE-0001", "set_id": "OTC-EXAMPLE-0001/gesla-fit" }, "uncertainty_m": 0.02, "uncertainty_basis": "calibrated", "flags": ["time_base_unverified", "gaps", "segment"] }
             }
           },
           "qc_status": "flagged",
@@ -788,14 +788,14 @@
     {
       "station_id": "OTC-EXAMPLE-0012",
       "status": "active",
-      "name": "Example Estuary (illustrative values, not data; one datum shape per set)",
+      "name": "Example Estuary; one datum shape per set (illustrative values, not data)",
       "country": "NOR",
       "lat": 60.4,
       "lon": 5.3,
       "timezone": "Europe/Oslo",
       "type": "reference",
-      "aliases": { "gesla": ["example-estuary-a", "example-estuary-b", "example-estuary-c", "example-estuary-d", "example-estuary-e", "example-estuary-f", "example-estuary-g", "example-estuary-h"] },
-      "recommended_set_id": "OTC-EXAMPLE-0012/gesla-fit-h",
+      "aliases": { "gesla": ["example-estuary-a", "example-estuary-b", "example-estuary-c", "example-estuary-d", "example-estuary-e"] },
+      "recommended_set_id": "OTC-EXAMPLE-0012/gesla-fit-e",
       "constant_sets": [
         {
           "set_id": "OTC-EXAMPLE-0012/gesla-fit-a",
@@ -839,41 +839,6 @@
           "quantity": "water_level",
           "source_record_id": "example-estuary-b",
           "source_version": "4.1",
-          "record_span": { "start": "2015-01-01T00:00:00Z", "end": "2016-01-01T00:00:00Z", "good_samples": 8500, "good_hours": 8500 },
-          "datum": {
-            "msl_offset_m": 1.2,
-            "zero": "gauge_zero",
-            "named": { "mhw": 1.94 },
-            "basis": {
-              "mhw": { "kind": "observed", "method": "first_reduction", "epoch": { "start": "2015-01-01", "end": "2015-12-31" }, "data_span": { "start": "2015-01-01", "end": "2015-12-31", "months": 12 }, "uncertainty_m": 0.02, "uncertainty_basis": "calibrated", "flags": ["no_qualified_control", "truncated_lows"] }
-            }
-          },
-          "convention_id": "otc-greenwich-schureman-v1",
-          "licence_id": "gesla-derived",
-          "qc_status": "flagged",
-          "qc_flags": [{ "flag": "broken_record", "reason": "low waters flat-lined: the gauge dries below 0.4 m" }],
-          "record_issues": [{ "issue": "flatline", "start": "2015-01-01T00:00:00Z", "end": "2016-01-01T00:00:00Z", "reason": "low waters cut off at the gauge's lowest reading" }],
-          "constituents": [
-            { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 0.8, "phase_deg": 120.0 },
-            { "name": "S2", "speed_deg_per_hour": 30.0, "amplitude_m": 0.25, "phase_deg": 160.0 }
-          ],
-          "time_base": {
-            "code": "verified",
-            "reason": "declared utc_instant confirmed by EOT20",
-            "declared": "utc_instant",
-            "published": "utc_instant",
-            "decided_in": "20991231",
-            "evidence": [{ "comparator_kind": "model", "comparator_id": "eot20", "distance_km": 1.0, "lag_min": 0.5 }]
-          },
-          "provenance": { "build": { "build_commit": "0000000" }, "selection_reason": "example of one datum shape", "decision": { "tier": "rule", "outcome": "accept" } }
-        },
-        {
-          "set_id": "OTC-EXAMPLE-0012/gesla-fit-c",
-          "source": "gesla-fit",
-          "source_type": "gauge",
-          "quantity": "water_level",
-          "source_record_id": "example-estuary-c",
-          "source_version": "4.1",
           "record_span": { "start": "2002-01-01T00:00:00Z", "end": "2021-01-01T00:00:00Z", "good_samples": 160000, "good_hours": 160000 },
           "datum": {
             "msl_offset_m": 1.2,
@@ -903,11 +868,11 @@
           "provenance": { "build": { "build_commit": "0000000" }, "selection_reason": "example of one datum shape", "decision": { "tier": "rule", "outcome": "accept" } }
         },
         {
-          "set_id": "OTC-EXAMPLE-0012/gesla-fit-d",
+          "set_id": "OTC-EXAMPLE-0012/gesla-fit-c",
           "source": "gesla-fit",
           "source_type": "gauge",
           "quantity": "water_level",
-          "source_record_id": "example-estuary-d",
+          "source_record_id": "example-estuary-c",
           "source_version": "4.1",
           "record_span": { "start": "2023-01-01T00:00:00Z", "end": "2025-01-01T00:00:00Z", "good_samples": 17000, "good_hours": 17000 },
           "datum": {
@@ -940,11 +905,11 @@
           "provenance": { "build": { "build_commit": "0000000" }, "selection_reason": "example of one datum shape", "decision": { "tier": "rule", "outcome": "accept" } }
         },
         {
-          "set_id": "OTC-EXAMPLE-0012/gesla-fit-e",
+          "set_id": "OTC-EXAMPLE-0012/gesla-fit-d",
           "source": "gesla-fit",
           "source_type": "gauge",
           "quantity": "water_level",
-          "source_record_id": "example-estuary-e",
+          "source_record_id": "example-estuary-d",
           "source_version": "4.1",
           "record_span": { "start": "2023-01-01T00:00:00Z", "end": "2025-01-01T00:00:00Z", "good_samples": 17000, "good_hours": 17000 },
           "datum": {
@@ -978,83 +943,11 @@
           "provenance": { "build": { "build_commit": "0000000" }, "selection_reason": "example of one datum shape", "decision": { "tier": "rule", "outcome": "accept" } }
         },
         {
-          "set_id": "OTC-EXAMPLE-0012/gesla-fit-f",
+          "set_id": "OTC-EXAMPLE-0012/gesla-fit-e",
           "source": "gesla-fit",
           "source_type": "gauge",
           "quantity": "water_level",
-          "source_record_id": "example-estuary-f",
-          "source_version": "4.1",
-          "record_span": { "start": "2024-01-01T00:00:00Z", "end": "2024-08-01T00:00:00Z", "good_samples": 5000, "good_hours": 5000 },
-          "datum": {
-            "msl_offset_m": 1.2,
-            "zero": "gauge_zero",
-            "named": { "msl": 1.21 },
-            "basis": {
-              "msl": { "kind": "observed", "method": "first_reduction", "epoch": { "start": "2024-01-01", "end": "2024-07-31" }, "data_span": { "start": "2024-01-01", "end": "2024-07-31", "months": 7 }, "uncertainty_m": 0.06, "uncertainty_basis": "calibrated", "flags": ["no_qualified_control", "short_record"] }
-            }
-          },
-          "convention_id": "otc-greenwich-schureman-v1",
-          "licence_id": "gesla-derived",
-          "qc_status": "flagged",
-          "qc_flags": [{ "flag": "short_record", "reason": "208 days of good data: K2 cannot be separated from S2" }],
-          "dropped_constituents": [{ "name": "K2", "dropped_reason": "rayleigh", "not_separable_from": "S2" }],
-          "expected_accuracy": { "cut_to_days": 208, "calibration_records": 25, "amp_uncertainty_m": 0.006, "phase_uncertainty_deg": 1.2 },
-          "constituents": [
-            { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 0.8, "phase_deg": 120.0 },
-            { "name": "S2", "speed_deg_per_hour": 30.0, "amplitude_m": 0.25, "phase_deg": 160.0 }
-          ],
-          "time_base": {
-            "code": "verified",
-            "reason": "declared utc_instant confirmed by EOT20",
-            "declared": "utc_instant",
-            "published": "utc_instant",
-            "decided_in": "20991231",
-            "evidence": [{ "comparator_kind": "model", "comparator_id": "eot20", "distance_km": 1.0, "lag_min": 0.5 }]
-          },
-          "provenance": { "build": { "build_commit": "0000000" }, "selection_reason": "example of one datum shape", "decision": { "tier": "rule", "outcome": "accept" } }
-        },
-        {
-          "set_id": "OTC-EXAMPLE-0012/gesla-fit-g",
-          "source": "gesla-fit",
-          "source_type": "gauge",
-          "quantity": "water_level",
-          "source_record_id": "example-estuary-g",
-          "source_version": "4.1",
-          "record_span": { "start": "2024-01-01T00:00:00Z", "end": "2024-07-01T00:00:00Z", "good_samples": 4300, "good_hours": 4300 },
-          "datum": {
-            "msl_offset_m": 1.2,
-            "zero": "gauge_zero",
-            "named": { "msl": 1.2 },
-            "basis": {
-              "msl": { "kind": "observed", "method": "standard", "epoch": { "start": "2002-01-01", "end": "2020-12-31", "name": "OTC 2002-2020" }, "data_span": { "start": "2024-01-01", "end": "2024-06-30", "months": 6 }, "control": { "station_id": "OTC-EXAMPLE-0001", "set_id": "OTC-EXAMPLE-0001/gesla-fit" }, "uncertainty_m": 0.03, "uncertainty_basis": "calibrated", "flags": ["short_record"] }
-            }
-          },
-          "convention_id": "otc-greenwich-schureman-v1",
-          "licence_id": "gesla-derived",
-          "qc_status": "flagged",
-          "qc_flags": [{ "flag": "short_record", "reason": "179 days of good data: K2 cannot be separated from S2" }],
-          "dropped_constituents": [{ "name": "K2", "dropped_reason": "rayleigh", "not_separable_from": "S2" }],
-          "expected_accuracy": { "cut_to_days": 179, "calibration_records": 25, "amp_uncertainty_m": 0.006, "phase_uncertainty_deg": 1.2 },
-          "constituents": [
-            { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 0.8, "phase_deg": 120.0 },
-            { "name": "S2", "speed_deg_per_hour": 30.0, "amplitude_m": 0.25, "phase_deg": 160.0 }
-          ],
-          "time_base": {
-            "code": "verified",
-            "reason": "declared utc_instant confirmed by EOT20",
-            "declared": "utc_instant",
-            "published": "utc_instant",
-            "decided_in": "20991231",
-            "evidence": [{ "comparator_kind": "model", "comparator_id": "eot20", "distance_km": 1.0, "lag_min": 0.5 }]
-          },
-          "provenance": { "build": { "build_commit": "0000000" }, "selection_reason": "example of one datum shape", "decision": { "tier": "rule", "outcome": "accept" } }
-        },
-        {
-          "set_id": "OTC-EXAMPLE-0012/gesla-fit-h",
-          "source": "gesla-fit",
-          "source_type": "gauge",
-          "quantity": "water_level",
-          "source_record_id": "example-estuary-h",
+          "source_record_id": "example-estuary-e",
           "source_version": "4.1",
           "record_span": { "start": "1950-01-01T00:00:00Z", "end": "1969-01-01T00:00:00Z", "good_samples": 160000, "good_hours": 160000 },
           "datum": {
@@ -1101,7 +994,7 @@
           "source_type": "gauge",
           "quantity": "water_level",
           "source_record_id": "example-pegel",
-          "source_version": "4.1",
+          "source_version": "20991231",
           "record_span": { "start": "2010-11-01T00:00:00Z", "end": "2020-11-01T00:00:00Z", "good_samples": 85000, "good_hours": 85000 },
           "datum": {
             "msl_offset_m": 5.0,
@@ -1117,11 +1010,203 @@
           "convention_id": "otc-greenwich-schureman-v1",
           "licence_id": "pegelonline",
           "qc_status": "flagged",
-          "qc_flags": [{ "flag": "broken_record", "reason": "low waters flat-lined: the gauge dries below 0.4 m" }],
+          "qc_flags": [{ "flag": "broken_record", "reason": "low waters flat-lined: the gauge dries below 3.6 m above PNP" }],
           "record_issues": [{ "issue": "flatline", "start": "2010-11-01T00:00:00Z", "end": "2020-11-01T00:00:00Z", "reason": "low waters cut off at the gauge's lowest reading" }],
           "constituents": [
             { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 0.8, "phase_deg": 120.0 },
             { "name": "S2", "speed_deg_per_hour": 30.0, "amplitude_m": 0.25, "phase_deg": 160.0 }
+          ],
+          "time_base": {
+            "code": "verified",
+            "reason": "declared utc_instant confirmed by EOT20",
+            "declared": "utc_instant",
+            "published": "utc_instant",
+            "decided_in": "20991231",
+            "evidence": [{ "comparator_kind": "model", "comparator_id": "eot20", "distance_km": 1.0, "lag_min": 0.5 }]
+          },
+          "provenance": { "build": { "build_commit": "0000000" }, "selection_reason": "example of one datum shape", "decision": { "tier": "rule", "outcome": "accept" } }
+        }
+      ]
+    },
+    {
+      "station_id": "OTC-EXAMPLE-0014",
+      "status": "active",
+      "name": "Example Skerries, far from any control (illustrative values, not data)",
+      "country": "NOR",
+      "lat": 66.0,
+      "lon": 13.0,
+      "timezone": "Europe/Oslo",
+      "type": "reference",
+      "aliases": { "gesla": ["example-skerries-a", "example-skerries-b"] },
+      "recommended_set_id": "OTC-EXAMPLE-0014/gesla-fit-a",
+      "constant_sets": [
+        {
+          "set_id": "OTC-EXAMPLE-0014/gesla-fit-a",
+          "source": "gesla-fit",
+          "source_type": "gauge",
+          "quantity": "water_level",
+          "source_record_id": "example-skerries-a",
+          "source_version": "4.1",
+          "record_span": { "start": "2015-01-01T00:00:00Z", "end": "2016-01-01T00:00:00Z", "good_samples": 8500, "good_hours": 8500 },
+          "datum": {
+            "msl_offset_m": 1.2,
+            "zero": "gauge_zero",
+            "named": { "mhw": 1.94 },
+            "basis": {
+              "mhw": { "kind": "observed", "method": "first_reduction", "epoch": { "start": "2015-01-01", "end": "2015-12-31" }, "data_span": { "start": "2015-01-01", "end": "2015-12-31", "months": 12 }, "uncertainty_m": 0.02, "uncertainty_basis": "calibrated", "flags": ["no_qualified_control", "truncated_lows"] }
+            }
+          },
+          "convention_id": "otc-greenwich-schureman-v1",
+          "licence_id": "gesla-derived",
+          "qc_status": "flagged",
+          "qc_flags": [{ "flag": "broken_record", "reason": "low waters flat-lined: the gauge dries below 0.4 m" }],
+          "record_issues": [{ "issue": "flatline", "start": "2015-01-01T00:00:00Z", "end": "2016-01-01T00:00:00Z", "reason": "low waters cut off at the gauge's lowest reading" }],
+          "constituents": [
+            { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 0.8, "phase_deg": 120.0 },
+            { "name": "S2", "speed_deg_per_hour": 30.0, "amplitude_m": 0.25, "phase_deg": 160.0 }
+          ],
+          "time_base": {
+            "code": "verified",
+            "reason": "declared utc_instant confirmed by EOT20",
+            "declared": "utc_instant",
+            "published": "utc_instant",
+            "decided_in": "20991231",
+            "evidence": [{ "comparator_kind": "model", "comparator_id": "eot20", "distance_km": 1.0, "lag_min": 0.5 }]
+          },
+          "provenance": { "build": { "build_commit": "0000000" }, "selection_reason": "example of one datum shape", "decision": { "tier": "rule", "outcome": "accept" } }
+        },
+        {
+          "set_id": "OTC-EXAMPLE-0014/gesla-fit-b",
+          "source": "gesla-fit",
+          "source_type": "gauge",
+          "quantity": "water_level",
+          "source_record_id": "example-skerries-b",
+          "source_version": "4.1",
+          "record_span": { "start": "2024-01-01T00:00:00Z", "end": "2024-08-01T00:00:00Z", "good_samples": 5000, "good_hours": 5000 },
+          "datum": {
+            "msl_offset_m": 1.2,
+            "zero": "gauge_zero",
+            "named": { "msl": 1.21 },
+            "basis": {
+              "msl": { "kind": "observed", "method": "first_reduction", "epoch": { "start": "2024-01-01", "end": "2024-07-31" }, "data_span": { "start": "2024-01-01", "end": "2024-07-31", "months": 7 }, "uncertainty_m": 0.06, "uncertainty_basis": "calibrated", "flags": ["no_qualified_control", "short_record"] }
+            }
+          },
+          "convention_id": "otc-greenwich-schureman-v1",
+          "licence_id": "gesla-derived",
+          "qc_status": "flagged",
+          "qc_flags": [{ "flag": "short_record", "reason": "208 days of good data: T2 cannot be separated from S2" }],
+          "dropped_constituents": [{ "name": "T2", "dropped_reason": "rayleigh", "not_separable_from": "S2" }],
+          "expected_accuracy": { "cut_to_days": 208, "calibration_records": 25, "amp_uncertainty_m": 0.006, "phase_uncertainty_deg": 1.2 },
+          "constituents": [
+            { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 0.8, "phase_deg": 120.0 },
+            { "name": "S2", "speed_deg_per_hour": 30.0, "amplitude_m": 0.25, "phase_deg": 160.0 }
+          ],
+          "time_base": {
+            "code": "verified",
+            "reason": "declared utc_instant confirmed by EOT20",
+            "declared": "utc_instant",
+            "published": "utc_instant",
+            "decided_in": "20991231",
+            "evidence": [{ "comparator_kind": "model", "comparator_id": "eot20", "distance_km": 1.0, "lag_min": 0.5 }]
+          },
+          "provenance": { "build": { "build_commit": "0000000" }, "selection_reason": "example of one datum shape", "decision": { "tier": "rule", "outcome": "accept" } }
+        }
+      ]
+    },
+    {
+      "station_id": "OTC-EXAMPLE-0015",
+      "status": "active",
+      "name": "Example Mixed Sound (illustrative values, not data)",
+      "country": "NOR",
+      "lat": 63.4,
+      "lon": 10.4,
+      "timezone": "Europe/Oslo",
+      "type": "reference",
+      "aliases": { "gesla": ["example-mixed-sound"] },
+      "recommended_set_id": "OTC-EXAMPLE-0015/gesla-fit",
+      "constant_sets": [
+        {
+          "set_id": "OTC-EXAMPLE-0015/gesla-fit",
+          "source": "gesla-fit",
+          "source_type": "gauge",
+          "quantity": "water_level",
+          "source_record_id": "example-mixed-sound",
+          "source_version": "4.1",
+          "record_span": { "start": "2002-01-01T00:00:00Z", "end": "2026-01-01T00:00:00Z", "good_samples": 210000, "good_hours": 210000 },
+          "datum": {
+            "msl_offset_m": 1.3,
+            "zero": "gauge_zero",
+            "named": { "mhhw": 2.15, "mhw": 1.98, "dtl": 1.3, "mtl": 1.3, "msl": 1.31, "mlw": 0.62, "mllw": 0.45 },
+            "basis": {
+              "mhhw": { "kind": "observed", "method": "first_reduction", "epoch": { "start": "2002-01-01", "end": "2020-12-31", "name": "OTC 2002-2020" }, "data_span": { "start": "2002-01-01", "end": "2020-12-31", "months": 228 }, "uncertainty_m": 0.004, "uncertainty_basis": "propagated" },
+              "mhw": { "kind": "observed", "method": "first_reduction", "epoch": { "start": "2002-01-01", "end": "2020-12-31", "name": "OTC 2002-2020" }, "data_span": { "start": "2002-01-01", "end": "2020-12-31", "months": 228 }, "uncertainty_m": 0.004, "uncertainty_basis": "propagated" },
+              "dtl": { "kind": "observed", "method": "first_reduction", "epoch": { "start": "2002-01-01", "end": "2020-12-31", "name": "OTC 2002-2020" }, "data_span": { "start": "2002-01-01", "end": "2020-12-31", "months": 228 }, "uncertainty_m": 0.004, "uncertainty_basis": "propagated" },
+              "mtl": { "kind": "observed", "method": "first_reduction", "epoch": { "start": "2002-01-01", "end": "2020-12-31", "name": "OTC 2002-2020" }, "data_span": { "start": "2002-01-01", "end": "2020-12-31", "months": 228 }, "uncertainty_m": 0.004, "uncertainty_basis": "propagated" },
+              "msl": { "kind": "observed", "method": "first_reduction", "epoch": { "start": "2002-01-01", "end": "2020-12-31", "name": "OTC 2002-2020" }, "data_span": { "start": "2002-01-01", "end": "2020-12-31", "months": 228 }, "uncertainty_m": 0.004, "uncertainty_basis": "propagated" },
+              "mlw": { "kind": "observed", "method": "first_reduction", "epoch": { "start": "2002-01-01", "end": "2020-12-31", "name": "OTC 2002-2020" }, "data_span": { "start": "2002-01-01", "end": "2020-12-31", "months": 228 }, "uncertainty_m": 0.004, "uncertainty_basis": "propagated" },
+              "mllw": { "kind": "observed", "method": "first_reduction", "epoch": { "start": "2002-01-01", "end": "2020-12-31", "name": "OTC 2002-2020" }, "data_span": { "start": "2002-01-01", "end": "2020-12-31", "months": 228 }, "uncertainty_m": 0.004, "uncertainty_basis": "propagated" }
+            }
+          },
+          "convention_id": "otc-greenwich-schureman-v1",
+          "licence_id": "gesla-derived",
+          "qc_status": "ok",
+          "constituents": [
+            { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 0.6, "phase_deg": 110.0 },
+            { "name": "S2", "speed_deg_per_hour": 30.0, "amplitude_m": 0.2, "phase_deg": 150.0 },
+            { "name": "K1", "speed_deg_per_hour": 15.0410686, "amplitude_m": 0.25, "phase_deg": 210.0 },
+            { "name": "O1", "speed_deg_per_hour": 13.9430356, "amplitude_m": 0.17, "phase_deg": 190.0 }
+          ],
+          "time_base": {
+            "code": "verified",
+            "reason": "declared utc_instant confirmed by EOT20",
+            "declared": "utc_instant",
+            "published": "utc_instant",
+            "decided_in": "20991231",
+            "evidence": [{ "comparator_kind": "model", "comparator_id": "eot20", "distance_km": 1.0, "lag_min": 0.5 }]
+          },
+          "provenance": { "build": { "build_commit": "0000000" }, "selection_reason": "example of one datum shape", "decision": { "tier": "rule", "outcome": "accept" } }
+        }
+      ]
+    },
+    {
+      "station_id": "OTC-EXAMPLE-0016",
+      "status": "active",
+      "name": "Example Mixed Cove (illustrative values, not data)",
+      "country": "NOR",
+      "lat": 63.5,
+      "lon": 10.6,
+      "timezone": "Europe/Oslo",
+      "type": "reference",
+      "aliases": { "gesla": ["example-mixed-cove"] },
+      "recommended_set_id": "OTC-EXAMPLE-0016/gesla-fit",
+      "constant_sets": [
+        {
+          "set_id": "OTC-EXAMPLE-0016/gesla-fit",
+          "source": "gesla-fit",
+          "source_type": "gauge",
+          "quantity": "water_level",
+          "source_record_id": "example-mixed-cove",
+          "source_version": "4.1",
+          "record_span": { "start": "2024-01-01T00:00:00Z", "end": "2024-07-01T00:00:00Z", "good_samples": 4300, "good_hours": 4300 },
+          "datum": {
+            "msl_offset_m": 1.25,
+            "zero": "gauge_zero",
+            "named": { "msl": 1.26 },
+            "basis": {
+              "msl": { "kind": "observed", "method": "standard", "epoch": { "start": "2002-01-01", "end": "2020-12-31", "name": "OTC 2002-2020" }, "data_span": { "start": "2024-01-01", "end": "2024-06-30", "months": 6 }, "control": { "station_id": "OTC-EXAMPLE-0015", "set_id": "OTC-EXAMPLE-0015/gesla-fit" }, "uncertainty_m": 0.03, "uncertainty_basis": "calibrated", "flags": ["short_record"] }
+            }
+          },
+          "convention_id": "otc-greenwich-schureman-v1",
+          "licence_id": "gesla-derived",
+          "qc_status": "flagged",
+          "qc_flags": [{ "flag": "short_record", "reason": "179 days of good data: K2 cannot be separated from S2" }],
+          "dropped_constituents": [{ "name": "K2", "dropped_reason": "rayleigh", "not_separable_from": "S2" }],
+          "expected_accuracy": { "cut_to_days": 179, "calibration_records": 25, "amp_uncertainty_m": 0.006, "phase_uncertainty_deg": 1.2 },
+          "constituents": [
+            { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 0.55, "phase_deg": 112.0 },
+            { "name": "S2", "speed_deg_per_hour": 30.0, "amplitude_m": 0.18, "phase_deg": 151.0 },
+            { "name": "K1", "speed_deg_per_hour": 15.0410686, "amplitude_m": 0.24, "phase_deg": 212.0 },
+            { "name": "O1", "speed_deg_per_hour": 13.9430356, "amplitude_m": 0.16, "phase_deg": 191.0 }
           ],
           "time_base": {
             "code": "verified",
