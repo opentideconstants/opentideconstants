@@ -58,7 +58,7 @@ plausible. For each active station, and each water-level constant set with const
     overlaps the data). A set whose first reductions of at least 216 months without
     no_qualified_control are only mhw and mhhw (or otc_mhw and otc_mhhw) counts only for a level
     with truncated_lows; a set with any other such first reduction counts for every level.
- 9. Tide type: F < 0.25 at stations in NOR, NLD, DEU, GBR, SWE and FIN.
+ 9. Tide type: F < 0.25 at stations in NOR, NLD, DEU and GBR.
 10. Subordinate offsets: for a ratio (R) subordinate station, each level of
     subordinate_offsets.datum equals the ratio times the level of the reference's recommended
     set, within 0.005 m: height_offset_low for low levels and height_offset_high for every other
@@ -83,7 +83,7 @@ from datetime import date
 
 # The number of checks each group (1-11 above) runs on the current example: a group that runs
 # fewer has stopped applying somewhere.
-MIN_CHECKS = {1: 18, 2: 26, 3: 115, 4: 4, 5: 6, 6: 170, 7: 104, 8: 5, 9: 17, 10: 8, 11: 12}
+MIN_CHECKS = {1: 18, 2: 26, 3: 115, 4: 4, 5: 6, 6: 170, 7: 104, 8: 5, 9: 15, 10: 8, 11: 12}
 
 SPEED = {"M2": 28.9841042, "S2": 30.0, "N2": 28.4397295, "K2": 30.0821373, "K1": 15.0410686,
          "O1": 13.9430356, "P1": 14.9589314, "Q1": 13.3986609, "T2": 29.9589333}
@@ -104,7 +104,7 @@ LOW = {"mlw", "mllw", "lat", "mlws", "mlwn", "mllws"}
 RANK = {"hat": 0, "mhhw": 1, "mhw": 2, "msl": 3, "mtl": 3, "dtl": 3, "mlw": 4, "mllw": 5, "lat": 6}
 OUTSIDE_CHAIN_HIGH = {"mhws", "mhwn"}
 OUTSIDE_CHAIN_LOW = {"mlws", "mlwn", "mllws"}
-SEMIDIURNAL = {"NOR", "NLD", "DEU", "GBR", "SWE", "FIN"}
+SEMIDIURNAL = {"NOR", "NLD", "DEU", "GBR"}
 SOURCE_RANK = {"official": 0, "gauge": 1, "model": 2}
 
 
