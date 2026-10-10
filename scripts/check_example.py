@@ -64,8 +64,9 @@ plausible. For each active station, and each water-level constant set with const
     0.25 <= F <= 3.0 at CAN stations west of 120 W (British Columbia).
 10. Subordinate offsets: for a ratio (R) subordinate station, each level of
     subordinate_offsets.datum equals the ratio times the level of the reference's recommended
-    set (its otc_ level for a computed one), within 0.005 m: height_offset_low for low levels
-    and height_offset_high for every other level.
+    set, within 0.005 m: height_offset_low for low levels and height_offset_high for every other
+    level. A computed level is compared with the reference's otc_ level; the reference must have
+    that level (and the same key for a published one), or the check fails.
 11. Recommended set: for each station with water-level sets, recommended_set_id is the set the
     published rule picks among those with constants: official before gauge fit before model;
     then the most good hours in 2002-2020, estimated as good_hours times the share of the record
@@ -85,7 +86,7 @@ from datetime import date
 
 # The number of checks each group (1-11 above) runs on the current example: a group that runs
 # fewer has stopped applying somewhere.
-MIN_CHECKS = {1: 18, 2: 26, 3: 115, 4: 4, 5: 6, 6: 170, 7: 104, 8: 5, 9: 20, 10: 4, 11: 12}
+MIN_CHECKS = {1: 18, 2: 26, 3: 115, 4: 4, 5: 6, 6: 170, 7: 104, 8: 5, 9: 20, 10: 8, 11: 12}
 
 SPEED = {"M2": 28.9841042, "S2": 30.0, "N2": 28.4397295, "K2": 30.0821373, "K1": 15.0410686,
          "O1": 13.9430356, "P1": 14.9589314, "Q1": 13.3986609, "T2": 29.9589333}
@@ -387,9 +388,9 @@ def audit(doc):
         rnamed = refset.get("datum", {}).get("named", {}) if refset else {}
         for k, v in so["datum"].get("named", {}).items():
             kind = so["datum"]["basis"].get(k, {}).get("kind")
-            rk = "otc_" + k if kind == "computed" and "otc_" + k in rnamed else k
+            rk = "otc_" + k if kind == "computed" else k
+            row(f"{st['station_id']} {k}", f"the reference has {rk}", sorted(rnamed), f"{rk} in the reference's datum", rk in rnamed)
             if rk not in rnamed:
-                row(f"{st['station_id']} {k}", "subordinate level has a reference level", rk, "in the reference datum", False)
                 continue
             ratio = so["height_offset_low"] if k in LOW else so["height_offset_high"]
             row(f"{st['station_id']} {k}", f"subordinate level = ratio x reference {rk}", v, f"{ratio} x {rnamed[rk]} = {ratio * rnamed[rk]:.3f}",
