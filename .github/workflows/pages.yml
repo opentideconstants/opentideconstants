@@ -41,8 +41,9 @@ jobs:
         run: npx --yes html-validate@11 "dist/**/*.html"
       - name: Check JSON Schema and example
         run: |
-          python -m pip install --quiet 'jsonschema[format-nongpl]'
+          python -m pip install --quiet -c .github/constraints-schema-check.txt 'jsonschema[format-nongpl]==4.26.0'
           python scripts/check_schema.py
+          python scripts/check_example.py
       - name: Upload Pages artifact
         if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3

@@ -10,7 +10,7 @@ layout: full
 <div class="top">
   <div class="kicker">OpenTideConstants · field guide</div>
   <h1>Tide Mechanics</h1>
-  <p class="lede">How a few numbers per station turn into a tide prediction, and which of those numbers OTC owns.</p>
+  <p class="lede">How a few numbers per station (per constant set) turn into a tide prediction, and which of those numbers OTC owns.</p>
   <ol class="toc">
     <li><a href="#s1">1 Sum of waves</a></li><li><a href="#s2">2 Constituents</a></li><li><a href="#s3">3 The formula</a></li>
     <li><a href="#s4">4 Phase and time base</a></li><li><a href="#s5">5 Analysis</a></li><li><a href="#s6">6 Record length</a></li>
@@ -64,9 +64,9 @@ layout: full
     <span>·cos(</span><button class="t" type="button" data-term="w" data-owner="fix" aria-pressed="false">ω</button><span>t + </span><button class="t" type="button" data-term="v0" data-owner="pred" aria-pressed="false">V<sub>0</sub></button>
     <span> + </span><button class="t" type="button" data-term="u" data-owner="pred" aria-pressed="false">u</button><span> − </span><button class="t" type="button" data-term="g" data-owner="pub" aria-pressed="false">g</button><span>)</span>
   </div>
-  <div class="btnrow"><span class="pill pub">OTC publishes per station</span><span class="pill pred">OTC publishes per year</span><span class="pill fix">fixed by astronomy</span></div>
+  <div class="btnrow"><span class="pill pub">OTC publishes per constant set</span><span class="pill pred">OTC publishes per year</span><span class="pill fix">fixed by astronomy</span></div>
   <ul class="terms" id="s3-terms">
-    <li data-term="z0"><b>Z<sub>0</sub></b> Mean water level above the chart datum. One number per station. <span class="pill pub">OTC</span></li>
+    <li data-term="z0"><b>Z<sub>0</sub></b> Mean water level above the set's zero (see <a href="/data-format/#fields">Data format</a>). One number per constant set. <span class="pill pub">OTC</span></li>
     <li data-term="H"><b>H</b> Amplitude: half the crest-to-trough height of this constituent. <span class="pill pub">OTC</span></li>
     <li data-term="g"><b>g</b> Phase lag: how many degrees the local crest trails the Moon or Sun's pull. <span class="pill pub">OTC</span></li>
     <li data-term="w"><b>ω</b> Speed in °/h. Identical worldwide. <span class="pill fix">astronomy</span></li>
@@ -179,7 +179,7 @@ layout: full
       <div class="chips"><span class="chip">broken_record</span><span class="chip">short_record</span></div></div></li>
     <li><span class="dot">fit</span><div><h3>Harmonic fit</h3><p>Least squares over the hours of good data. Record length decides how many constituents enter (section 6).</p></div></li>
     <li><span class="dot">✓</span><div><h3>Canary check</h3><p>Compares fitted H and g with official constants at overlapping stations to catch systematic errors.</p></div></li>
-    <li><span class="dot">db</span><div><h3>Combined dataset</h3><p>Z<sub>0</sub>, and H and g per constituent, per station. Every constant set carries a <code>qc_status</code>, its <code>time_base</code> annotation and its <code>provenance</code>. A short record never outranks a set with more hours of good data at the same station. When a source fails its checks, its sets are carried over from an earlier release and flagged <code>carried_over</code>. JMA stations that JMA does not own are used only to check fits. They are never in the release files.</p>
+    <li><span class="dot">db</span><div><h3>Combined dataset</h3><p>Z<sub>0</sub>, and H and g per constituent, per constant set; a station can have several sets. Every constant set carries a <code>qc_status</code>, its <code>time_base</code> annotation and its <code>provenance</code>. A short record never outranks a set with more hours of good data at the same station. When a source fails its checks, its sets are carried over from an earlier release and flagged <code>carried_over</code>. JMA stations that JMA does not own are used only to check fits. They are never in the release files.</p>
       <div class="chips"><span class="chip v">ok</span><span class="chip c">flagged</span><span class="chip u">no_constants</span></div></div></li>
     <li><span class="dot">rel</span><div><h3>Release</h3><p>Dated release files (<code>OTC_{YYYYMMDD}</code>) on <code>data.opentideconstants.org</code>. The pointer <code>OTC_latest-f1.json</code> names the newest release in format 1. Cite a release by the concept DOI and its datestamp (<a href="/about/#cite">How to cite</a>).</p></div></li>
     <li><span class="dot">sdk</span><div><h3>SDKs</h3><p>Python, Ruby, TypeScript and C libraries read a release, check its SHA-256 checksums, and give typed access to stations, constant sets, constituents (H and g), provenance and licences. They also predict tides and currents from the release.</p>
