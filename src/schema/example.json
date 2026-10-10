@@ -76,6 +76,20 @@
       "provider": "Rijkswaterstaat",
       "attribution": "Example attribution text.",
       "commercial_use": true
+    },
+    {
+      "licence_id": "smhi",
+      "spdx": "CC-BY-4.0",
+      "provider": "SMHI",
+      "attribution": "Example attribution text.",
+      "commercial_use": true
+    },
+    {
+      "licence_id": "fmi",
+      "spdx": "CC-BY-4.0",
+      "provider": "Finnish Meteorological Institute",
+      "attribution": "Example attribution text.",
+      "commercial_use": true
     }
   ],
   "constituents": [
@@ -175,11 +189,13 @@
           "datum": {
             "msl_offset_m": 0.9,
             "zero": "chart_datum",
-            "chart_datum": "lat",
-            "named": { "lat": 0.0, "msl": 0.9 },
+            "zero_name": "CD",
+            "chart_datum": "cd",
+            "named": { "cd": 0.0, "lat": 0.0, "msl": 0.9 },
             "basis": {
+              "cd": { "kind": "published", "method": "source", "source_name": "CD" },
               "lat": { "kind": "published", "method": "source", "source_name": "LAT" },
-              "msl": { "kind": "published", "method": "source", "source_name": "MSL" }
+              "msl": { "kind": "published", "method": "source", "source_name": "MSL", "epoch": { "start": "1996-01-01", "end": "2014-12-31", "name": "Kartverket MSL 1996-2014" } }
             }
           },
           "convention_id": "kartverket-utc1-v1",
@@ -348,6 +364,16 @@
           "licence_id": "gesla-cmems-nc",
           "source_record_id": "example-fjord-b",
           "record_span": { "start": "2000-01-01T00:00:00Z", "end": "2012-01-01T00:00:00Z", "good_samples": 220000, "good_hours": 55000 },
+          "datum": {
+            "msl_offset_m": 1.1,
+            "zero": "chart_datum",
+            "zero_name": "ACD",
+            "chart_datum": "cd",
+            "named": { "cd": 0.0 },
+            "basis": {
+              "cd": { "kind": "published", "method": "source", "source_name": "Admiralty Chart Datum (ACD)" }
+            }
+          },
           "qc_status": "flagged",
           "qc_flags": [
             { "flag": "broken_record", "reason": "datum step on 2006-05-14; constants are fitted to the segment before it" },
@@ -492,6 +518,7 @@
       "lon": -71.05,
       "timezone": "America/New_York",
       "type": "reference",
+      "aliases": { "noaa": "8443970" },
       "recommended_set_id": "OTC-EXAMPLE-0006/noaa",
       "constant_sets": [
         {
@@ -506,14 +533,15 @@
             "zero": "chart_datum",
             "zero_name": "MLLW",
             "chart_datum": "mllw",
-            "named": { "mhhw": 3.141, "msl": 1.554, "mllw": 0.0, "lat": -0.511, "hat": 3.765, "otc_lat": -0.523 },
+            "named": { "mhhw": 3.141, "msl": 1.554, "mllw": 0.0, "lat": -0.511, "hat": 3.765, "otc_lat": -0.523, "otc_hat": 3.781 },
             "basis": {
               "mhhw": { "kind": "published", "method": "source", "source_name": "MHHW", "epoch": { "start": "1983-01-01", "end": "2001-12-31", "name": "NTDE 1983-2001" } },
               "msl": { "kind": "published", "method": "source", "source_name": "MSL", "epoch": { "start": "1983-01-01", "end": "2001-12-31", "name": "NTDE 1983-2001" } },
               "mllw": { "kind": "published", "method": "source", "source_name": "MLLW", "epoch": { "start": "1983-01-01", "end": "2001-12-31", "name": "NTDE 1983-2001" } },
               "lat": { "kind": "published", "method": "source", "source_name": "LAT" },
               "hat": { "kind": "published", "method": "source", "source_name": "HAT" },
-              "otc_lat": { "kind": "computed", "method": "harmonic_extremes", "epoch": { "start": "2020-01-01", "end": "2038-12-31", "name": "OTC LAT 2020-2038" }, "uncertainty_m": 0.012, "uncertainty_basis": "calibrated" }
+              "otc_lat": { "kind": "computed", "method": "harmonic_extremes", "epoch": { "start": "2020-01-01", "end": "2038-12-31", "name": "OTC LAT 2020-2038" }, "uncertainty_m": 0.012, "uncertainty_basis": "calibrated" },
+              "otc_hat": { "kind": "computed", "method": "harmonic_extremes", "epoch": { "start": "2020-01-01", "end": "2038-12-31", "name": "OTC LAT 2020-2038" }, "uncertainty_m": 0.012, "uncertainty_basis": "calibrated" }
             }
           },
           "convention_id": "noaa-greenwich-schureman-v1",
@@ -552,10 +580,10 @@
           "zero": "chart_datum",
           "zero_name": "MLLW",
           "chart_datum": "mllw",
-          "named": { "mhhw": 2.953, "mllw": 0.0, "lat": -0.48, "hat": 3.539 },
+          "named": { "mhhw": 2.953, "mllw": 0.0, "lat": -0.492, "hat": 3.554 },
           "basis": {
-            "mhhw": { "kind": "published", "method": "source", "source_name": "MHHW", "epoch": { "start": "1983-01-01", "end": "2001-12-31", "name": "NTDE 1983-2001" }, "control": { "source_id": "8443970" } },
-            "mllw": { "kind": "published", "method": "source", "source_name": "MLLW", "epoch": { "start": "1983-01-01", "end": "2001-12-31", "name": "NTDE 1983-2001" }, "control": { "source_id": "8443970" } },
+            "mhhw": { "kind": "published", "method": "source", "source_name": "MHHW", "epoch": { "start": "1983-01-01", "end": "2001-12-31", "name": "NTDE 1983-2001" }, "control": { "source_id": "8443970", "station_id": "OTC-EXAMPLE-0006" } },
+            "mllw": { "kind": "published", "method": "source", "source_name": "MLLW", "epoch": { "start": "1983-01-01", "end": "2001-12-31", "name": "NTDE 1983-2001" }, "control": { "source_id": "8443970", "station_id": "OTC-EXAMPLE-0006" } },
             "lat": { "kind": "computed", "method": "subordinate_offsets", "epoch": { "start": "2020-01-01", "end": "2038-12-31", "name": "OTC LAT 2020-2038" }, "uncertainty_m": 0.03, "uncertainty_basis": "calibrated" },
             "hat": { "kind": "computed", "method": "subordinate_offsets", "epoch": { "start": "2020-01-01", "end": "2038-12-31", "name": "OTC LAT 2020-2038" }, "uncertainty_m": 0.03, "uncertainty_basis": "calibrated" }
           }
@@ -605,6 +633,100 @@
             "published": "utc_instant",
             "decided_in": "20991231",
             "evidence": [{ "comparator_kind": "model", "comparator_id": "eot20", "distance_km": 1.0, "lag_min": 0.6 }]
+          },
+          "provenance": { "build": { "build_commit": "0000000" }, "selection_reason": "only eligible record", "decision": { "tier": "rule", "outcome": "accept" } }
+        }
+      ]
+    },
+    {
+      "station_id": "OTC-EXAMPLE-0009",
+      "status": "active",
+      "name": "Example Sound (illustrative values, not data)",
+      "country": "SWE",
+      "lat": 57.7,
+      "lon": 11.9,
+      "timezone": "Europe/Stockholm",
+      "type": "reference",
+      "recommended_set_id": "OTC-EXAMPLE-0009/smhi",
+      "constant_sets": [
+        {
+          "set_id": "OTC-EXAMPLE-0009/smhi",
+          "source": "smhi",
+          "source_type": "gauge",
+          "quantity": "water_level",
+          "source_record_id": "example-smhi",
+          "source_version": "20991231",
+          "record_span": { "start": "2015-01-01T00:00:00Z", "end": "2025-01-01T00:00:00Z", "good_samples": 87000, "good_hours": 87000 },
+          "datum": {
+            "msl_offset_m": 0.152,
+            "zero": "vertical_datum",
+            "zero_name": "RH 2000",
+            "chart_datum": "rh2000",
+            "named": { "rh2000": 0.0 },
+            "basis": {
+              "rh2000": { "kind": "published", "method": "source", "source_name": "RH 2000" }
+            }
+          },
+          "convention_id": "otc-greenwich-schureman-v1",
+          "licence_id": "smhi",
+          "qc_status": "ok",
+          "constituents": [
+            { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 0.11, "phase_deg": 40.0 }
+          ],
+          "time_base": {
+            "code": "verified",
+            "reason": "declared utc_instant confirmed by EOT20",
+            "declared": "utc_instant",
+            "published": "utc_instant",
+            "decided_in": "20991231",
+            "evidence": [{ "comparator_kind": "model", "comparator_id": "eot20", "distance_km": 1.0, "lag_min": 0.4 }]
+          },
+          "provenance": { "build": { "build_commit": "0000000" }, "selection_reason": "only eligible record", "decision": { "tier": "rule", "outcome": "accept" } }
+        }
+      ]
+    },
+    {
+      "station_id": "OTC-EXAMPLE-0010",
+      "status": "active",
+      "name": "Example Skerry (illustrative values, not data)",
+      "country": "FIN",
+      "lat": 60.1,
+      "lon": 24.9,
+      "timezone": "Europe/Helsinki",
+      "type": "reference",
+      "recommended_set_id": "OTC-EXAMPLE-0010/fmi",
+      "constant_sets": [
+        {
+          "set_id": "OTC-EXAMPLE-0010/fmi",
+          "source": "fmi",
+          "source_type": "gauge",
+          "quantity": "water_level",
+          "source_record_id": "example-fmi",
+          "source_version": "20991231",
+          "record_span": { "start": "2015-01-01T00:00:00Z", "end": "2025-01-01T00:00:00Z", "good_samples": 87000, "good_hours": 87000 },
+          "datum": {
+            "msl_offset_m": 0.231,
+            "zero": "vertical_datum",
+            "zero_name": "N2000",
+            "chart_datum": "mw",
+            "named": { "mw": 0.214 },
+            "basis": {
+              "mw": { "kind": "published", "method": "source", "source_name": "MSL", "epoch": { "start": "2023-01-01", "end": "2023-12-31" } }
+            }
+          },
+          "convention_id": "otc-greenwich-schureman-v1",
+          "licence_id": "fmi",
+          "qc_status": "ok",
+          "constituents": [
+            { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 0.01, "phase_deg": 40.0 }
+          ],
+          "time_base": {
+            "code": "verified",
+            "reason": "declared utc_instant confirmed by EOT20",
+            "declared": "utc_instant",
+            "published": "utc_instant",
+            "decided_in": "20991231",
+            "evidence": [{ "comparator_kind": "model", "comparator_id": "eot20", "distance_km": 1.0, "lag_min": 0.4 }]
           },
           "provenance": { "build": { "build_commit": "0000000" }, "selection_reason": "only eligible record", "decision": { "tier": "rule", "outcome": "accept" } }
         }
