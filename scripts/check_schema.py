@@ -993,6 +993,8 @@ R_DATUM_EXTRA = _D + r"additionalProperties"
 R_MSL_OFFSET = _D + r"properties/msl_offset_m/type"
 R_OTC = _D + r"allOf/0/properties/basis/patternProperties/\^otc_/"
 R_HIGH_ONLY = _D + r"allOf/0/properties/basis/patternProperties/\^\(\?!"
+R_MSL_SAMPLING = _D + r"allOf/0/properties/basis/patternProperties/\^\(otc_\)\?msl\$/"
+R_TRUNCATED_DATUM = _D + r"allOf/1/then/"
 R_PUBLISHED = basis_rule(r"allOf/0/then/")
 R_COMPUTED = basis_rule(r"allOf/1/then/")
 R_OBSERVED = basis_rule(r"allOf/2/then/")
@@ -1222,6 +1224,14 @@ def put(target, datum):
     return lambda d: target(d).__setitem__("datum", copy.deepcopy(datum))
 
 
+def put_and_get(target, datum):
+    """Like put, but the mutation returns the datum it set (a base for trim and edit)."""
+    def f(d):
+        put(target, datum)(d)
+        return target(d)["datum"]
+    return f
+
+
 def with_subordinate(d, datum=SUBORDINATE_DATUM):
     d["stations"].append({
         "station_id": "OTC-EXAMPLE-9998", "status": "active", "name": "Datum control subordinate",
@@ -1252,6 +1262,29 @@ def edit(base, key, change):
 
 def set_flags(*flags):
     return lambda b: b.__setitem__("flags", list(flags))
+
+
+HIGH = ("mhw", "mhhw")
+
+
+def trim(base, keep=HIGH):
+    """Return a base that keeps only the keep levels: a truncated record has no low-water levels
+    in its datum (round 4), so controls about the direct method and truncated_lows start here."""
+    def f(d):
+        datum = base(d)
+        for part in ("named", "basis"):
+            for k in [k for k in datum[part] if k not in keep]:
+                datum[part].pop(k)
+        return datum
+    return f
+
+
+def high_on_a(d):
+    return trim(observed_on_a)(d)
+
+
+def high_noaa(d):
+    return trim(noaa_on_first, ("mhhw",))(d)
 
 
 def own_months(start, end, months, flags=("no_qualified_control",)):
@@ -1295,7 +1328,7 @@ datum_must_pass("a published lat with no epoch (the Kartverket set; its msl has 
 datum_must_pass("an observed level with flags time_base_unverified, sampling_assumed, gaps and segment",
                 edit(observed_on_a, "mhw", set_flags("time_base_unverified", "sampling_assumed", "gaps", "segment")))
 datum_must_pass("an observed MHW by the direct method with truncated_lows",
-                edit(observed_on_a, "mhw", lambda b: [b.__setitem__("method", "direct"),
+                edit(high_on_a, "mhw", lambda b: [b.__setitem__("method", "direct"),
                                                       b.__setitem__("flags", ["truncated_lows"])]))
 datum_must_pass("a computed short_record LAT", edit(noaa_on_first, "otc_lat", set_flags("short_record", "microtidal")))
 datum_must_pass("a provisional published level (JMA style)", edit(noaa_on_first, "msl", set_flags("provisional")))
@@ -1324,7 +1357,7 @@ datum_must_fail("kind published with method harmonic_extremes",
                 edit(noaa_on_first, "mllw", lambda b: b.__setitem__("method", "harmonic_extremes")))
 datum_must_fail("kind published with data_span",
                 edit(noaa_on_first, "mllw", lambda b: b.__setitem__("data_span", {"start": "1983-01-01", "end": "2001-12-31", "months": 228})))
-datum_must_fail("kind published with flag truncated_lows (on mhhw, a high-water level)", edit(noaa_on_first, "mhhw", set_flags("truncated_lows")))
+datum_must_fail("kind published with flag truncated_lows (on mhhw, a high-water level)", edit(high_noaa, "mhhw", set_flags("truncated_lows")))
 datum_must_fail("kind computed with method source", edit(noaa_on_first, "otc_lat", lambda b: b.__setitem__("method", "source")))
 datum_must_fail("kind computed with control",
                 edit(noaa_on_first, "otc_lat", lambda b: b.__setitem__("control", {"source_id": "8443970"})))
@@ -1400,7 +1433,7 @@ datum_must_fail("a comparison (standard) with epoch end 2021-12-31",
                 edit(observed_on_a, "msl", lambda b: [b.__setitem__("method", "standard"),
                                                       b["epoch"].__setitem__("end", "2021-12-31")]))
 datum_must_fail("a comparison (direct) with epoch start 2001-01-01",
-                edit(observed_on_a, "mhw", lambda b: [b.update(method="direct", flags=["truncated_lows"]),
+                edit(high_on_a, "mhw", lambda b: [b.update(method="direct", flags=["truncated_lows"]),
                                                       b["epoch"].__setitem__("start", "2001-01-01")]))
 datum_must_fail("an unflagged first_reduction of 228 months over 1950-1968 (not the OTC epoch)",
                 own_months("1950-01-01", "1968-12-31", 228, flags=()))
@@ -1451,20 +1484,22 @@ HIGH_ONLY_REJECTED = (["lat", "hat", "msl", "mtl", "dtl", "mlw", "mllw"]
                          "otc_otc_mhw", "mhw2", "xmhw", "mhhws", "otc_mhws"])
 for key in HIGH_ONLY_REJECTED:
     datum_must_fail(f"{key} by the direct method with truncated_lows",
-                    lambda d, k=key: [put(gauge_a, GESLA_OBSERVED_DATUM)(d),
+                    lambda d, k=key: [high_on_a(d),
                                       gauge_a(d)["datum"]["named"].__setitem__(k, 0.5),
                                       gauge_a(d)["datum"]["basis"].__setitem__(k, gesla_observed(**DIRECT))],
-                    R_HIGH_ONLY)
+                    # A low-water key that carries truncated_lows breaks both the key rule and the
+                    # datum rule of round 4 by design; the other keys test the key rule alone.
+                    either(R_HIGH_ONLY, R_TRUNCATED_DATUM) if re.match(r"^(otc_)?(mlw|mllw|mtl|dtl|msl|lat|mlws|mlwn|mllws)$", key) else R_HIGH_ONLY)
 for key in ("otc_mhw", "otc_mhhw"):
     datum_must_pass(f"{key} by the direct method with truncated_lows",
-                    lambda d, k=key: [noaa_on_first(d)["named"].__setitem__(k, 3.0),
+                    lambda d, k=key: [high_noaa(d)["named"].__setitem__(k, 3.0),
                                       first_set(d)["datum"]["basis"].__setitem__(k, gesla_observed(**DIRECT))])
-datum_must_pass("mhhw by the direct method with truncated_lows", edit(observed_on_a, "mhhw", lambda b: b.update(method="direct", flags=["truncated_lows"])))
+datum_must_pass("mhhw by the direct method with truncated_lows", edit(high_on_a, "mhhw", lambda b: b.update(method="direct", flags=["truncated_lows"])))
 
 # Reviewer C coverage: one change per constraint that existed but had no control of its own.
 datum_must_fail("method modified_range_ratio without control", edit(observed_on_a, "msl", lambda b: b.pop("control")))
 datum_must_fail("method direct without control",
-                edit(observed_on_a, "mhw", lambda b: [b.update(DIRECT), b.pop("control")]))
+                edit(high_on_a, "mhw", lambda b: [b.update(DIRECT), b.pop("control")]))
 datum_must_fail("a comparison control with set_id and source_id but no station_id",
                 edit(observed_on_a, "msl", lambda b: b.__setitem__("control", {"set_id": "OTC-EXAMPLE-0001/gesla-fit", "source_id": "x"})))
 for bad in ("2020-13-01", "2020-01-32", "2020-00-10", "2020-01-00", "20201-01-01", "x2020-01-01", "2020-1-01"):
@@ -1491,7 +1526,7 @@ datum_must_fail("a repeated flag", edit(observed_on_a, "msl", set_flags("gaps", 
 datum_must_fail("kind published with flag short_record", edit(noaa_on_first, "mllw", set_flags("short_record")))
 datum_must_fail("kind computed with flag provisional", edit(noaa_on_first, "otc_lat", set_flags("provisional")))
 datum_must_fail("kind computed with flag truncated_lows (on otc_mhw)",
-                lambda d: [noaa_on_first(d)["named"].__setitem__("otc_mhw", 2.9),
+                lambda d: [high_noaa(d)["named"].__setitem__("otc_mhw", 2.9),
                            first_set(d)["datum"]["basis"].__setitem__("otc_mhw", dict(NOAA_DATUM["basis"]["otc_lat"], flags=["truncated_lows"]))])
 datum_must_fail("an empty source_name", edit(noaa_on_first, "mllw", lambda b: b.__setitem__("source_name", "")))
 datum_must_fail("a source_name of 32 characters", edit(noaa_on_first, "mllw", lambda b: b.__setitem__("source_name", "M" * 32)))
@@ -1539,9 +1574,14 @@ datum_must_fail("a comparison on epoch start 1983-01-01 (end 2020-12-31)",
                 edit(observed_on_a, "msl", lambda b: b["epoch"].__setitem__("start", "1983-01-01")), R_COMPARISON)
 datum_must_fail("a comparison on epoch end 2001-12-31 (start 2002-01-01)",
                 edit(observed_on_a, "msl", lambda b: b["epoch"].__setitem__("end", "2001-12-31")), R_COMPARISON)
+SUBORDINATE_HIGH = unalias({k: v for k, v in SUBORDINATE_DATUM.items() if k not in ("named", "basis", "chart_datum")})
+SUBORDINATE_HIGH.update(named={"mhhw": SUBORDINATE_DATUM["named"]["mhhw"], "hat": SUBORDINATE_DATUM["named"]["hat"]},
+                        basis=unalias({"mhhw": SUBORDINATE_DATUM["basis"]["mhhw"], "hat": SUBORDINATE_DATUM["basis"]["hat"]}))
 for method, extra in (("standard", {}), ("modified_range_ratio", {}), ("direct", {"flags": ["truncated_lows"]})):
     datum_must_fail(f"a subordinate station's mhhw observed by {method}",
-                    on_subordinate("mhhw", lambda b, m=method, x=extra: [b.clear(), b.update(gesla_observed(method=m, **x))]),
+                    lambda d, m=method, x=extra: [with_subordinate(d, SUBORDINATE_HIGH),
+                                                  d["stations"][-1]["subordinate_offsets"]["datum"]["basis"]["mhhw"].clear(),
+                                                  d["stations"][-1]["subordinate_offsets"]["datum"]["basis"]["mhhw"].update(gesla_observed(method=m, **x))],
                     R_ONLY_SUBORDINATE_METHODS)
 for key in ("hat", "mhhw"):
     datum_must_fail(f"a constant set's {key} computed by subordinate_offsets",
@@ -1555,11 +1595,11 @@ for key in ("otc_msl", "otc_mhw", "otc_hat"):
                                       first_set(d)["datum"]["basis"].__setitem__(k, noaa_published("X"))],
                     R_OTC)
 datum_must_fail("mhw by the direct method without truncated_lows",
-                edit(observed_on_a, "mhw", lambda b: b.__setitem__("method", "direct")), R_DIRECT_FLAG)
+                edit(high_on_a, "mhw", lambda b: b.__setitem__("method", "direct")), R_DIRECT_FLAG)
 datum_must_fail("mhw by the direct method with flags gaps only (no truncated_lows)",
-                edit(observed_on_a, "mhw", lambda b: b.update(method="direct", flags=["gaps"])), R_DIRECT_FLAG)
+                edit(high_on_a, "mhw", lambda b: b.update(method="direct", flags=["gaps"])), R_DIRECT_FLAG)
 datum_must_fail("mhw by the standard method with truncated_lows",
-                edit(observed_on_a, "mhw", lambda b: b.update(method="standard", flags=["truncated_lows"])), R_FLAG_DIRECT)
+                edit(high_on_a, "mhw", lambda b: b.update(method="standard", flags=["truncated_lows"])), R_FLAG_DIRECT)
 datum_must_fail("an unflagged first_reduction with epoch start 1950-01-01 (end 2020-12-31)",
                 lambda d: [put(first_set, PRIMARY_DATUM)(d),
                            first_set(d)["datum"]["basis"]["msl"]["epoch"].__setitem__("start", "1950-01-01")],
@@ -1567,7 +1607,7 @@ datum_must_fail("an unflagged first_reduction with epoch start 1950-01-01 (end 2
 datum_must_fail("an own-month average of 11 months without short_record",
                 own_months("2024-01-01", "2024-11-30", 11), R_SHORT)
 datum_must_fail("mhw by modified_range_ratio with truncated_lows",
-                edit(observed_on_a, "mhw", set_flags("truncated_lows")), R_FLAG_DIRECT)
+                edit(high_on_a, "mhw", set_flags("truncated_lows")), R_FLAG_DIRECT)
 datum_must_fail("a comparison of 214 months with short_record", edit(observed_on_a, "msl", set_flags("short_record")), R_SHORT)
 datum_must_fail("a 19-year determination with short_record",
                 lambda d: [put(first_set, PRIMARY_DATUM)(d), first_set(d)["datum"]["basis"]["msl"].__setitem__("flags", ["short_record"])],
@@ -1609,22 +1649,23 @@ OWN_MONTH_MHW = {"msl_offset_m": 1.1, "zero": "gauge_zero", "named": {"mhw": 1.8
                                "uncertainty_m": 0.03, "uncertainty_basis": "calibrated",
                                "flags": ["no_qualified_control", "truncated_lows"]} for k in ("mhw", "mhhw")}}
 datum_must_pass("a 19-year determination of mhw with truncated_lows",
-                lambda d: [put(first_set, PRIMARY_DATUM)(d), first_set(d)["datum"]["basis"]["mhw"].__setitem__("flags", ["truncated_lows"])])
+                lambda d: [trim(put_and_get(first_set, PRIMARY_DATUM))(d), first_set(d)["datum"]["basis"]["mhw"].__setitem__("flags", ["truncated_lows"])])
 datum_must_pass("own-month averages of mhw and mhhw with truncated_lows", put(gauge_a, OWN_MONTH_MHW))
 datum_must_pass("a 19-year determination of mhhw with truncated_lows",
-                lambda d: [put(first_set, PRIMARY_DATUM)(d), first_set(d)["datum"]["basis"]["mhhw"].__setitem__("flags", ["truncated_lows"])])
+                lambda d: [trim(put_and_get(first_set, PRIMARY_DATUM))(d), first_set(d)["datum"]["basis"]["mhhw"].__setitem__("flags", ["truncated_lows"])])
 datum_must_fail("an own-month average of mlw with truncated_lows",
                 lambda d: [put(gauge_a, OWN_MONTH_MHW)(d), gauge_a(d)["datum"]["named"].__setitem__("mlw", 0.4),
                            gauge_a(d)["datum"]["basis"].__setitem__("mlw", copy.deepcopy(OWN_MONTH_MHW["basis"]["mhw"]))],
-                R_HIGH_ONLY)
+                either(R_HIGH_ONLY, R_TRUNCATED_DATUM))
 for key in ("mlw", "mllw", "msl", "mtl", "dtl", "otc_mlw"):
     datum_must_fail(f"a 19-year determination of {key} with truncated_lows",
-                    lambda d, k=key: [put(first_set, PRIMARY_DATUM)(d),
+                    lambda d, k=key: [trim(put_and_get(first_set, PRIMARY_DATUM))(d),
                                       first_set(d)["datum"]["named"].__setitem__(k, 0.5),
                                       first_set(d)["datum"]["basis"].__setitem__(k, dict(copy.deepcopy(OBSERVED_228), flags=["truncated_lows"]))],
-                    R_HIGH_ONLY)
+                    either(R_HIGH_ONLY, R_TRUNCATED_DATUM))
 datum_must_fail("an own-month average of msl with truncated_lows",
-                own_months("2023-01-01", "2024-12-31", 24, flags=("no_qualified_control", "truncated_lows")), R_HIGH_ONLY)
+                own_months("2023-01-01", "2024-12-31", 24, flags=("no_qualified_control", "truncated_lows")),
+                either(R_HIGH_ONLY, R_TRUNCATED_DATUM))
 # A string flags makes every "contains" test pass, so with truncated_lows allowed on a first reduction
 # the only rule left to reject it, on an own-month mhw under 12 months, is the flags type.
 datum_must_fail("flags as a string on an own-month mhw of 6 months",
@@ -1637,7 +1678,44 @@ datum_must_fail("flags as a string on an own-month mhw of 6 months",
 datum_must_fail("no_qualified_control on a comparison (method standard)",
                 edit(observed_on_a, "msl", lambda b: b.update(method="standard", flags=["no_qualified_control"])), R_OWN_MONTH)
 datum_must_fail("no_qualified_control on a comparison (method direct)",
-                edit(observed_on_a, "mhw", lambda b: b.update(method="direct", flags=["truncated_lows", "no_qualified_control"])), R_OWN_MONTH)
+                edit(high_on_a, "mhw", lambda b: b.update(method="direct", flags=["truncated_lows", "no_qualified_control"])), R_OWN_MONTH)
+
+# --- PR #47 round 4 (orchestrator decisions on C-F4 and C-F8) -----------------------------------
+
+# C-F4: in one datum, when any level carries truncated_lows, no level is a low-water key, whatever
+# its method: lows from a cut-off record are never trusted.
+GESLA_HIGH_DATUM = unalias({"msl_offset_m": 1.1, "zero": "gauge_zero",
+                            "named": {"mhhw": 1.78, "mhw": 1.72},
+                            "basis": {"mhhw": gesla_observed(method="direct", flags=["truncated_lows"]),
+                                      "mhw": gesla_observed(method="direct", flags=["truncated_lows"])}})
+datum_must_pass("a truncated record with only high-water levels (mhw, mhhw by the direct method)", put(gauge_a, GESLA_HIGH_DATUM))
+LOW_WATER_KEYS = ["mlw", "mllw", "mtl", "dtl", "msl", "lat", "mlws", "mlwn", "mllws"]
+for key in LOW_WATER_KEYS + ["otc_" + k for k in LOW_WATER_KEYS]:
+    datum_must_fail(f"{key} by modified_range_ratio next to a truncated mhw in one datum",
+                    lambda d, k=key: [put(gauge_a, GESLA_HIGH_DATUM)(d), gauge_a(d)["datum"]["named"].__setitem__(k, 0.4),
+                                      gauge_a(d)["datum"]["basis"].__setitem__(k, gesla_observed())],
+                    R_TRUNCATED_DATUM)
+datum_must_fail("a computed lat next to a truncated 19-year mhw in one datum",
+                lambda d: [put(first_set, PRIMARY_DATUM)(d),
+                           [first_set(d)["datum"][part].pop(k) for k in ("mtl", "dtl", "msl", "mlw", "mllw") for part in ("named", "basis")],
+                           first_set(d)["datum"]["basis"]["mhw"].__setitem__("flags", ["truncated_lows"]),
+                           first_set(d)["datum"]["named"].__setitem__("lat", -0.1),
+                           first_set(d)["datum"]["basis"].__setitem__("lat", copy.deepcopy(NOAA_DATUM["basis"]["otc_lat"]))],
+                R_TRUNCATED_DATUM)
+datum_must_pass("high-water keys of other names (hat, mhws) next to a truncated mhw in one datum",
+                lambda d: [put(gauge_a, GESLA_HIGH_DATUM)(d)] + [
+                    [gauge_a(d)["datum"]["named"].__setitem__(k, 2.0),
+                     gauge_a(d)["datum"]["basis"].__setitem__(k, copy.deepcopy(NOAA_DATUM["basis"]["otc_lat"]))] for k in ("hat", "mhws")])
+# C-F8: sampling_assumed is not allowed on msl or otc_msl (MSL is a mean of all samples).
+datum_must_fail("an observed msl with sampling_assumed", edit(observed_on_a, "msl", set_flags("sampling_assumed")), R_MSL_SAMPLING)
+datum_must_fail("an observed otc_msl with sampling_assumed",
+                lambda d: [noaa_on_first(d)["named"].__setitem__("otc_msl", 1.56),
+                           first_set(d)["datum"]["basis"].__setitem__("otc_msl", dict(copy.deepcopy(OBSERVED_228), flags=["sampling_assumed"]))],
+                R_MSL_SAMPLING)
+datum_must_pass("an observed mhw and mtl with sampling_assumed",
+                lambda d: [edit(observed_on_a, "mhw", set_flags("sampling_assumed"))(d),
+                           gauge_a(d)["datum"]["basis"]["mtl"].__setitem__("flags", ["sampling_assumed"])])
+datum_must_pass("a computed lat with sampling_assumed", edit(noaa_on_first, "otc_lat", set_flags("sampling_assumed")))
 
 # Build checks 9-14 of the schema's description: valid JSON Schema on purpose, the release build stops them.
 datum_left_to_build("named and basis with different keys (check 9)",
