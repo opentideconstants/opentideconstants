@@ -9,13 +9,13 @@ plausible. For each active station, and each water-level constant set with const
     fewer than 8767 h, N2/M2 and Q1/O1 fewer than 662 h, S2/M2 fewer than 355 h, O1/K1 fewer than
     328 h), the weaker one is dropped, not kept, with not_separable_from set to the partner. Each
     Rayleigh drop is needed, and a short_record reason states the good days and names each
-    dropped constituent.
+    Rayleigh drop (drops for other reasons need not be named).
  3. Levels in datum.named against the constants, using each amplitude at its largest Schureman
     node factor (M2 and N2 1.0379, K1 1.1128, O1 and Q1 1.1827, K2 1.3172, others 1):
     - every high level (mhw, mhhw, hat, mhws, mhwn and otc_ forms) is no more than Z0 plus the
       summed amplitudes, and every low level (mlw, mllw, lat, mlws, mlwn, mllws and otc_ forms)
       no less than Z0 minus them (0.02 m slack);
-    - msl is within 0.05 m of Z0 (msl_offset_m);
+    - msl and otc_msl are within 0.05 m of Z0 (msl_offset_m);
     - a computed hat on a set with only M2 and S2 equals Z0 plus the summed amplitudes (0.02 m);
     - mhw - mlw is within 30% of 2 x M2; mtl = (mhw + mlw) / 2 and dtl = (mhhw + mllw) / 2
       (0.01 m);
@@ -30,7 +30,7 @@ plausible. For each active station, and each water-level constant set with const
  6. Each observed basis with a data_span:
     - data_span is inside record_span;
     - data_span.months is no more than the calendar months of data_span minus the months a
-      recorded gaps issue touches;
+      recorded gaps issue touches (a gaps issue with no end is ignored);
     - when months were skipped (months below the calendar months), the level carries gaps;
     - good hours supply the counted months: at least 672 h a month for a first reduction (a
       counted month has no gap) and 576 h for a comparison (24 common tidal days);
@@ -50,15 +50,18 @@ plausible. For each active station, and each water-level constant set with const
     otherwise), a record that overlaps the data, and, for every level the method uses, an
     observed first reduction of at least 216 months without no_qualified_control (direct: mhw,
     mhhw; standard: mtl, msl, mhw, mlw, mhhw, mllw, and dtl when the set writes dtl; modified
-    range ratio: those and dtl). Outside the US, standard is used for 0.25 <= F <= 3.0 and
-    modified_range_ratio otherwise.
+    range ratio: those and dtl). The compared set has M2 too. Outside the US, a standard or
+    modified_range_ratio comparison is standard for 0.25 <= F <= 3.0 and modified_range_ratio
+    otherwise; a direct comparison is exempt from this rule.
  8. no_qualified_control: no other set with such a first reduction qualifies as its control
     (within 250 km, same class, M2 on both sets with a ratio of 0.5 to 2.0, a record that
-    overlaps the data; a set whose first reductions are only mhw and mhhw counts only for a
-    truncated level).
+    overlaps the data). A set whose first reductions of at least 216 months without
+    no_qualified_control are only mhw and mhhw (or otc_mhw and otc_mhhw) counts only for a level
+    with truncated_lows; a set with any other such first reduction counts for every level.
  9. Tide type: F < 0.25 at stations in NOR, NLD, DEU, GBR, SWE and FIN, and at US stations on the
-    Atlantic coast (east of 82 W and north of 25 N); 0.25 <= F <= 3.0 in British Columbia (CAN,
-    west of 120 W).
+    Atlantic coast: east of 82 W and north of 25 N, but not south of 30 N and west of 80.5 W
+    (Florida's Gulf coast) and not north of 41 N and west of 76 W (Lakes Erie and Ontario);
+    0.25 <= F <= 3.0 at CAN stations west of 120 W (British Columbia).
 10. Subordinate offsets: for a ratio (R) subordinate station, each level of
     subordinate_offsets.datum equals the ratio times the level of the reference's recommended
     set (its otc_ level for a computed one), within 0.005 m: height_offset_low for low levels
@@ -68,9 +71,9 @@ plausible. For each active station, and each water-level constant set with const
     then the most good hours in 2002-2020, estimated as good_hours times the share of the record
     span's days inside 2002-01-01 to 2021-01-01; then the most recent end.
 
-It prints each mismatch, and exits 1 on any mismatch or when a check group runs fewer checks
-than its floor in MIN_CHECKS (a guard against a check that silently stops applying). With --all
-it prints every check.
+It prints each mismatch, any check group that runs fewer checks than its floor in MIN_CHECKS
+(a guard against a check that silently stops applying), and a totals line. It exits 1 on any
+mismatch or short group. With --all it prints every check.
 
 Usage: python scripts/check_example.py [path to example.json] [--all]
 """
@@ -82,7 +85,7 @@ from datetime import date
 
 # The number of checks each group (1-11 above) runs on the current example: a group that runs
 # fewer has stopped applying somewhere.
-MIN_CHECKS = {1: 18, 2: 26, 3: 115, 4: 4, 5: 6, 6: 170, 7: 92, 8: 5, 9: 20, 10: 4, 11: 12}
+MIN_CHECKS = {1: 18, 2: 26, 3: 115, 4: 4, 5: 6, 6: 170, 7: 104, 8: 5, 9: 20, 10: 4, 11: 12}
 
 SPEED = {"M2": 28.9841042, "S2": 30.0, "N2": 28.4397295, "K2": 30.0821373, "K1": 15.0410686,
          "O1": 13.9430356, "P1": 14.9589314, "Q1": 13.3986609, "T2": 29.9589333}
@@ -323,6 +326,7 @@ def audit(doc):
                 if ccs is None:
                     continue
                 row(w, "control set has M2", sorted(amps(ccs)), "M2 among the constituents", "M2" in amps(ccs))
+                row(w, "compared set has M2", sorted(a), "M2 among the constituents", "M2" in a)
                 if "M2" not in amps(ccs) or "M2" not in a:
                     continue
                 dist = km(st, cst)
@@ -353,9 +357,9 @@ def audit(doc):
                 for psid, (pst, pcs) in primaries.items():
                     if psid == sid:
                         continue
-                    pb = pcs.get("datum", {}).get("basis", {})
-                    if not any(x in pb for x in ("mlw", "mllw", "msl", "mtl")) and "truncated_lows" not in fl:
-                        continue
+                    firsts = {x for x, v in pcs.get("datum", {}).get("basis", {}).items() if is_primary(v)}
+                    if firsts <= {"mhw", "mhhw", "otc_mhw", "otc_mhhw"} and "truncated_lows" not in fl:
+                        continue  # a primary of high waters only controls a truncated level only
                     prs = pcs.get("record_span")
                     if "M2" not in a or "M2" not in amps(pcs):
                         continue  # no M2 ratio, so this set cannot qualify as the control
@@ -366,7 +370,9 @@ def audit(doc):
                 row(w, "no_qualified_control: no 19-year control qualifies", qual, "none", not qual)
         # 9. tide type
         group[0] = 9
-        if st["country"] in SEMIDIURNAL or (st["country"] == "USA" and st["lon"] > -82 and st["lat"] > 25):
+        atlantic = (st["country"] == "USA" and st["lon"] > -82 and st["lat"] > 25
+                    and not (st["lat"] < 30 and st["lon"] < -80.5) and not (st["lat"] > 41 and st["lon"] < -76))
+        if st["country"] in SEMIDIURNAL or atlantic:
             row(sid, f"tide type plausible for {st['country']}", f"F {f:.2f}", "F < 0.25", f < 0.25)
         if st["country"] == "CAN" and st["lon"] < -120:
             row(sid, "tide type plausible for British Columbia", f"F {f:.2f}", "0.25 <= F <= 3.0", 0.25 <= f <= 3.0)
@@ -418,12 +424,10 @@ def main(argv):
         print(("ok" if r[4] else "MISMATCH") + " | " + " | ".join(r[:4]))
     counts = {g: sum(1 for r in rows if r[5] == g) for g in range(1, 12)}
     short = {g: (counts[g], n) for g, n in MIN_CHECKS.items() if counts[g] < n}
-    if short:
-        for g, (have, n) in sorted(short.items()):
-            print(f"FAIL: check group {g} ran {have} checks, fewer than its floor of {n}: a check stopped applying")
-        return 1
-    print(f"{'ok' if not bad else 'FAIL'}: {len(rows)} checks of example.json, {len(bad)} mismatches")
-    return 1 if bad else 0
+    for g, (have, n) in sorted(short.items()):
+        print(f"FAIL: check group {g} ran {have} checks, fewer than its floor of {n}: a check stopped applying")
+    print(f"{'ok' if not (bad or short) else 'FAIL'}: {len(rows)} checks of example.json, {len(bad)} mismatches")
+    return 1 if bad or short else 0
 
 
 if __name__ == "__main__":
