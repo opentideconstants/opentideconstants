@@ -140,7 +140,7 @@
       "timezone": "Europe/Oslo",
       "type": "reference",
       "aliases": { "kartverket": "EXA", "gesla": ["example-file-id"] },
-      "recommended_set_id": "OTC-EXAMPLE-0001/gesla-fit",
+      "recommended_set_id": "OTC-EXAMPLE-0001/kartverket",
       "constant_sets": [
         {
           "set_id": "OTC-EXAMPLE-0001/gesla-fit",
@@ -624,7 +624,7 @@
           "quantity": "water_level",
           "source_record_id": "example-rws",
           "source_version": "20991231",
-          "record_span": { "start": "2023-01-01T00:00:00Z", "end": "2025-01-01T00:00:00Z", "good_samples": 17520, "good_hours": 17520 },
+          "record_span": { "start": "2023-01-01T00:00:00Z", "end": "2025-01-01T00:00:00Z", "good_samples": 17530, "good_hours": 17530 },
           "datum": {
             "msl_offset_m": 0.071,
             "zero": "vertical_datum",
@@ -783,7 +783,9 @@
           "qc_status": "ok",
           "constituents": [
             { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 1.7, "phase_deg": 140.0 },
-            { "name": "S2", "speed_deg_per_hour": 30.0, "amplitude_m": 0.58, "phase_deg": 140.0 }
+            { "name": "S2", "speed_deg_per_hour": 30.0, "amplitude_m": 0.58, "phase_deg": 140.0 },
+            { "name": "N2", "speed_deg_per_hour": 28.4397295, "amplitude_m": 0.33, "phase_deg": 82.0 },
+            { "name": "K2", "speed_deg_per_hour": 30.0821373, "amplitude_m": 0.16, "phase_deg": 138.0 }
           ],
           "time_base": {
             "code": "verified",
@@ -1095,7 +1097,7 @@
           "quantity": "water_level",
           "source_record_id": "example-skerries-b",
           "source_version": "4.1",
-          "record_span": { "start": "2024-01-01T00:00:00Z", "end": "2024-08-01T00:00:00Z", "good_samples": 5100, "good_hours": 5100 },
+          "record_span": { "start": "2024-01-01T00:00:00Z", "end": "2024-08-01T00:00:00Z", "good_samples": 5108, "good_hours": 5108 },
           "datum": {
             "msl_offset_m": 1.2,
             "zero": "gauge_zero",
