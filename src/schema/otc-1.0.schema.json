@@ -941,12 +941,12 @@
       },
       "allOf": [
         {
-          "description": "An otc_ key is OTC's own value next to a published one, so it is never kind published. sampling_assumed is never on msl or otc_msl: MSL is a mean of all samples. When low waters are cut off (truncated_lows, by the direct method or a first reduction), only high-water levels are given: a level by the direct method or with truncated_lows is mhw or mhhw (or otc_mhw, otc_mhhw). Keys reach this pattern only after datum_key has accepted them, so its $ needs no newline guard.",
+          "description": "An otc_ key is OTC's own value next to a published one, so it is never kind published. sampling_assumed is never on msl, mtl, dtl or their otc_ forms: they are means of heights. When low waters are cut off (truncated_lows, by the direct method or a first reduction), only high-water levels are given: a level by the direct method or with truncated_lows is mhw or mhhw (or otc_mhw, otc_mhhw). Keys reach this pattern only after datum_key has accepted them, so its $ needs no newline guard.",
           "properties": {
             "basis": {
               "patternProperties": {
                 "^otc_": { "properties": { "kind": { "enum": ["computed", "observed"] } } },
-                "^(otc_)?msl$": {
+                "^(otc_)?(msl|mtl|dtl)$": {
                   "not": { "required": ["flags"], "properties": { "flags": { "contains": { "const": "sampling_assumed" } } } }
                 },
                 "^(?!(otc_)?(mhw|mhhw)$)": {
@@ -962,15 +962,15 @@
           }
         },
         {
-          "description": "Lows from a cut-off record are never trusted: when any level of the datum carries truncated_lows, no level of the datum is a low-water key (mlw, mllw, mtl, dtl, msl, lat, mlws, mlwn, mllws or their otc_ forms), whatever its method.",
+          "description": "Lows from a cut-off record are never trusted: when any level of the datum carries truncated_lows, every low-water key (mlw, mllw, mtl, dtl, msl, lat, mlws, mlwn, mllws or their otc_ forms) in basis has kind published, so OTC's own observed and computed low-water levels are dropped and the publisher's are kept, and named has no otc_ low-water key (an otc_ key is never published). An unprefixed low-water key in named with no basis entry is left to build check 9.",
           "if": {
             "required": ["basis"],
             "properties": { "basis": { "not": { "additionalProperties": { "not": { "required": ["flags"], "properties": { "flags": { "contains": { "const": "truncated_lows" } } } } } } } }
           },
           "then": {
             "properties": {
-              "named": { "propertyNames": { "not": { "pattern": "^(otc_)?(mlw|mllw|mtl|dtl|msl|lat|mlws|mlwn|mllws)$" } } },
-              "basis": { "propertyNames": { "not": { "pattern": "^(otc_)?(mlw|mllw|mtl|dtl|msl|lat|mlws|mlwn|mllws)$" } } }
+              "basis": { "patternProperties": { "^(otc_)?(mlw|mllw|mtl|dtl|msl|lat|mlws|mlwn|mllws)$": { "properties": { "kind": { "const": "published" } } } } },
+              "named": { "propertyNames": { "not": { "pattern": "^otc_(mlw|mllw|mtl|dtl|msl|lat|mlws|mlwn|mllws)$" } } }
             }
           }
         }
@@ -1056,7 +1056,7 @@
           "enum": ["source", "calibrated", "propagated"]
         },
         "flags": {
-          "description": "time_base_unverified / time_base_disputed: the set's time-base annotation. sampling_assumed: the sampling class (instantaneous or hourly mean) is the declared one, not verified; the uncertainty includes the possible bias; never on msl or otc_msl, a mean of all samples. truncated_lows: low waters are cut off, so the datum gives no low-water levels at all (no mlw, mllw, mtl, dtl, msl, lat, mlws, mlwn, mllws or their otc_ forms), whatever their method. gaps: gaps of 3 hours or less were filled, or months were skipped for gaps. segment: only the part of the record after a datum step is used (see data_span). short_record: observed, under 12 months of data (an observed level has it exactly then); computed, constants from under one year of good data, so the level does not follow the IHO recommendation for computing LAT and HAT (constants from at least one year of observations). no_qualified_control: no comparison was possible, so this is a first reduction over the record's own months, not adjusted to the OTC datum epoch. microtidal: mean range under 0.1 m. provisional: the source marks the value provisional.",
+          "description": "time_base_unverified / time_base_disputed: the set's time-base annotation. sampling_assumed: the sampling class (instantaneous or hourly mean) is the declared one, not verified; the uncertainty includes the possible bias; never on msl, mtl, dtl or their otc_ forms, which are means of heights and do not depend on the sampling class. truncated_lows: low waters are cut off, so the datum has no computed or observed low-water level (a published one is kept). gaps: gaps of 3 hours or less were filled, or months were skipped for gaps. segment: only the part of the record after a datum step is used (see data_span). short_record: observed, under 12 months of data (an observed level has it exactly then); computed, constants from under one year of good data, so the level does not follow the IHO recommendation for computing LAT and HAT (constants from at least one year of observations). no_qualified_control: no comparison was possible, so this is a first reduction over the record's own months, not adjusted to the OTC datum epoch. microtidal: mean range under 0.1 m. provisional: the source marks the value provisional.",
           "type": "array",
           "uniqueItems": true,
           "items": { "enum": ["time_base_unverified", "time_base_disputed", "sampling_assumed", "truncated_lows", "gaps", "segment", "short_record", "no_qualified_control", "microtidal", "provisional"] }
