@@ -5,15 +5,16 @@ and dropped constituents by name, licences by licence_id, conventions by convent
 astronomical tables by astro_table_id. Every other list is matched by position. Each change prints
 on its own line, with the path of the item it is in:
 
-  path: old -> new                 a changed value; values of different JSON types (true and 1,
-                                   1 and 1.0) count as changed, and both are printed as JSON
-  path[key]: added / removed       an item only in the new or only in the old list
-  path[key]: duplicate (n items)   a key that n items share in the old or new list; the first of
-                                   them is the one compared
-  path[#i]: item without key       an item of a keyed list that is not an object with the key
-  path: reordered                  the items both lists hold are in a different order
-  path: n items -> m items         a list matched by position whose length changed (its common
-                                   items are compared)
+  path: old -> new                      a changed value; values of different JSON types (true
+                                        and 1, 1 and 1.0) count as changed, both printed as JSON
+  path: added / path: removed           an object field only in the new or only in the old file
+  path[key]: added / removed            an item only in the new or only in the old list
+  path[key]: duplicate (n items, side)  a key that n items share, side old or new; the first of
+                                        them is the one compared
+  path[#i]: item without key K (side)   an item of a keyed list that is not an object with key K
+  path: reordered                       the items both lists hold are in a different order
+  path: n items -> m items              a list matched by position whose length changed (its
+                                        common items are compared)
 
 The base revision must be in the local git history (in a shallow CI checkout, fetch it first,
 for example with actions/checkout's fetch-depth: 0). If git cannot read it, the script prints
