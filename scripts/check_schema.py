@@ -1918,7 +1918,7 @@ EX_DIRECT_MHW = unalias({"msl_offset_m": 1.2, "zero": "gauge_zero", "named": {"m
 EX_MHHW_19 = unalias({"msl_offset_m": 1.2, "zero": "gauge_zero", "named": {"mhhw": 2.01},
                       "basis": {"mhhw": observed("first_reduction", "2002-01-01", "2020-12-31", 228, epoch=OTC_EPOCH,
                                                  flags=["truncated_lows"], uncertainty_m=0.005, uncertainty_basis="propagated")}})
-EX_HAT = unalias({"msl_offset_m": 1.2, "zero": "gauge_zero", "named": {"mhw": 1.95, "mhhw": 2.02, "hat": 2.24},
+EX_HAT = unalias({"msl_offset_m": 1.2, "zero": "gauge_zero", "named": {"mhw": 1.95, "mhhw": 2.02, "hat": 2.28},
                   "basis": {"mhw": observed("direct", "2023-01-01", "2024-12-31", 24, epoch=OTC_EPOCH, flags=["truncated_lows"]),
                             "mhhw": observed("direct", "2023-01-01", "2024-12-31", 24, epoch=OTC_EPOCH, flags=["truncated_lows"]),
                             "hat": {"kind": "computed", "method": "harmonic_extremes", "epoch": LAT_WINDOW,
@@ -1946,7 +1946,7 @@ EX_STANDARD_6 = unalias({"msl_offset_m": 2.95, "zero": "gauge_zero", "named": {"
                                                    flags=["short_record"], uncertainty_m=0.03, control=EX_CONTROL_MIXED)}})
 EX_MSL_TIME_BASE = unalias({"msl_offset_m": 1.05, "zero": "gauge_zero", "named": {"msl": 1.06},
                             "basis": {"msl": observed("modified_range_ratio", "2002-01-01", "2006-04-30", 47, epoch=OTC_EPOCH,
-                                                      flags=["time_base_unverified", "gaps"])}})
+                                                      flags=["time_base_unverified", "gaps", "segment"])}})
 EXAMPLE_ONLY_BLOCKS = (
     ("an mhw by the direct method with truncated_lows", "OTC-EXAMPLE-0012", "gesla-fit-a", EX_DIRECT_MHW),
     ("an mhhw 19-year first reduction with truncated_lows", "OTC-EXAMPLE-0012", "gesla-fit-b", EX_MHHW_19),
