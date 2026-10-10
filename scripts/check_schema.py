@@ -993,7 +993,7 @@ R_DATUM_EXTRA = _D + r"additionalProperties"
 R_MSL_OFFSET = _D + r"properties/msl_offset_m/type"
 R_OTC = _D + r"allOf/0/properties/basis/patternProperties/\^otc_/"
 R_HIGH_ONLY = _D + r"allOf/0/properties/basis/patternProperties/\^\(\?!"
-R_MSL_SAMPLING = _D + r"allOf/0/properties/basis/patternProperties/\^\(otc_\)\?msl\$/"
+R_MSL_SAMPLING = _D + r"allOf/0/properties/basis/patternProperties/\^\(otc_\)\?\(msl\|mtl\|dtl\)\$/"
 R_TRUNCATED_DATUM = _D + r"allOf/1/then/"
 R_PUBLISHED = basis_rule(r"allOf/0/then/")
 R_COMPUTED = basis_rule(r"allOf/1/then/")
@@ -1689,8 +1689,9 @@ datum_must_fail("no_qualified_control on a comparison (method direct)",
 
 # --- PR #47 round 4 (orchestrator decisions on C-F4 and C-F8) -----------------------------------
 
-# C-F4: in one datum, when any level carries truncated_lows, no level is a low-water key, whatever
-# its method: lows from a cut-off record are never trusted.
+# C-F4 (spec 3.5 note (1), as revised in C-F4/C-F8 review 1): when any level of a datum carries
+# truncated_lows, every low-water key in basis has kind published (OTC's own observed and computed
+# lows are dropped; the publisher's are kept), and named has no otc_ low-water key.
 GESLA_HIGH_DATUM = unalias({"msl_offset_m": 1.1, "zero": "gauge_zero",
                             "named": {"mhhw": 1.78, "mhw": 1.72},
                             "basis": {"mhhw": gesla_observed(method="direct", flags=["truncated_lows"]),
@@ -1698,7 +1699,7 @@ GESLA_HIGH_DATUM = unalias({"msl_offset_m": 1.1, "zero": "gauge_zero",
 datum_must_pass("a truncated record with only high-water levels (mhw, mhhw by the direct method)", put(gauge_a, GESLA_HIGH_DATUM))
 LOW_WATER_KEYS = ["mlw", "mllw", "mtl", "dtl", "msl", "lat", "mlws", "mlwn", "mllws"]
 for key in LOW_WATER_KEYS + ["otc_" + k for k in LOW_WATER_KEYS]:
-    datum_must_fail(f"{key} by modified_range_ratio next to a truncated mhw in one datum",
+    datum_must_fail(f"an observed {key} by modified_range_ratio next to a truncated mhw in one datum",
                     lambda d, k=key: [put(gauge_a, GESLA_HIGH_DATUM)(d), gauge_a(d)["datum"]["named"].__setitem__(k, 0.4),
                                       gauge_a(d)["datum"]["basis"].__setitem__(k, gesla_observed())],
                     R_TRUNCATED_DATUM)
@@ -1706,9 +1707,35 @@ for key in LOW_WATER_KEYS + ["otc_" + k for k in LOW_WATER_KEYS]:
 datum_must_fail("mlw in basis only (not in named) next to a truncated mhw in one datum",
                 lambda d: [put(gauge_a, GESLA_HIGH_DATUM)(d), gauge_a(d)["datum"]["basis"].__setitem__("mlw", gesla_observed())],
                 R_TRUNCATED_DATUM)
-datum_must_fail("mlw in named only (not in basis) next to a truncated mhw in one datum",
-                lambda d: [put(gauge_a, GESLA_HIGH_DATUM)(d), gauge_a(d)["datum"]["named"].__setitem__("mlw", 0.4)],
+datum_must_fail("otc_mlw in named only (not in basis) next to a truncated mhw in one datum",
+                lambda d: [put(gauge_a, GESLA_HIGH_DATUM)(d), gauge_a(d)["datum"]["named"].__setitem__("otc_mlw", 0.4)],
                 R_TRUNCATED_DATUM)
+datum_must_fail("an observed mlw by the standard method next to a truncated mhw first reduction",
+                lambda d: [trim(put_and_get(first_set, PRIMARY_DATUM), ("mhw",))(d),
+                           first_set(d)["datum"]["basis"]["mhw"].__setitem__("flags", ["truncated_lows"]),
+                           first_set(d)["datum"]["named"].__setitem__("mlw", 0.5),
+                           first_set(d)["datum"]["basis"].__setitem__("mlw", gesla_observed(method="standard"))],
+                R_TRUNCATED_DATUM)
+datum_must_fail("a computed otc_lat next to a truncated mhw in one datum",
+                lambda d: [put(gauge_a, GESLA_HIGH_DATUM)(d), gauge_a(d)["datum"]["named"].__setitem__("otc_lat", -0.1),
+                           gauge_a(d)["datum"]["basis"].__setitem__("otc_lat", copy.deepcopy(NOAA_DATUM["basis"]["otc_lat"]))],
+                R_TRUNCATED_DATUM)
+# Published lows are kept at a truncated set: a PEGELONLINE-shape datum (published MThw, MTnw) with
+# an observed otc_mhw first reduction carrying truncated_lows.
+PEGEL_TRUNCATED = unalias({"msl_offset_m": 5.0, "zero": "gauge_zero", "zero_name": "PNP",
+                           "named": {"mhw": 6.5, "mlw": 3.4, "otc_mhw": 6.48},
+                           "basis": {"mhw": {"kind": "published", "method": "source", "source_name": "MThw",
+                                             "epoch": {"start": "2010-11-01", "end": "2020-10-31"}},
+                                     "mlw": {"kind": "published", "method": "source", "source_name": "MTnw",
+                                             "epoch": {"start": "2010-11-01", "end": "2020-10-31"}},
+                                     "otc_mhw": OWN_MONTH_MHW["basis"]["mhw"]}})
+datum_must_pass("published mhw and mlw (PEGELONLINE MThw, MTnw) with an observed otc_mhw carrying truncated_lows",
+                put(gauge_a, PEGEL_TRUNCATED))
+datum_must_pass("a truncated mhw with a published cd = 0 as chart_datum",
+                lambda d: [put(gauge_a, GESLA_HIGH_DATUM)(d),
+                           gauge_a(d)["datum"].update(zero="chart_datum", zero_name="CD", chart_datum="cd"),
+                           gauge_a(d)["datum"]["named"].__setitem__("cd", 0.0),
+                           gauge_a(d)["datum"]["basis"].__setitem__("cd", {"kind": "published", "method": "source", "source_name": "CD"})])
 datum_must_fail("a computed lat next to a truncated 19-year mhw in one datum",
                 lambda d: [put(first_set, PRIMARY_DATUM)(d),
                            [first_set(d)["datum"][part].pop(k) for k in ("mtl", "dtl", "msl", "mlw", "mllw") for part in ("named", "basis")],
@@ -1726,9 +1753,17 @@ datum_must_fail("an observed otc_msl with sampling_assumed",
                 lambda d: [noaa_on_first(d)["named"].__setitem__("otc_msl", 1.56),
                            first_set(d)["datum"]["basis"].__setitem__("otc_msl", dict(copy.deepcopy(OBSERVED_228), flags=["sampling_assumed"]))],
                 R_MSL_SAMPLING)
-datum_must_pass("an observed mhw and mtl with sampling_assumed",
-                lambda d: [edit(observed_on_a, "mhw", set_flags("sampling_assumed"))(d),
-                           gauge_a(d)["datum"]["basis"]["mtl"].__setitem__("flags", ["sampling_assumed"])])
+for key in ("mtl", "dtl"):
+    datum_must_fail(f"an observed {key} with sampling_assumed", edit(observed_on_a if key == "mtl" else put_and_get(first_set, PRIMARY_DATUM), key, set_flags("sampling_assumed")), R_MSL_SAMPLING)
+datum_must_fail("an observed otc_mtl with sampling_assumed",
+                lambda d: [noaa_on_first(d)["named"].__setitem__("otc_mtl", 1.56),
+                           first_set(d)["datum"]["basis"].__setitem__("otc_mtl", dict(copy.deepcopy(OBSERVED_228), flags=["sampling_assumed"]))],
+                R_MSL_SAMPLING)
+datum_must_pass("an observed mhw, mlw and mllw with sampling_assumed",
+                lambda d: [edit(observed_on_a, "mhw", set_flags("sampling_assumed"))(d)] +
+                          [gauge_a(d)["datum"]["basis"][k].__setitem__("flags", ["sampling_assumed"]) for k in ("mlw", "mllw")])
+datum_must_pass("an observed msl with time_base_unverified and no sampling_assumed",
+                edit(observed_on_a, "msl", set_flags("time_base_unverified")))
 datum_must_pass("a computed lat with sampling_assumed", edit(noaa_on_first, "otc_lat", set_flags("sampling_assumed")))
 
 # Build checks 9-14 of the schema's description: valid JSON Schema on purpose, the release build stops them.
@@ -1767,6 +1802,8 @@ datum_left_to_build("a modified_range_ratio comparison whose control's primary h
 datum_left_to_build("a standard comparison whose control's primary has only MHW and MHHW (check 11)",
                     lambda d: [high_only_primary(d), observed_on_a(d),
                                [b.__setitem__("method", "standard") for b in gauge_a(d)["datum"]["basis"].values()]])
+datum_left_to_build("a truncated mhw with named.mlw but no basis.mlw (check 9)",
+                    lambda d: [put(gauge_a, GESLA_HIGH_DATUM)(d), gauge_a(d)["datum"]["named"].__setitem__("mlw", 0.4)])
 datum_left_to_build("a data_span with end before start (check 13)",
                     edit(observed_on_a, "msl", lambda b: b["data_span"].update(start="2025-12-31", end="2007-01-01")))
 datum_left_to_build("an own-month average whose epoch is not its data_span (check 14)",
