@@ -1663,6 +1663,13 @@ for key in ("mlw", "mllw", "msl", "mtl", "dtl", "otc_mlw"):
                                       first_set(d)["datum"]["named"].__setitem__(k, 0.5),
                                       first_set(d)["datum"]["basis"].__setitem__(k, dict(copy.deepcopy(OBSERVED_228), flags=["truncated_lows"]))],
                     either(R_HIGH_ONLY, R_TRUNCATED_DATUM))
+# Keys outside the low-water set reach only the key rule: a first reduction with truncated_lows on them.
+for key in ("hat", "mhws", "cd", "otc_hat"):
+    datum_must_fail(f"a 19-year determination of {key} with truncated_lows",
+                    lambda d, k=key: [trim(put_and_get(first_set, PRIMARY_DATUM))(d),
+                                      first_set(d)["datum"]["named"].__setitem__(k, 2.0),
+                                      first_set(d)["datum"]["basis"].__setitem__(k, dict(copy.deepcopy(OBSERVED_228), flags=["truncated_lows"]))],
+                    R_HIGH_ONLY)
 datum_must_fail("an own-month average of msl with truncated_lows",
                 own_months("2023-01-01", "2024-12-31", 24, flags=("no_qualified_control", "truncated_lows")),
                 either(R_HIGH_ONLY, R_TRUNCATED_DATUM))
