@@ -1796,6 +1796,9 @@ datum_must_fail("a truncated mhw with a computed mhws",
                 lambda d: [put(gauge_a, GESLA_HIGH_DATUM)(d), gauge_a(d)["datum"]["named"].__setitem__("mhws", 2.1),
                            gauge_a(d)["datum"]["basis"].__setitem__("mhws", copy.deepcopy(COMPUTED_CD))],
                 R_TRUNCATED_DATUM)
+datum_must_fail("a truncated mhw with an observed otc_cd in basis only (no named.otc_cd)",
+                lambda d: [put(gauge_a, GESLA_HIGH_DATUM)(d), gauge_a(d)["datum"]["basis"].__setitem__("otc_cd", copy.deepcopy(OBS_FR))],
+                R_TRUNCATED_DATUM)
 datum_must_fail("a truncated mhw whose named has otc_elw (no basis.otc_elw)",
                 lambda d: [put(gauge_a, GESLA_HIGH_DATUM)(d), gauge_a(d)["datum"]["named"].__setitem__("otc_elw", 0.6)],
                 R_TRUNCATED_DATUM)
