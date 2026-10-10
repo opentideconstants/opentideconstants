@@ -8,7 +8,7 @@ r"""Check the JSON Schema and the example document.
    Schema cannot express this, so this script checks it, as the release
    build will.
 4. Every alias system accepts a real id from its source, and
-5. negative controls must fail: for example a constant set without
+5. negative controls must fail, including a constant set without
    convention_id or quantity, a local convention without utc_offset_hours, a
    bad datestamp, a constituent name over 15 characters, duplicate aliases,
    a release (or .meta.json) with no astro_tables while a convention uses
