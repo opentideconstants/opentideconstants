@@ -1,0 +1,12 @@
+/* Unlisted home alternates (/home-a/, /home-b/; front matter "stylesheet: home-alt.css").
+   They reuse the Home classes in site.css; this file only adds what those pages need. */
+.page-home-a main > .section:last-child,
+.page-home-b main > .section:last-child { padding-bottom: var(--space-8); }
+
+/* A code or JSON specimen, framed like the Home plot. Code keeps its lines and scrolls inside
+   its box on a narrow screen; a JSON specimen (.wrap) wraps instead. */
+.specimen pre { margin: 0; white-space: pre; }
+.specimen pre.wrap { white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (max-width: 40rem) { .specimen pre { font-size: 0.78rem; padding-inline: var(--space-3); } }
+.specimen .plot-head .place { font-family: var(--font-mono); font-size: 1.1rem; font-weight: 600; }
+.sheet-note code { overflow-wrap: anywhere; }

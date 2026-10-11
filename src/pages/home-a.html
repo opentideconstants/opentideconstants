@@ -1,0 +1,152 @@
+---
+title: Home (alternate A)
+description: OpenTideConstants is one open dataset of tidal harmonic constants in which every constant set states its licence, its provenance, its clock check and its conventions, in a versioned format with a published JSON Schema.
+unlisted: true
+stylesheet: home-alt.css
+layout: full
+---
+<section class="sheet" aria-labelledby="hero-title">
+  <div class="wrap">
+    <div class="sheet-frame">
+      <div class="sheet-art">
+        {{include chart-sheet.svg}}
+        <span class="lat l1" aria-hidden="true">54°15′N</span><span class="lat l2" aria-hidden="true">54°10′N</span><span class="lon o1" aria-hidden="true">7°50′E</span><span class="lon o2" aria-hidden="true">7°55′E</span>
+      </div>
+      <div class="title-block">
+        <h1 id="hero-title">Open tide data you can <em>check.</em></h1>
+        <p class="lead">OpenTideConstants (OTC) is one open dataset of tidal harmonic constants. Every constant set states its licence, where it came from, how its clock was checked and which conventions it uses. The format is versioned, its JSON Schema is public, and every file has a SHA-256 checksum.</p>
+        <div class="actions">
+          <a class="button" href="/data-format/">Read the format <span aria-hidden="true">→</span></a>
+          <a class="more" href="/method/">Read the method</a>
+        </div>
+      </div>
+      <p class="sheet-note"><span class="place">Helgoland.</span> The German WSV gauge records in GESLA are in German civil time but are labelled UTC. OTC checks the clock of every gauge record before it uses it, and records what it found.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section wrap" aria-labelledby="every-set">
+  <div class="section-head">
+    <h2 id="every-set">What every constant set tells you</h2>
+    <p>A set of constants is only as useful as what you know about it. In OTC, that knowledge is part of the data, in fields that a program can read, not in a note on a web page.</p>
+  </div>
+  <ul class="marked">
+    <li class="first">
+      <div>
+        <h3>A licence for each set, not one for the whole file</h3>
+        <p>Every set names its <code>licence_id</code>. The release lists each licence with its SPDX id, provider, terms URL, the attribution text to show and <code>commercial_use</code>. Where commercial use is not allowed, the licence says so and says why. You can tell which stations you may ship in a paid product before you ship it.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Provenance</h3>
+        <p>Each set records its source, the source record and version, the span of data used, the input's SHA-256, why it was selected, and the build commit that made it.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>A clock check</h3>
+        <p>Every gauge set carries a time-base code: <code>verified</code>, <code>corrected</code>, <code>unverified</code> or <code>disputed</code>, with the reason and the evidence. A clock is corrected only on positive evidence.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Declared conventions</h3>
+        <p>Every set states its phase reference, time zone, astronomical-argument model, nodal corrections and constituent definitions. A converter never guesses.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>QC with reasons</h3>
+        <p>A set is <code>ok</code>, <code>flagged</code> or <code>no_constants</code>. Every flag has a reason, such as a short record, a broken record or an unverified clock, and the numbers behind it.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Nothing dropped without a trace</h3>
+        <p>Short and broken records stay listed and labelled. The only sets left out are third-party analyses of records whose time base OTC disputes.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Every set kept</h3>
+        <p>A station lists all of its constant sets, from every source, with one recommended by a published rule. You can choose another.</p>
+      </div>
+    </li>
+  </ul>
+</section>
+
+<section class="section proof" aria-labelledby="licence-record">
+  <div class="wrap">
+    <div class="section-head">
+      <h2 id="licence-record">The licence is in the data</h2>
+      <p>This is one entry from the licence list of an OTC release build. Some gauge records come from agencies whose terms do not clearly cover derived constants. OTC keeps those sets, marks them for non-commercial use only, and links the upstream terms.</p>
+    </div>
+    <figure class="plot specimen">
+      <div class="plot-head"><p class="place">licences[]</p><p>One entry, as written by the build.</p></div>
+<pre class="wrap"><code>{
+  "licence_id": "gesla-cdwr-nc",
+  "spdx": "CC-BY-NC-4.0",
+  "provider": "California Department of Water Resources (CDWR, CDEC) via GESLA",
+  "commercial_use": false,
+  "restriction": "Non-commercial use only: the originating agency's terms for these records are not documented or do not clearly cover derived constants; commercial use needs the data owner's permission.",
+  "terms_url": "https://cdec.water.ca.gov/intro.html"
+}</code></pre>
+      <figcaption>
+        <p>Every set with this <code>licence_id</code> carries the same terms. The fields are described on <a href="/data-format/#fields">Data format</a>, and the licences on <a href="/about/#licence">Licence and attribution</a>.</p>
+      </figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="section wrap" aria-labelledby="stable">
+  <div class="section-head">
+    <h2 id="stable">A format you can depend on</h2>
+  </div>
+  <div class="release">
+    <div>
+      <h3>Format 1.0</h3>
+      <p class="stem">OTC_{YYYYMMDD}</p>
+    </div>
+    <ul>
+      <li><strong>A published JSON Schema</strong> for the format, on <a href="/data-format/#schema">Data format</a>.</li>
+      <li><strong>A reader gate.</strong> Each release states <code>format_version</code> and <code>min_reader_version</code>, so an old reader stops instead of misreading a newer release.</li>
+      <li><strong>Dated files.</strong> Every file is named by the date of its release.</li>
+      <li><strong>SHA-256 checksums</strong> for every file.</li>
+      <li><strong>Stable station ids</strong> in the OTC namespace, never changed and never reused.</li>
+      <li><strong>JSON, JSON Lines and CSV.</strong> JSON for programs, JSON Lines for streaming and per-station diffs, CSV for spreadsheets.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="section wrap" aria-labelledby="open">
+  <div class="section-head">
+    <h2 id="open">Open in the ways that matter</h2>
+  </div>
+  <ul class="marked">
+    <li class="first">
+      <div>
+        <h3>Open data, open process</h3>
+        <p>The site source and the <a href="{{site.repoUrl}}/issues">issue tracker</a> are public on GitHub. Anyone can report a problem with a station there. Derived constants are CC BY 4.0, with per-provider attribution; the code is MIT.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Accuracy, with its label</h3>
+        <p>The <a href="/validation/">Validation</a> page sets out how accuracy is measured against official predictions: time and height errors, missed and extra events, and the predictor's own floor as a control. Each result states when it was measured and which constants were compared.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Citable</h3>
+        <p>The repository has a <code>CITATION.cff</code>, and <a href="/about/#cite">How to cite</a> gives the text. Each release records its datestamp, its build commit and the version of every source it used.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>A documented method</h3>
+        <p>The <a href="/method/">Method</a> covers fitting, the clock checks, broken and short records, set selection and the release gate. <a href="/conventions/">Conventions</a> defines every convention a set can declare.</p>
+      </div>
+    </li>
+  </ul>
+</section>
