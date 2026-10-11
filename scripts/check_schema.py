@@ -35,7 +35,8 @@ r"""Check the JSON Schema and the example document.
    without provenance.modified, modified anywhere else, an unknown
    source_type, a ticon-4 set that is not analysis, a gesla-fit set that is
    not gauge, a set without source, and a source_quality_note flag on a
-   gauge, official or model set must fail.
+   gauge, official or model set must fail, as must a ticon-4 set under
+   another licence and the ticon-4 licence on another source.
    Retired values and fields
    (qc_status accepted and fallback, qc_flags verdict, provenance.time_base,
    provenance.build_commit, release.doi, depth_type above_bottom) must fail. Python's re lets $ match before a
@@ -480,7 +481,9 @@ must_pass("analysis set without record_span", lambda d: analysis(d).pop("record_
 must_pass("analysis set with an unverified time base and a time_base flag",
           lambda d: [verified_analysis(d)["time_base"].update(code="unverified", reason="no comparator gives a verdict", evidence=[]),
                      verified_analysis(d).update(qc_status="flagged", qc_flags=[{"flag": "time_base", "reason": "time base unverified"}])])
-must_fail("analysis set without a time base", lambda d: verified_analysis(d).pop("time_base"))
+# with provenance.modified set, a missing time base breaks only the rule that requires one
+must_fail("analysis set without a time base",
+          lambda d: [verified_analysis(d).pop("time_base"), verified_analysis(d)["provenance"].__setitem__("modified", "x")])
 must_fail("analysis set with a disputed time base",
           lambda d: [verified_analysis(d)["time_base"].update(code="disputed", reason="lags disagree"),
                      verified_analysis(d).update(qc_status="flagged", qc_flags=[{"flag": "time_base", "reason": "time base disputed"}])])
@@ -496,6 +499,9 @@ must_fail("ticon-4 set with source_type gauge (it has everything a gauge set nee
 must_fail("gesla-fit set with source_type analysis (verified, so it has everything an analysis set needs)",
           lambda d: station(d, "OTC-EXAMPLE-0011")["constant_sets"][0].__setitem__("source_type", "analysis"))
 must_fail("constant set without source", lambda d: first_set(d).pop("source"))
+must_fail("ticon-4 set under another licence", lambda d: verified_analysis(d).__setitem__("licence_id", "gesla-derived"))
+must_fail("ticon-4 licence on a set of another source",
+          lambda d: [verified_analysis(d).__setitem__("source", "ticon"), verified_analysis(d).__setitem__("licence_id", "ticon-4")])
 must_fail("source_quality_note flag on a model set",
           lambda d: model(d).update(qc_status="flagged", qc_flags=[{"flag": "source_quality_note", "reason": "x"}]))
 must_fail("source_quality_note flag on a gauge set",

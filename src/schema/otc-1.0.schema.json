@@ -493,9 +493,11 @@
           "else": { "properties": { "provenance": { "not": { "required": ["modified"] } } } }
         },
         {
-          "description": "The source names its source type: ticon-4 is an analysis, gesla-fit is a gauge fit.",
+          "description": "The source names its source type: ticon-4 is an analysis, gesla-fit is a gauge fit. The ticon-4 licence goes with the ticon-4 source, and only with it.",
           "allOf": [
             { "if": { "properties": { "source": { "const": "ticon-4" } }, "required": ["source"] }, "then": { "properties": { "source_type": { "const": "analysis" } } } },
+            { "if": { "properties": { "source": { "const": "ticon-4" } }, "required": ["source"] }, "then": { "properties": { "licence_id": { "const": "ticon-4" } } } },
+            { "if": { "properties": { "licence_id": { "const": "ticon-4" } }, "required": ["licence_id"] }, "then": { "required": ["source"], "properties": { "source": { "const": "ticon-4" } } } },
             { "if": { "properties": { "source": { "const": "gesla-fit" } }, "required": ["source"] }, "then": { "properties": { "source_type": { "const": "gauge" } } } }
           ]
         },

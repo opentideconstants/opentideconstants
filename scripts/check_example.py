@@ -85,7 +85,7 @@ from datetime import date
 
 # The number of checks each group (1-11 above) runs on the current example: a group that runs
 # fewer has stopped applying somewhere.
-MIN_CHECKS = {1: 19, 2: 26, 3: 115, 4: 4, 5: 6, 6: 170, 7: 104, 8: 5, 9: 16, 10: 8, 11: 13}
+MIN_CHECKS = {1: 21, 2: 36, 3: 115, 4: 4, 5: 6, 6: 170, 7: 104, 8: 5, 9: 16, 10: 8, 11: 14}
 
 SPEED = {"M2": 28.9841042, "S2": 30.0, "N2": 28.4397295, "K2": 30.0821373, "K1": 15.0410686,
          "O1": 13.9430356, "P1": 14.9589314, "Q1": 13.3986609, "T2": 29.9589333}
