@@ -14,7 +14,7 @@ layout: full
       </div>
       <div class="title-block">
         <h1 id="hero-title">Open tide data, combined into <em>one dataset.</em></h1>
-        <p class="lead">OpenTideConstants (OTC) combines official agency constants, constants that we fit from gauge records, third-party analyses of gauge records, and tide-model constants into one consistent dataset: one format, declared conventions, provenance for every record, and the accuracy of every station against official predictions. It is rebuilt automatically from the latest upstream data and released under CC BY 4.0. Every release is citable by one concept DOI and its datestamp.</p>
+        <p class="lead">OpenTideConstants (OTC) combines official agency constants, constants that we fit from gauge records, third-party analyses of gauge records, and tide-model constants into one consistent dataset: one format, declared conventions, provenance for every record, and the accuracy of every station against official predictions. It is built from the latest upstream data, and each constant set carries a licence from its source's terms; some sets are for non-commercial use only. Every release is citable by one concept DOI and its datestamp.</p>
         <div class="actions">
           <a class="button" href="/downloads/">Downloads <span aria-hidden="true">→</span></a>
           <a class="more" href="/method/">Read the method</a>
@@ -87,7 +87,7 @@ layout: full
       <li><strong>Declared conventions</strong> for every constant set.</li>
       <li><strong>Provenance</strong> for every record.</li>
       <li><strong>Accuracy for every station</strong> against official predictions.</li>
-      <li><strong>Every set kept.</strong> A station lists all its constant sets, not only the one recommended by a published rule.</li>
+      <li><strong>Every published set listed.</strong> A station lists all its published constant sets, not only the one recommended by a published rule.</li>
       <li><strong>SHA-256 checksums</strong> for every file, and one concept DOI for all releases.</li>
     </ul>
   </div>
@@ -124,13 +124,13 @@ layout: full
     <li class="first">
       <div>
         <h3>One dataset from many open sources</h3>
-        <p>Official constants, constants fitted from gauge records, third-party analyses and model constants, in one format. Every station has a stable id, its aliases in other systems (NOAA, GESLA, TICON, XTide, Kartverket, Slackwater), and every constant set from every source (except a third-party analysis (TICON-4) of a record whose time base OTC disputes), with one recommended by a published rule.</p>
+        <p>Official constants, constants fitted from gauge records, third-party analyses and model constants, in one format. Every station has a stable id, its aliases in other systems (GESLA, TICON, webcaltides, and agency ids such as NOAA, Kartverket and LINZ), and every constant set from every source that the release build accepts, with one recommended by a published rule.</p>
       </div>
     </li>
     <li>
       <div>
         <h3>Accuracy for every station</h3>
-        <p>Every release publishes, per station, how well the constants reproduce official predictions: time and height errors, missed and extra events, and the same numbers for the previous release.</p>
+        <p>Every release publishes, per station, how well the constants reproduce official predictions: time and height errors, and missed and extra events.</p>
       </div>
     </li>
     <li>
@@ -142,13 +142,13 @@ layout: full
     <li>
       <div>
         <h3>Time bases checked</h3>
-        <p>Every input record is checked for a wrong or undeclared clock. A clock is corrected only on positive evidence. A record whose time base cannot be confirmed is kept with the time base it declares, and is annotated as unverified or disputed.</p>
+        <p>Every input record is checked for a wrong or undeclared clock. A clock is corrected only on positive evidence. A record whose time base cannot be confirmed is kept with the time base it declares, and is annotated as unverified. A record whose time base OTC disputes or cannot resolve is not published.</p>
       </div>
     </li>
     <li>
       <div>
-        <h3>Automatic and current</h3>
-        <p>Weekly watchers detect upstream changes. A build that passes all gates is published with no person in the loop. A build that fails keeps the last good release live.</p>
+        <h3>Gated releases</h3>
+        <p>A release is published only when its whole-release checks pass. If a check fails, nothing is published.</p>
       </div>
     </li>
     <li>
@@ -178,7 +178,7 @@ layout: full
       <tr><th scope="row"><a href="/source-linz/">LINZ</a> (New Zealand)</th><td>Official constants</td><td>CC BY 4.0</td><td>Official</td></tr>
       <tr><th scope="row"><a href="/source-jma/">JMA</a> (Japan)</th><td>Official constants (JMA-owned stations)</td><td>Public Data License 1.0 (CC BY 4.0 compatible)</td><td>Official</td></tr>
       <tr><th scope="row"><a href="/source-noaa-currents/">NOAA CO-OPS currents</a></th><td>Official tidal-current constants</td><td>Public domain (US Government)</td><td>Official (currents)</td></tr>
-      <tr><th scope="row"><a href="/source-gesla/">GESLA</a></th><td>Gauge records that OTC fits (derived constants only)</td><td>CC BY 4.0 on derived constants, per-provider attribution</td><td>Gauge fit</td></tr>
+      <tr><th scope="row"><a href="/source-gesla/">GESLA</a></th><td>Gauge records that OTC fits (derived constants only)</td><td>Per record, from the terms that apply to it, with per-provider attribution; some non-commercial</td><td>Gauge fit</td></tr>
       <tr><th scope="row"><a href="/source-pegelonline/">PEGELONLINE</a> (Germany)</th><td>Gauge records that OTC fits</td><td>DL-DE-&gt;Zero-2.0</td><td>Gauge fit</td></tr>
       <tr><th scope="row"><a href="/source-rijkswaterstaat/">Rijkswaterstaat</a> (Netherlands)</th><td>Gauge records that OTC fits</td><td>CC0</td><td>Gauge fit</td></tr>
       <tr><th scope="row"><a href="/source-marine-institute/">Marine Institute</a> (Ireland)</th><td>Gauge records that OTC fits</td><td>CC BY 4.0</td><td>Gauge fit</td></tr>

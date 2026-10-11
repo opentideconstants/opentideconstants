@@ -16,7 +16,7 @@ order: 4
   <li><strong>Third-party analysis</strong>: harmonic constants that a third party, not the gauge operator, published from a gauge record (TICON-4). OTC uses them for a gauge whose own OTC fit cannot be published, for example for licence reasons, and only after the same time-base check as its own fits.</li>
   <li><strong>Model constants</strong>: constants from a global or regional tide model, labelled as model constants. EOT20 is the model source.</li>
 </ol>
-<p>Only sets of the same quantity compete: water level for a tide station, current for a current station. Whatever their ranks, a short record never outranks a set that has constants and more hours of good data, and a set with no constants is never recommended. Every set stays in the release files, not only the recommended one, so you can choose another. A source must also pass the <a href="/method/#source-checks">per-source convention check</a>. When a source fails it in a build, its stations stay listed with that source's last good constants from an earlier release, named in <code>carried_from_release</code>, and flagged <code>carried_over</code>. No station disappears because a source failed. The validation table shows how each set scores against official predictions.</p>
+<p>Only sets of the same quantity compete: water level for a tide station, current for a current station. Whatever their ranks, a short record never outranks a set that has constants and more hours of good data, and a set with no constants is never recommended. Every published set stays in the release files, not only the recommended one, so you can choose another. A source must also pass the <a href="/method/#source-checks">per-source convention check</a>. The first release has no earlier release to carry constants from, so no set in it is flagged <code>carried_over</code>. The validation table shows how each set scores against official predictions.</p>
 
 <h2 id="source-list">The sources</h2>
 <p>OTC combines fifteen open sources. For each one, the licence was read and the access path was checked on 2026-10-07 (LINZ, SHOM REFMAR and JMA on 2026-10-08). The coverage figures on each source's page are from those checks.</p>
@@ -41,7 +41,7 @@ order: 4
 </ul>
 
 <h2 id="cross-checks">Used only as cross-checks</h2>
-<p>These are compared with OTC on every build but are not published as OTC sources: the XTide harmonics files and the Slackwater database. TICON-4 (constants fitted from GESLA-4.0) is compared on every build too, and is also a source: see <a href="/source-ticon-4/">TICON-4</a>.</p>
+<p>This is compared with OTC on every build but is not published as an OTC source: the Slackwater database. TICON-4 (constants fitted from GESLA-4.0) is compared on every build too, and is also a source: see <a href="/source-ticon-4/">TICON-4</a>.</p>
 
 <h2 id="not-used">Considered, not added</h2>
 <p>These sources were checked and are not added. Some of their gauges reach OTC through other sources, such as GESLA. To request one, see <a href="/not-included/#sources">Not included</a>.</p>
