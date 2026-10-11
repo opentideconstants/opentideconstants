@@ -401,7 +401,7 @@
         "convention_id": { "type": "string", "minLength": 1 },
         "licence_id": { "type": "string", "minLength": 1 },
         "qc_status": {
-          "description": "ok: constants are published and qc_flags is empty. flagged: constants are published and qc_flags says what to know about them. no_constants: the set is listed but no constants were fitted; no_constants_reason says why, and qc_flags has at least one flag. No status marks a record as removed: every record stays listed. A set carried over from an earlier release has the carried_over flag and provenance.carried_from_release.",
+          "description": "ok: constants are published and qc_flags is empty. flagged: constants are published and qc_flags says what to know about them. no_constants: the set is listed but no constants were fitted; no_constants_reason says why, and qc_flags has at least one flag. No status marks a record as removed: every record stays listed, except that a third-party analysis (TICON-4) of a record whose time base OTC disputes is not carried. A set carried over from an earlier release has the carried_over flag and provenance.carried_from_release.",
           "enum": ["ok", "flagged", "no_constants"]
         },
         "qc_flags": { "type": "array", "items": { "$ref": "#/$defs/qc_flag" } },
