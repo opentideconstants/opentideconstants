@@ -1,14 +1,13 @@
 <section class="section wrap" aria-labelledby="better">
   <div class="section-head">
-    <h2 id="better">Better fits</h2>
-    <p>Constants passed on from someone else's analysis carry its mistakes with them. OTC fits its own from the observed water levels, with a method you can read, and publishes only what the record can support. Another party's analysis is carried only where OTC's own fit cannot be published, and only after the same checks.</p>
-    <!-- HOLD: B8 accuracy against held-out water levels. Switch on only after the accuracy fix (FIX-CONST) lands and the release is re-scored (scorecard rows 5 and 6). Draft: "Against water levels that neither dataset was fitted on, OTC's constants are closer at more gauges than they are further." Add measured counts only from the final scorecard. -->
+    <h2 id="better">How OTC fits</h2>
+    <p>OTC fits its own constants from the observed water levels, with a method you can read, and publishes only what the record can support.</p>
   </div>
   <ul class="marked">
     <li class="first">
       <div>
         <h3>The clock is checked before anything is fitted</h3>
-        <p>A gauge whose clock is read wrongly moves every high and low water at that place. OTC checks every gauge record's clock against the independent evidence that exists before it fits it. It corrects a clock only on positive evidence, marks it unverified when there is none, and does not publish a record whose clock is shown to be wrong. The build will not fit at all without a finished audit, and the verdict and its evidence ship with each set.</p>
+        <p>A gauge whose clock is read wrongly moves every high and low water at that place. OTC checks every gauge record's clock against the independent evidence that exists before it fits it. It corrects a clock only on positive evidence, marks it unverified when there is none, and does not publish a record whose clock is shown to be wrong and cannot be corrected. The build will not fit at all without a finished audit, and the verdict and its evidence ship with each set.</p>
       </div>
     </li>
     <li>
@@ -32,7 +31,7 @@
     <li>
       <div>
         <h3>Up to 19 years per fit</h3>
-        <p>Each fit uses the last 19 years of a record, or all of a shorter one, so the weather averages out and the full set of constituents is resolved.</p>
+        <p>Each fit uses the last 19 years of a record, or all of a shorter one, so the weather averages out and the record can separate as many constituents as it holds.</p>
       </div>
     </li>
     <li>
@@ -44,7 +43,7 @@
     <li>
       <div>
         <h3>Short records, honest numbers</h3>
-        <p>A record under a year long is published with a measured expected accuracy: long records of the same kind of tide are cut to the same months, refitted and compared.</p>
+        <p>A record with under a year of data is published with a measured expected accuracy: long records of the same kind of tide are cut to the same months, refitted and compared.</p>
       </div>
     </li>
     <li>
@@ -63,11 +62,8 @@
       <div>
         <h3>Every set can be traced</h3>
         <p>Each fitted set records the SHA-256 of its input record and of the tables, and the build commit that made it. The <a href="/method/">Method</a> documents every step.</p>
-        <!-- HOLD: F11 public rebuild. Switch on when the pipeline is in the public repository and an outside rebuild matches (scorecard row 25). Draft: "Anyone can rebuild a release from its published inputs and get the same files." -->
       </div>
     </li>
-    <!-- HOLD: B9 prediction fidelity. Switch on when the SDKs predict and each SDK's error against NOAA's tables is measured (scorecard row 7). Draft: "Given an agency's own constants, the OTC predictor reproduces its official tables to within N min." -->
-    <!-- HOLD: B10 recommended set chosen by measured skill on held-out water levels. Switch on after REC-SKILL runs (scorecard row 29). -->
   </ul>
 </section>
 
@@ -75,11 +71,11 @@
   <div class="wrap">
     <div class="section-head">
       <h2 id="evidence">The evidence ships with the data</h2>
-      <p>At Helgoland, the German federal gauge records are hourly means labelled as instants, which puts every time stamp half an hour off. OTC compared them with a second gauge in the same harbour, corrected them, fitted 19 years, and wrote down how it knows and how sure it is.</p>
+      <p>At Helgoland, the German federal gauge records are hourly means labelled as instants, which puts every time stamp half an hour off. OTC compared them with a second record, corrected them, fitted 19 years, and wrote down how it knows and how sure it is.</p>
     </div>
     <figure class="plot specimen">
       <div class="plot-head"><p class="place">constant set</p><p>One Helgoland set from an OTC release build, abridged.</p></div>
-<pre class="wrap"><code><span class="ln">"time_base": {</span><span class="ln">  "code": "corrected",</span><span class="ln">  "declared": "utc_instant",</span><span class="ln">  "published": "utc_mean_start60",</span><span class="ln">  "evidence": [{ "comparator_kind": "sibling_record", "lag_min": -29.61 }]</span><span class="ln">},</span><span class="ln">"record_span": { "start": <span class="nw">"2007-06-29"</span>, "end": <span class="nw">"2026-06-28"</span> },</span><span class="ln">"constituents": [</span><span class="ln">  { "name": "M2", "amplitude_m": 1.09681, "phase_deg": 310.59, "amp_uncertainty_m": 0.00517 },</span><span class="ln">  { "name": "S2", "amplitude_m": 0.29087, "phase_deg": 17.82, "amp_uncertainty_m": 0.00371 },</span><span class="ln">  …</span><span class="ln">],</span><span class="ln">"dropped_constituents": [{ "name": "MSF", "dropped_reason": "noise" }]</span></code></pre>
+<pre class="wrap"><code><span class="ln">"time_base": {</span><span class="ln">  "code": "corrected",</span><span class="ln">  "declared": "utc_instant",</span><span class="ln">  "published": "utc_mean_start60",</span><span class="ln">  "evidence": [{</span><span class="ln">    "comparator_kind": "sibling_record",</span><span class="ln">    "lag_min": -29.61</span><span class="ln">  }]</span><span class="ln">},</span><span class="ln">"record_span": {</span><span class="ln">  "start": <span class="nw">"2007-06-29"</span>,</span><span class="ln">  "end": <span class="nw">"2026-06-28"</span></span><span class="ln">},</span><span class="ln">"constituents": [</span><span class="ln">  { "name": "M2",</span><span class="ln">    "amplitude_m": 1.09681,</span><span class="ln">    "phase_deg": 310.59,</span><span class="ln">    "amp_uncertainty_m": 0.00517 },</span><span class="ln">  { "name": "S2",</span><span class="ln">    "amplitude_m": 0.29087,</span><span class="ln">    "phase_deg": 17.82,</span><span class="ln">    "amp_uncertainty_m": 0.00371 },</span><span class="ln">  …</span><span class="ln">],</span><span class="ln">"dropped_constituents": [</span><span class="ln">  { "name": "MSF",</span><span class="ln">    "dropped_reason": "noise" }</span><span class="ln">]</span></code></pre>
       <figcaption>
         <p>Abridged: the set has 44 constituents, and its time-base evidence, provenance and other fields are shortened or left out; record dates are shown without times. The fields are described on <a href="/data-format/#fields">Data format</a>.</p>
       </figcaption>
@@ -89,17 +85,13 @@
 
 <section class="section wrap" aria-labelledby="bigger">
   <div class="section-head">
-    <h2 id="bigger">Bigger</h2>
-    <p>More ways in, and more of what is known at each place.</p>
-    <!-- HOLD: G4 coverage. Switch on after the agency merge and the scorecard re-run (scorecard rows 1 and 2). Draft: "More places with real constants than any other open tide dataset: N places, counted once within 1 km." Print N only from the final scorecard. -->
-    <!-- HOLD: G6 sources. Switch on after the agency merge puts the official constants in the release. Draft: "Official constants from NOAA, Kartverket, LINZ and JMA, gauge records fitted from GESLA and national networks, and model constants, always labelled, in one release." -->
+    <h2 id="bigger">Ways in</h2>
   </div>
   <ul class="marked">
     <li class="first">
       <div>
         <h3>SDKs in four languages</h3>
         <p>Python, Ruby, TypeScript and C, with the same queries and the same error codes, all checked by one language-neutral conformance suite. Any other language can call the C library.</p>
-        <!-- HOLD: G1 install commands (pip install, gem install, npm install). Switch on when the SDKs are published to PyPI, RubyGems and npm and the C release is on GitHub. -->
       </div>
     </li>
     <li>
@@ -111,7 +103,7 @@
     <li>
       <div>
         <h3>Short records included</h3>
-        <p>A record under a year long is still published when it passes the gates, flagged <code>short_record</code>, so a place with little data is not a blank.</p>
+        <p>A record with under a year of data is still published when it passes the gates, flagged <code>short_record</code>, so a place with little data is not a blank.</p>
       </div>
     </li>
     <li>
@@ -120,9 +112,6 @@
         <p>Look a station up by its OTC id or by its id in another system, search by name, or ask for the stations near a point.</p>
       </div>
     </li>
-    <!-- HOLD: G7 currents. Switch on when the NOAA currents adapter is in the release (scorecard row 8). Draft: "Tidal currents with every depth bin and both axes, not one bin per station." -->
-    <!-- HOLD: G8 secondary stations. Switch on when the release has offset stations and the SDKs predict them (scorecard rows 3 and 4). -->
-    <!-- HOLD: G9 datums. Switch on when datums are in the release (scorecard rows 9 to 11). Draft: "Chart datum, LAT and HAT, and observed datums, each labelled with how it was found." -->
   </ul>
 </section>
 
@@ -141,7 +130,7 @@
     <li>
       <div>
         <h3>No licence guesswork</h3>
-        <p>Records whose owners forbid redistribution are withheld until the owner permits it. Where a contributor's terms are not documented, the set is marked non-commercial, with the reason and a link to the terms.</p>
+        <p>Where a record's owner forbids redistribution, OTC does not publish its own fit of that record. Where TICON-4 publishes an analysis of it under CC BY 4.0, that analysis is carried and labelled as a third-party analysis. Where a contributor's terms are not documented, the set is marked non-commercial, with the reason and a link to the terms.</p>
       </div>
     </li>
     <li>
@@ -154,7 +143,6 @@
       <div>
         <h3>Citable</h3>
         <p>The repository has a <code>CITATION.cff</code>, and <a href="/about/#cite">How to cite</a> gives the text. Each release records its datestamp, build commit and source versions.</p>
-        <!-- HOLD: V5 DOI. Switch on when the concept DOI resolves to the release files (scorecard row 23). Draft: "One concept DOI for every release, archived on Zenodo." -->
       </div>
     </li>
     <li>
@@ -167,7 +155,6 @@
       <div>
         <h3>Works offline</h3>
         <p>An SDK checks a release's SHA-256, caches it and then answers with no network. Or bundle a release with your app and open it from a file.</p>
-        <!-- HOLD: V7 offline prediction. Switch on when the SDKs predict (scorecard row 20). -->
       </div>
     </li>
     <li>
@@ -176,8 +163,6 @@
         <p>The site source and the <a href="{{site.repoUrl}}/issues">issue tracker</a> are public on GitHub. Anyone can report a problem with a station there, and the code is MIT.</p>
       </div>
     </li>
-    <!-- HOLD: V9 free files with no rate limits. Switch on when the first release is hosted at data.opentideconstants.org. -->
-    <!-- HOLD: V10 automatic updates. Switch on when the weekly source watchers run (scorecard row 21). Draft: "Every source is checked weekly, and a change reaches a release with no person in the loop." -->
   </ul>
 </section>
 
@@ -200,7 +185,6 @@ with OpenTideConstants(commercial_only=True) as otc:
         <p>At Helgoland, <code>commercial_only=True</code> moves the recommendation from a set licensed for non-commercial use to an open one, and the credit text follows. Amplitudes are in metres and phases in degrees, in the convention that the set declares.</p>
       </figcaption>
     </figure>
-    <!-- HOLD: prediction example. Switch on when the SDKs predict: add a second snippet with the next high and low waters. -->
   </div>
 </section>
 
