@@ -1,18 +1,19 @@
 # OpenTideConstants
 
-OpenTideConstants (OTC) is one open dataset of tidal harmonic constants. It combines 14 open sources into one format, with declared conventions, provenance for every record, and the accuracy of every station against official predictions. It is rebuilt automatically from the latest upstream data.
+OpenTideConstants (OTC) is one open dataset of tidal harmonic constants. It combines 15 open sources into one format, with declared conventions, provenance for every record, and the accuracy of every station against official predictions. It is rebuilt automatically from the latest upstream data.
 
 Site: [opentideconstants.org](https://opentideconstants.org)
 
 ## What is in the dataset
 
-OTC takes three kinds of source. At one location, they rank in this order:
+OTC takes four kinds of source. At one location, they rank in this order:
 
 1. **Official constants**, published by the agency responsible for the gauge: NOAA CO-OPS (water levels and currents), Kartverket (Norway), LINZ (New Zealand) and JMA (Japan).
 2. **Gauge fits**: constants that OTC fits from sea-level records: GESLA, PEGELONLINE (Germany), Rijkswaterstaat (Netherlands), Marine Institute (Ireland), DMI (Denmark), SMHI (Sweden), FMI (Finland) and SHOM REFMAR (France).
-3. **Model constants** from the EOT20 global tide model, interpolated to station points. They are always labelled as model constants.
+3. **Third-party analyses**: constants that a third party fitted from gauge records, TICON-4, used only where OTC's own fit of the gauge cannot be published and only after the same time-base check.
+4. **Model constants** from the EOT20 global tide model, interpolated to station points. They are always labelled as model constants.
 
-A station keeps every constant set from every source. One set is recommended by a published rule. Each station has a stable id and its aliases in other systems (NOAA, GESLA, TICON, XTide, Kartverket, Slackwater). The [Sources](https://opentideconstants.org/sources/) page gives the licence, access and coverage of each source.
+A station keeps every constant set from every source, except a third-party analysis (TICON-4) of a record whose time base OTC disputes, which is not carried. One set is recommended by a published rule. Each station has a stable id and its aliases in other systems (NOAA, GESLA, TICON, XTide, Kartverket, Slackwater). The [Sources](https://opentideconstants.org/sources/) page gives the licence, access and coverage of each source.
 
 The format is version 1.0. A release has one JSON document with a published [JSON Schema](https://opentideconstants.org/schema/otc-1.0.schema.json), the same data as JSON Lines (one station per line), and one long CSV table for spreadsheets. The JSON document also carries the per-year astronomical tables (V0+u and the node factor f) that a predictor needs, computed with congen after Schureman.
 
@@ -21,7 +22,7 @@ Every constant set carries:
 - its **convention**: phase reference, astronomical-argument model, nodal corrections and constituent table;
 - its **provenance**: where the set came from and what the build did to it;
 - its **QC status and flags**: `ok`, `flagged` or `no_constants`, with a reason for each flag;
-- a **time-base annotation** for gauge fits: `verified`, `corrected`, `unverified` or `disputed`, with the evidence;
+- a **time-base annotation** for gauge fits and third-party analyses: `verified`, `corrected`, `unverified` or `disputed`, with the evidence;
 - **broken-record** and **short-record** details, where they apply;
 - its **validation** scores against official predictions, with the previous release's scores;
 - its **licence** and attribution text.

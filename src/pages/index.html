@@ -1,6 +1,6 @@
 ---
 title: Home
-description: OpenTideConstants combines open tide data (official agency constants, constants fitted from gauge records, and tide-model constants) into one consistent dataset with one format, declared conventions, per-record provenance and published accuracy for every station.
+description: OpenTideConstants combines open tide data (official agency constants, constants fitted from gauge records, third-party analyses of gauge records, and tide-model constants) into one consistent dataset with one format, declared conventions, per-record provenance and published accuracy for every station.
 nav: Home
 order: 1
 layout: full
@@ -14,7 +14,7 @@ layout: full
       </div>
       <div class="title-block">
         <h1 id="hero-title">Open tide data, combined into <em>one dataset.</em></h1>
-        <p class="lead">OpenTideConstants (OTC) combines official agency constants, constants that we fit from gauge records, and tide-model constants into one consistent dataset: one format, declared conventions, provenance for every record, and the accuracy of every station against official predictions. It is rebuilt automatically from the latest upstream data and released under CC BY 4.0. Every release is citable by one concept DOI and its datestamp.</p>
+        <p class="lead">OpenTideConstants (OTC) combines official agency constants, constants that we fit from gauge records, third-party analyses of gauge records, and tide-model constants into one consistent dataset: one format, declared conventions, provenance for every record, and the accuracy of every station against official predictions. It is rebuilt automatically from the latest upstream data and released under CC BY 4.0. Every release is citable by one concept DOI and its datestamp.</p>
         <div class="actions">
           <a class="button" href="/downloads/">Downloads <span aria-hidden="true">→</span></a>
           <a class="more" href="/method/">Read the method</a>
@@ -26,8 +26,8 @@ layout: full
 </section>
 <section class="section wrap flow" aria-labelledby="combined">
   <div class="section-head">
-    <h2 id="combined">Three kinds of source, one release</h2>
-    <p>Each source has its own licence, format and conventions. OTC reads each one with its own adapter, checks it, and writes everything into one format. At one location, official constants rank before a gauge fit, and a gauge fit before model constants.</p>
+    <h2 id="combined">Four kinds of source, one release</h2>
+    <p>Each source has its own licence, format and conventions. OTC reads each one with its own adapter, checks it, and writes everything into one format. At one location, official constants rank before a gauge fit, a gauge fit before a third party's analysis of a gauge record, and that analysis before model constants.</p>
     <p>See how tidal constants become a tide prediction in <a href="/tide-mechanics/">Tide Mechanics</a>.</p>
   </div>
   <ul class="streams">
@@ -57,17 +57,25 @@ layout: full
       </ul>
     </li>
     <li class="stream">
+      <h3>Third-party analyses</h3>
+      <p class="rank">Constants a third party fitted from gauge records, after OTC's time-base check. Only where OTC's own fit cannot be published. Ranked third.</p>
+      <ul>
+        <li><a href="/source-ticon-4/">TICON-4</a></li>
+      </ul>
+    </li>
+    <li class="stream">
       <h3>Model constants</h3>
-      <p class="rank">From a global tide model at station points, always labelled as model constants. Ranked third.</p>
+      <p class="rank">From a global tide model at station points, always labelled as model constants. Ranked last.</p>
       <ul>
         <li><a href="/source-eot20/">EOT20</a></li>
       </ul>
     </li>
   </ul>
   <svg class="confluence" viewBox="0 0 600 80" preserveAspectRatio="none" aria-hidden="true">
-    <path d="M100 0 C100 45, 300 35, 300 80"/>
-    <path d="M500 0 C500 45, 300 35, 300 80"/>
-    <path class="main" d="M300 0 V80"/>
+    <path d="M75 0 C75 45, 300 35, 300 80"/>
+    <path d="M375 0 C375 45, 300 35, 300 80"/>
+    <path d="M525 0 C525 45, 300 35, 300 80"/>
+    <path class="main" d="M225 0 C225 45, 300 35, 300 80"/>
   </svg>
   <div class="release">
     <div>
@@ -79,7 +87,7 @@ layout: full
       <li><strong>Declared conventions</strong> for every constant set.</li>
       <li><strong>Provenance</strong> for every record.</li>
       <li><strong>Accuracy for every station</strong> against official predictions.</li>
-      <li><strong>Every set kept.</strong> A station lists every constant set, with one recommended by a published rule.</li>
+      <li><strong>Every set kept.</strong> A station lists all its constant sets, not only the one recommended by a published rule.</li>
       <li><strong>SHA-256 checksums</strong> for every file, and one concept DOI for all releases.</li>
     </ul>
   </div>
@@ -116,7 +124,7 @@ layout: full
     <li class="first">
       <div>
         <h3>One dataset from many open sources</h3>
-        <p>Official constants, constants fitted from gauge records and model constants, in one format. Every station has a stable id, its aliases in other systems (NOAA, GESLA, TICON, XTide, Kartverket, Slackwater), and every constant set from every source, with one recommended by a published rule.</p>
+        <p>Official constants, constants fitted from gauge records, third-party analyses and model constants, in one format. Every station has a stable id, its aliases in other systems (NOAA, GESLA, TICON, XTide, Kartverket, Slackwater), and every constant set from every source (except a third-party analysis (TICON-4) of a record whose time base OTC disputes), with one recommended by a published rule.</p>
       </div>
     </li>
     <li>
@@ -178,10 +186,11 @@ layout: full
       <tr><th scope="row"><a href="/source-smhi/">SMHI</a> (Sweden)</th><td>Gauge records that OTC fits</td><td>CC BY 4.0 SE</td><td>Gauge fit</td></tr>
       <tr><th scope="row"><a href="/source-fmi/">FMI</a> (Finland)</th><td>Gauge records that OTC fits</td><td>CC BY 4.0</td><td>Gauge fit</td></tr>
       <tr><th scope="row"><a href="/source-shom-refmar/">SHOM REFMAR</a> (France)</th><td>Gauge records that OTC fits (observations only)</td><td>Etalab Licence Ouverte 2.0</td><td>Gauge fit</td></tr>
+      <tr><th scope="row"><a href="/source-ticon-4/">TICON-4</a></th><td>Constants fitted from GESLA records, where OTC's own fit cannot be published</td><td>CC BY 4.0</td><td>Third-party analysis</td></tr>
       <tr><th scope="row"><a href="/source-eot20/">EOT20</a></th><td>Model constants at station points</td><td>CC BY 4.0</td><td>Model</td></tr>
     </tbody>
   </table>
   </div>
-  <p>At one location, official constants rank before a gauge fit, and a gauge fit before model constants. Model constants are always labelled as such. Sources that were checked and not added are listed under <a href="/sources/#not-used">Considered, not added</a>. See <a href="/sources/">Sources</a> for licences, attribution, update cadence and coverage, <a href="/method/">Method</a> for how each source is processed, and <a href="/why/">Why</a> for the problems this project addresses.</p>
+  <p>At one location, official constants rank before a gauge fit, a gauge fit before a third party's analysis of a gauge record, and that analysis before model constants. Model constants are always labelled as such. Sources that were checked and not added are listed under <a href="/sources/#not-used">Considered, not added</a>. See <a href="/sources/">Sources</a> for licences, attribution, update cadence and coverage, <a href="/method/">Method</a> for how each source is processed, and <a href="/why/">Why</a> for the problems this project addresses.</p>
 </section>
 <script src="/assets/plot.js" defer></script>

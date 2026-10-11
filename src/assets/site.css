@@ -287,8 +287,8 @@ body:has(.docs-layout) .footer-inner { padding-inline: 4rem; max-width: none; }
 .sheet-map .tdiamond text { font-family: var(--font-mono); font-weight: 600; font-size: 18px; fill: var(--color-accent); }
 .sheet-map .limit { fill: none; stroke: var(--color-accent); stroke-width: 2; stroke-dasharray: 14 6 3 6; opacity: 0.85; }
 
-/* Sources flow: three kinds of source run together into one release */
-.streams { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-5); }
+/* Sources flow: four kinds of source run together into one release */
+.streams { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-5); }
 .stream { margin: 0; padding: var(--space-4) var(--space-5) var(--space-5); background: var(--color-shallow); border: var(--border-width) solid var(--color-contour); }
 .stream h3 { margin-bottom: var(--space-1); }
 .stream .rank { margin: 0 0 var(--space-3); font-size: var(--font-size-small); color: var(--color-text); }
