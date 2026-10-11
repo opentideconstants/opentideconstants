@@ -66,7 +66,7 @@ The brand mark is a tidal diamond: an outlined square on its point, with the top
 
 Documentation pages (`layout: docs`) work like the aimock docs:
 
-- **Left sidebar.** Fixed under the header, 260px (`--sidebar-w`), on the surface colour, scrolling on its own. It lists the docs pages in two groups (Documentation, then the fourteen Sources), with mono uppercase group labels. The current page is tinted with the accent and scrolled to the middle of the sidebar on load. A page with `sidebar: hidden` in its front matter is built and stays in the sitemap, but is not listed (used for a source that is not in the current release).
+- **Left sidebar.** Fixed under the header, 260px (`--sidebar-w`), on the surface colour, scrolling on its own. It lists the docs pages in two groups (Documentation, then the fifteen Sources), with mono uppercase group labels. The current page is tinted with the accent and scrolled to the middle of the sidebar on load. A page with `sidebar: hidden` in its front matter is built and stays in the sitemap, but is not listed (used for a source that is not in the current release).
 - **Text column.** At most 960px, centred between the sidebars. The footer lines up with it.
 - **"On this page".** A sticky 220px list at the right edge that links the page's h2 and h3 headings (h3 indented) and marks the one being read (`assets/docs.js`). It appears only when a page has four or more such headings. The build gives every h2 and h3 an id.
 - Below 75rem (1200px) the right list is hidden. At 48rem (768px) and below the left sidebar is off-screen and slides in from the left when the header's menu button (☰) is pressed.
@@ -83,7 +83,7 @@ Documentation pages (`layout: docs`) work like the aimock docs:
 ## Home
 
 1. **Chart sheet hero.** A chart of Helgoland (depth bands, contours, soundings, a compass rose, a tide-gauge symbol), with the title in a cartouche and a framed Helgoland note. The chart is decorative (`aria-hidden`); its soundings are illustrative, not survey data.
-2. **Three kinds of source, one release.** Official constants, gauge records that OTC fits and model constants run as three streams, into one release box. The introduction has a line of its own that links Tide Mechanics. On narrow screens the streams stack and a single line joins them to the release.
+2. **Four kinds of source, one release.** Official constants, gauge records that OTC fits, third-party analyses and model constants run as four streams, into one release box; the gauge stream's line is the accent. The introduction has a line of its own that links Tide Mechanics. On narrow screens the streams stack and a single line joins them to the release.
 3. **Why one consistent dataset matters.** The Helgoland tide-curve plot: the official prediction, TICON-4 shifted by its mean time error (88–90 min) and our fit shifted by its mean time error (6.7 min). There is a wide and a compact version of the plot.
 4. **What is different.** A diamond-marked list; the first item ("one dataset from many open sources") spans the full width.
 5. **Sources at a glance.** One table of every source, with what OTC takes, its licence and its rank. The closing paragraph is set like a section introduction.
