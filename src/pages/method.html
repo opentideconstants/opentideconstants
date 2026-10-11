@@ -32,11 +32,8 @@ order: 5
 </ol>
 
 <h2 id="broken-records">Broken-record checks</h2>
-<p>A broken record is published only when the release build accepts its fit. The checks look for a datum step, a flat line, spikes, gaps, a clock step, quantised or out-of-range values, main constituents that are not stable from year to year or between the two halves of the span, and a record that does not correlate with a nearby gauge that correlates with its own neighbours.</p>
-<ul>
-  <li>When the record gives no usable fit, or the fit is implausible, or the main constituents differ between the two halves of the record, the record is not published. The Hirtshals record (no tide in the input) is the reference case.</li>
-</ul>
-<p>The thresholds are calibrated on the data and published with each release. The fields are on <a href="/data-format/#fields">Data format</a>.</p>
+<p>The checks remove spikes, and refuse a fit whose main constituents differ between the two halves of the record, whose own uncertainty is too large, or that is implausible against nearby gauges or EOT20. A refused record is not published.</p>
+<p>The fields are on <a href="/data-format/#fields">Data format</a>.</p>
 
 <h2 id="selection">Record selection</h2>
 <p>When several records exist at one gauge, the build picks one by fixed rules, in this order: the most good data in the 19-year span; recent records before records that ended long ago; the gauge operator's own record before a re-distribution of it; instantaneous before averaged; sub-hourly before hourly; then the lowest file id. A short record never comes before a record with constants and more hours of good data, and a record with no constants is never chosen. When two eligible records disagree beyond their uncertainty, the record with the lower error against an official reference is chosen. Every choice and its reason is recorded. A third party's published constants for a gauge (source type <code>analysis</code>) are not a record that OTC fits, so they take no part in this selection: they rank below any OTC gauge fit at the station (see <a href="/sources/#ranking">How sources rank</a>).</p>
@@ -76,6 +73,6 @@ order: 5
 <ol>
   <li><strong>Fixed rules</strong> decide every case they can classify: pass, fail or fall back.</li>
   <li><strong>One batched automated review per build</strong> handles the cases the rules cannot classify. Each answer is either <em>accept</em> or <em>fall back</em>, with a reason that cites the evidence. Answers are stored in a public table keyed by the evidence, and reused while the evidence is unchanged, so a rebuild is reproducible.</li>
-  <li><strong>Fallback:</strong> the first release has no earlier release to fall back to.</li>
+  <li><strong>Fallback:</strong> the first release has no earlier release to fall back to, so the build refuses a case it cannot decide.</li>
 </ol>
-<p>A release is published only when every whole-release gate passes, including the round-trip checks of the converters and the uploads. If any gate fails, nothing is published, the last good release stays live, and an alert opens a public issue. Licence and publication policy stay with the project owner and never block a build.</p>
+<p>A release is published only when every whole-release gate passes, including the round-trip checks of the converters and the uploads. If any gate fails, nothing is published; after the first release, the last good release stays live, and an alert opens a public issue. Licence and publication policy stay with the project owner and never block a build.</p>
