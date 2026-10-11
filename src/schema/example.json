@@ -6,7 +6,7 @@
     "min_reader_version": "1.0",
     "fit_min_good_hours": 360,
     "concept_doi": null,
-    "source_versions": { "gesla": "4.1", "kartverket": "20991231", "noaa": "20991231" }
+    "source_versions": { "gesla": "4.1", "kartverket": "20991231", "noaa": "20991231", "ticon": "4" }
   },
   "conventions": [
     {
@@ -30,6 +30,15 @@
     },
     {
       "convention_id": "noaa-greenwich-schureman-v1",
+      "phase_reference": "greenwich_utc",
+      "v0_model": "schureman_tcd",
+      "nodal_handling": "f_u_at_prediction",
+      "constituent_table_version": "example",
+      "astro_table_id": "tcd-20251228",
+      "canary": { "status": "not_applicable" }
+    },
+    {
+      "convention_id": "ticon4-greenwich-schureman-v1",
       "phase_reference": "greenwich_utc",
       "v0_model": "schureman_tcd",
       "nodal_handling": "f_u_at_prediction",
@@ -69,6 +78,13 @@
       "commercial_use": false,
       "restriction": "Non-commercial use only: the GESLA licence page lists CMEMS records for research use; commercial use needs the data owner's permission.",
       "terms_url": "https://gesla787883612.wordpress.com/license/"
+    },
+    {
+      "licence_id": "ticon-4",
+      "spdx": "CC-BY-4.0",
+      "provider": "TICON-4",
+      "attribution": "Example attribution text.",
+      "commercial_use": true
     },
     {
       "licence_id": "rws",
@@ -757,7 +773,7 @@
       "lon": -5.5,
       "timezone": "Europe/London",
       "type": "reference",
-      "aliases": { "gesla": ["example-uk-file-id"] },
+      "aliases": { "gesla": ["example-uk-file-id", "example-uk-file-id-2"], "ticon": ["example-uk-file-id-2"] },
       "recommended_set_id": "OTC-EXAMPLE-0011/gesla-fit",
       "constant_sets": [
         {
@@ -796,6 +812,28 @@
             "evidence": [{ "comparator_kind": "model", "comparator_id": "eot20", "distance_km": 1.0, "lag_min": 0.3 }]
           },
           "provenance": { "build": { "build_commit": "0000000" }, "selection_reason": "only eligible record", "decision": { "tier": "rule", "outcome": "accept" } }
+        },
+        {
+          "set_id": "OTC-EXAMPLE-0011/ticon-4",
+          "source": "ticon-4",
+          "source_type": "analysis",
+          "quantity": "water_level",
+          "source_record_id": "example-uk-file-id-2",
+          "source_version": "4",
+          "record_span": { "start": "1993-01-01T00:00:00Z", "end": "2020-12-31T23:00:00Z", "good_hours": 201000 },
+          "convention_id": "ticon4-greenwich-schureman-v1",
+          "licence_id": "ticon-4",
+          "qc_status": "flagged",
+          "qc_flags": [
+            { "flag": "source_quality_note", "reason": "The publisher reports 18% of the record's hours missing.", "values": { "missing_pct": 18.0 } }
+          ],
+          "constituents": [
+            { "name": "M2", "speed_deg_per_hour": 28.9841042, "amplitude_m": 1.69, "phase_deg": 141.0, "amp_uncertainty_m": 0.004, "phase_uncertainty_deg": 0.2 },
+            { "name": "S2", "speed_deg_per_hour": 30.0, "amplitude_m": 0.57, "phase_deg": 141.0, "amp_uncertainty_m": 0.004, "phase_uncertainty_deg": 0.4 },
+            { "name": "N2", "speed_deg_per_hour": 28.4397295, "amplitude_m": 0.32, "phase_deg": 83.0, "amp_uncertainty_m": 0.004, "phase_uncertainty_deg": 0.7 },
+            { "name": "K2", "speed_deg_per_hour": 30.0821373, "amplitude_m": 0.16, "phase_deg": 139.0, "amp_uncertainty_m": 0.004, "phase_uncertainty_deg": 1.4 }
+          ],
+          "provenance": { "build": { "build_commit": "0000000" }, "selection_reason": "the record's licence does not allow publishing an OTC fit, so the publisher's constants are used" }
         }
       ]
     },

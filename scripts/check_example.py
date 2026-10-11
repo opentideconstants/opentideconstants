@@ -65,7 +65,8 @@ plausible. For each active station, and each water-level constant set with const
     level. A computed level is compared with the reference's otc_ level; the reference must have
     that level (and the same key for a published one), or the check fails.
 11. Recommended set: for each station with water-level sets, recommended_set_id is the set the
-    published rule picks among those with constants: official before gauge fit before model;
+    published rule picks among those with constants: official before gauge fit before analysis
+    (a third party's published constants) before model;
     then the most good hours in 2002-2020, estimated as good_hours times the share of the record
     span's days inside 2002-01-01 to 2021-01-01; then the most recent end.
 
@@ -83,7 +84,7 @@ from datetime import date
 
 # The number of checks each group (1-11 above) runs on the current example: a group that runs
 # fewer has stopped applying somewhere.
-MIN_CHECKS = {1: 18, 2: 26, 3: 115, 4: 4, 5: 6, 6: 170, 7: 104, 8: 5, 9: 15, 10: 8, 11: 12}
+MIN_CHECKS = {1: 19, 2: 26, 3: 115, 4: 4, 5: 6, 6: 170, 7: 104, 8: 5, 9: 16, 10: 8, 11: 12}
 
 SPEED = {"M2": 28.9841042, "S2": 30.0, "N2": 28.4397295, "K2": 30.0821373, "K1": 15.0410686,
          "O1": 13.9430356, "P1": 14.9589314, "Q1": 13.3986609, "T2": 29.9589333}
@@ -105,7 +106,7 @@ RANK = {"hat": 0, "mhhw": 1, "mhw": 2, "msl": 3, "mtl": 3, "dtl": 3, "mlw": 4, "
 OUTSIDE_CHAIN_HIGH = {"mhws", "mhwn"}
 OUTSIDE_CHAIN_LOW = {"mlws", "mlwn", "mllws"}
 SEMIDIURNAL = {"NOR", "NLD", "DEU", "GBR"}
-SOURCE_RANK = {"official": 0, "gauge": 1, "model": 2}
+SOURCE_RANK = {"official": 0, "gauge": 1, "analysis": 2, "model": 3}
 
 
 def rayleigh_hours(a, b):
@@ -404,7 +405,7 @@ def audit(doc):
                 in_span = rs.get("good_hours", 0) * max(0, (a1 - a0).days) / span if span else 0.0
             return (-SOURCE_RANK.get(cs.get("source_type"), 9), in_span, rs["end"] if rs else "")
         best = max(cands, key=key)["set_id"]
-        row(st["station_id"], "recommended set: official, then gauge fit, then model; then most good hours in 2002-2020; then most recent",
+        row(st["station_id"], "recommended set: official, then gauge fit, then analysis, then model; then most good hours in 2002-2020; then most recent",
             st.get("recommended_set_id"), best, st.get("recommended_set_id") == best)
     return rows
 

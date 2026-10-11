@@ -29,7 +29,10 @@ r"""Check the JSON Schema and the example document.
    code or with an unknown one, corrected without from/to, no_constants
    with constants, and any qc_status excluded must fail; every annotation
    code, a broken record with a usable segment and a no-constants record
-   must pass. Retired values and fields
+   must pass. An analysis set (a third party's published constants) without
+   time_base, good_hours or record_span must pass; an unknown source_type,
+   and a source_quality_note flag on a gauge or official set, must fail.
+   Retired values and fields
    (qc_status accepted and fallback, qc_flags verdict, provenance.time_base,
    provenance.build_commit, release.doi, depth_type above_bottom) must fail. Python's re lets $ match before a
    final newline; ECMA-262 does not. The schema ends every pattern with
@@ -447,6 +450,28 @@ must_fail("D9 carried-over set with qc_status ok",
 must_fail("C1 release without min_reader_version", lambda d: d["release"].pop("min_reader_version"))
 must_fail("C3 gauge set without good_hours", lambda d: fjord(d, "a")["record_span"].pop("good_hours"))
 must_fail("C3 gauge set without record_span", lambda d: fjord(d, "a").pop("record_span"))
+
+
+def analysis(d):
+    return next(cs for cs in station(d, "OTC-EXAMPLE-0011")["constant_sets"] if cs["source_type"] == "analysis")
+
+
+def official(d):
+    return next(cs for cs in station(d, "OTC-EXAMPLE-0001")["constant_sets"] if cs["source_type"] == "official")
+
+
+if "time_base" in analysis(example):
+    print("FAIL: the example's analysis set has a time_base, so it does not show that one is optional")
+    sys.exit(1)
+must_pass("analysis set without good_hours", lambda d: analysis(d)["record_span"].pop("good_hours"))
+must_pass("analysis set without record_span", lambda d: analysis(d).pop("record_span"))
+must_fail("unknown source_type", lambda d: analysis(d).__setitem__("source_type", "ticon"))
+must_fail("source_quality_note flag on a gauge set",
+          lambda d: [fjord(d, "a").__setitem__("qc_status", "flagged"),
+                     fjord(d, "a").__setitem__("qc_flags", [{"flag": "source_quality_note", "reason": "x"}])])
+must_fail("source_quality_note flag on an official set",
+          lambda d: [official(d).__setitem__("qc_status", "flagged"),
+                     official(d).__setitem__("qc_flags", [{"flag": "source_quality_note", "reason": "x"}])])
 must_fail("reference station with no constant sets",
           lambda d: station(d, "OTC-EXAMPLE-0005").update(constant_sets=[], recommended_set_id=None))
 
