@@ -20,6 +20,10 @@
 //                        e.g. a source not in the current release)
 //   redirect: /path/#id (optional; the page is only a redirect to that address, for old URLs.
 //                        It is left out of the navigation and the sitemap; its body is ignored.)
+//   unlisted: true      (optional; the page is built but left out of the sitemap, and is marked
+//                        noindex instead of canonical. It cannot have "nav". Used for draft
+//                        alternates such as /home-a/ that are viewed by direct link only.)
+//   stylesheet: x.css   (optional; also loads /assets/x.css after site.css, on this page only)
 //   ---
 // The page body is inserted into src/layout.html. Placeholders: {{title}},
 // {{description}}, {{canonical_tag}}, {{social_tags}}, {{nav}}, {{content}}, {{year}}, and any key of
@@ -55,6 +59,9 @@ function parsePage(file) {
   for (const key of ["title", "description"]) {
     if (!meta[key]) throw new Error(`${file}: front matter needs "${key}"`);
   }
+  if (meta.unlisted && meta.unlisted !== "true") throw new Error(`${file}: unlisted must be "true"`);
+  if (meta.unlisted && meta.nav) throw new Error(`${file}: an unlisted page cannot be in the navigation`);
+  if (meta.stylesheet && !/^[\w.-]+\.css$/.test(meta.stylesheet)) throw new Error(`${file}: stylesheet must be a file name in assets/`);
   return { meta, body: raw.slice(m[0].length) };
 }
 
@@ -234,8 +241,14 @@ for (const page of pages) {
       return `<li><a href="${p.path}"${current}>${p.meta.nav}</a></li>`;
     })
     .join("\n          ");
+  const siteCss = '<link rel="stylesheet" href="/assets/site.css">';
+  if (page.meta.stylesheet && !layout.includes(siteCss)) throw new Error(`${page.file}: layout.html has no ${siteCss} to add the page stylesheet after`);
+  if (page.meta.stylesheet && !existsSync(join(src, "assets", page.meta.stylesheet))) throw new Error(`${page.file}: no such stylesheet assets/${page.meta.stylesheet}`);
+  const pageLayout = page.meta.stylesheet
+    ? layout.replace(siteCss, `$&\n  <link rel="stylesheet" href="/assets/${page.meta.stylesheet}">`)
+    : layout;
   const html = versionAssets(fillSite(
-    layout
+    pageLayout
       .replaceAll("{{content}}", page.meta.layout === "full" ? fillIncludes(page.body.trim()) : page.meta.layout === "docs" ? docsLayout(page) : `<div class="wrap doc">\n${page.body.trim()}\n</div>`)
       .replaceAll("{{docs_toggle}}", page.meta.layout === "docs" ? '<button class="sidebar-toggle" type="button" aria-label="Documentation menu" aria-controls="docs-sidebar" aria-expanded="false">☰</button>' : "")
       .replaceAll("{{page}}", page.name)
@@ -243,7 +256,7 @@ for (const page of pages) {
       .replaceAll("{{social_tags}}", socialTags(page, page.name === "index" ? `${site.name}: open tidal harmonic constants` : page.meta.title))
       .replaceAll("{{title}}", page.name === "index" ? `${site.name}: open tidal harmonic constants` : `${page.meta.title} · ${site.name}`)
       .replaceAll("{{description}}", page.meta.description)
-      .replaceAll("{{canonical_tag}}", page.name === "404" ? "<meta name=\"robots\" content=\"noindex\">" : `<link rel="canonical" href="${site.url}${page.path}">`)
+      .replaceAll("{{canonical_tag}}", page.name === "404" || page.meta.unlisted ? "<meta name=\"robots\" content=\"noindex\">" : `<link rel="canonical" href="${site.url}${page.path}">`)
       .replaceAll("{{year}}", String(new Date().getUTCFullYear()))
   ));
   if (/\{\{[^}]+\}\}/.test(html)) throw new Error(`${page.file}: unfilled placeholder ${html.match(/\{\{[^}]+\}\}/)[0]}`);
@@ -253,7 +266,7 @@ for (const page of pages) {
 }
 
 const urls = pages
-  .filter((p) => p.name !== "404" && !p.meta.redirect)
+  .filter((p) => p.name !== "404" && !p.meta.redirect && !p.meta.unlisted)
   .sort((a, b) => a.path.localeCompare(b.path))
   .map((p) => `  <url><loc>${site.url}${p.path}</loc></url>`)
   .join("\n");

@@ -1,0 +1,120 @@
+---
+title: Home (alternate B)
+description: OpenTideConstants is an open dataset of tidal harmonic constants in one versioned format, with SDKs for Python, Ruby, TypeScript and C that share one interface and one conformance suite, work offline and can keep only the sets licensed for commercial use.
+unlisted: true
+stylesheet: home-alt.css
+layout: full
+---
+<section class="sheet" aria-labelledby="hero-title">
+  <div class="wrap">
+    <div class="sheet-frame">
+      <div class="sheet-art">
+        {{include chart-sheet.svg}}
+        <span class="lat l1" aria-hidden="true">54°15′N</span><span class="lat l2" aria-hidden="true">54°10′N</span><span class="lon o1" aria-hidden="true">7°50′E</span><span class="lon o2" aria-hidden="true">7°55′E</span>
+      </div>
+      <div class="title-block">
+        <h1 id="hero-title">One format. <em>Four SDKs.</em></h1>
+        <p class="lead">OpenTideConstants (OTC) is an open dataset of tidal harmonic constants in one versioned format. The SDKs for Python, Ruby, TypeScript and C share one interface and one conformance suite. Each one downloads a release, checks its SHA-256, caches it, and then works with no network.</p>
+        <div class="actions">
+          <a class="button" href="/data-format/">Read the format <span aria-hidden="true">→</span></a>
+          <a class="more" href="/downloads/">Files and downloads</a>
+        </div>
+      </div>
+      <p class="sheet-note"><span class="place">Shipping a paid product?</span> Open the SDK with <code>commercial_only</code>, and it keeps only the constant sets whose licence allows commercial use.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section wrap" aria-labelledby="you-get">
+  <div class="section-head">
+    <h2 id="you-get">What you get</h2>
+    <p>Tide constants from many publishers, in one shape, through one interface in the language you already use.</p>
+  </div>
+  <ul class="marked">
+    <li class="first">
+      <div>
+        <h3>One format for every kind of source</h3>
+        <p>Official agency constants, OTC's fits of gauge records, third-party analyses and model constants all use the same JSON format, checked by one published JSON Schema. Every set says which kind it is, and a station's recommended set is chosen by a published rule. Your code reads one shape, whatever the source.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Four SDKs, one interface</h3>
+        <p>Python, Ruby, TypeScript and C have the same queries and the same error codes. All four pass one language-neutral conformance suite. The Python and Ruby SDKs use only the standard library, and the TypeScript SDK has no runtime dependencies.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Offline</h3>
+        <p>With <code>offline</code> set, an SDK never opens a socket and loads the newest release in its cache. Or bundle a release with your app and open it from a file, checked against its <code>.sha256</code>.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>A commercial-use option</h3>
+        <p>Every set names its licence, and the release says whether that licence allows commercial use. <code>commercial_only</code> (<code>commercialOnly</code> in TypeScript) keeps only the sets that do, and each station's recommendation then comes from those sets.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Pin a release</h3>
+        <p>Open a release by its date for reproducible builds. A release that needs a newer reader fails with <code>reader_too_old</code> instead of being misread.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Find stations</h3>
+        <p>Look a station up by its OTC id or by an id in another system, search by name, or find the stations near a point or the nearest one.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Credit, done for you</h3>
+        <p><code>attribution</code> gives the exact credit text for the stations you use, from each set's licence.</p>
+      </div>
+    </li>
+  </ul>
+</section>
+
+<section class="section proof" aria-labelledby="example">
+  <div class="wrap">
+    <div class="section-head">
+      <h2 id="example">A few lines to a station's constants</h2>
+      <p>The same steps work in Ruby, TypeScript and C. The SDK downloads the latest release once, checks it and caches it; after that it answers from the cache.</p>
+    </div>
+    <figure class="plot specimen">
+      <div class="plot-head"><p class="place">Python</p><p>The nearest station to Helgoland, its M2 constituent and the credit to show.</p></div>
+<pre><code>from opentideconstants import OpenTideConstants
+
+with OpenTideConstants(commercial_only=True) as otc:
+    st = otc.nearest(lat=54.18, lon=7.89).station
+    m2 = st.recommended_set.constituent("M2")
+    print(st.name, m2.amplitude_m, m2.phase_deg)
+    print(otc.attribution([st]))</code></pre>
+      <figcaption>
+        <p>At Helgoland, <code>commercial_only=True</code> moves the recommendation from a set licensed for non-commercial use to an open one, and the credit text follows. Amplitudes are in metres and phases in degrees, in the convention that the set declares. The fields are on <a href="/data-format/#fields">Data format</a>.</p>
+      </figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="section wrap" aria-labelledby="files">
+  <div class="section-head">
+    <h2 id="files">Or just the files</h2>
+  </div>
+  <div class="release">
+    <div>
+      <h3>One OTC release</h3>
+      <p class="stem">OTC_{YYYYMMDD}</p>
+    </div>
+    <ul>
+      <li><strong>JSON</strong>, also gzip-compressed, with every station and set.</li>
+      <li><strong>JSON Lines</strong>, one station per line, for streaming and per-station diffs.</li>
+      <li><strong>CSV</strong>, one long table for spreadsheets.</li>
+      <li><strong>A metadata file</strong> with the release, conventions, licences and constituents.</li>
+      <li><strong>SHA-256 checksums</strong> for every file.</li>
+      <li><strong>A reader gate.</strong> <code>format_version</code> and <code>min_reader_version</code> in every release.</li>
+    </ul>
+  </div>
+  <p class="flow-key">The files and what each one holds are on <a href="/downloads/#formats">Downloads</a>. What the SDKs leave out, and why, is on <a href="/not-included/#sdks">Not included</a>.</p>
+</section>

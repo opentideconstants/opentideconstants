@@ -1,0 +1,23 @@
+/* Unlisted home alternates (/home-a/, /home-b/; front matter "stylesheet: home-alt.css").
+   They reuse the Home classes in site.css; this file only adds what those pages need. */
+.page-home-a main > .section:last-child,
+.page-home-b main > .section:last-child { padding-bottom: var(--space-8); }
+
+/* A code or JSON specimen, framed like the Home plot. Code keeps its lines and scrolls inside
+   its box on a narrow screen; a JSON specimen (.wrap) wraps instead. */
+.specimen pre { margin: 0; white-space: pre; }
+.specimen pre.wrap, .specimen pre.wrap code { white-space: pre-wrap; overflow-wrap: normal; }
+.specimen pre.wrap .url { overflow-wrap: anywhere; }   /* a URL breaks after its host (<wbr>), and mid-word only if it must */
+/* Each line of a wrapped specimen is a block with a hanging indent, so a wrapped line continues
+   to the right of the key that starts it */
+.specimen pre.wrap .ln { display: block; padding-left: 4ch; text-indent: -4ch; }
+@media (max-width: 40rem) { .specimen pre { font-size: 0.78rem; padding-inline: var(--space-3); } }
+.specimen .plot-head .place { font-family: var(--font-mono); font-size: 1.1rem; font-weight: 600; }
+.sheet-note code { overflow-wrap: anywhere; }
+
+/* On narrow screens the release box has a joining line from the source streams above it; these
+   pages have no streams, so the line is hidden */
+@media (max-width: 60rem) {
+  .page-home-a .release::before,
+  .page-home-b .release::before { display: none; }
+}
