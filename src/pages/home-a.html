@@ -40,7 +40,7 @@ layout: full
     <li>
       <div>
         <h3>Provenance</h3>
-        <p>Each set records its source, the source record and version, the span of data used, and the build commit that made it.</p>
+        <p>Each set records its source, the source record and version, and the build commit that made it. A set fitted from a gauge record also records the span of data used.</p>
       </div>
     </li>
     <li>
@@ -84,7 +84,7 @@ layout: full
     </div>
     <figure class="plot specimen">
       <div class="plot-head"><p class="place">licences[]</p><p>One entry from the build, abridged: its <code>attribution</code>, <code>citation</code> and <code>url</code> fields are left out.</p></div>
-<pre class="wrap"><code><span class="ln">{</span><span class="ln">  "licence_id": "gesla-cdwr-nc",</span><span class="ln">  "spdx": "CC-BY-NC-4.0",</span><span class="ln">  "provider": "California Department of Water Resources (CDWR, CDEC) via GESLA",</span><span class="ln">  "commercial_use": false,</span><span class="ln">  "restriction": "Non-commercial use only: the originating agency's terms for these records are not documented or do not clearly cover derived constants; commercial use needs the data owner's permission.",</span><span class="ln">  "terms_url": "https://cdec.water.ca.gov/intro.html"</span><span class="ln">}</span></code></pre>
+<pre class="wrap"><code><span class="ln">{</span><span class="ln">  "licence_id": "gesla-cdwr-nc",</span><span class="ln">  "spdx": "CC-BY-NC-4.0",</span><span class="ln">  "provider": "California Department of Water Resources (CDWR, CDEC) via GESLA",</span><span class="ln">  "commercial_use": false,</span><span class="ln">  "restriction": "Non-commercial use only: the originating agency's terms for these records are not documented or do not clearly cover derived constants; commercial use needs the data owner's permission.",</span><span class="ln">  "terms_url": <span class="url">"https://cdec.water.ca.gov/<wbr>intro.html"</span></span><span class="ln">}</span></code></pre>
       <figcaption>
         <p>Every set with this <code>licence_id</code> carries the same terms. The fields are described on <a href="/data-format/#fields">Data format</a>, and the licences on <a href="/about/#licence">Licence and attribution</a>.</p>
       </figcaption>
