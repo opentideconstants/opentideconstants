@@ -66,7 +66,8 @@ plausible. For each active station, and each water-level constant set with const
     that level (and the same key for a published one), or the check fails.
 11. Recommended set: for each station with water-level sets, recommended_set_id is the set the
     published rule picks among those with constants: official before gauge fit before analysis
-    (a third party's published constants) before model;
+    (a third party's published constants) before model, after leaving out every short_record set
+    that another set of the station outhours (whatever its rank);
     then the most good hours in 2002-2020, estimated as good_hours times the share of the record
     span's days inside 2002-01-01 to 2021-01-01; then the most recent end.
 
@@ -84,7 +85,7 @@ from datetime import date
 
 # The number of checks each group (1-11 above) runs on the current example: a group that runs
 # fewer has stopped applying somewhere.
-MIN_CHECKS = {1: 19, 2: 26, 3: 115, 4: 4, 5: 6, 6: 170, 7: 104, 8: 5, 9: 16, 10: 8, 11: 12}
+MIN_CHECKS = {1: 19, 2: 26, 3: 115, 4: 4, 5: 6, 6: 170, 7: 104, 8: 5, 9: 16, 10: 8, 11: 13}
 
 SPEED = {"M2": 28.9841042, "S2": 30.0, "N2": 28.4397295, "K2": 30.0821373, "K1": 15.0410686,
          "O1": 13.9430356, "P1": 14.9589314, "Q1": 13.3986609, "T2": 29.9589333}
@@ -201,23 +202,25 @@ def audit(doc):
             row(sid, "good_hours within the record span", rs["good_hours"], f"<= {span_h}", rs["good_hours"] <= span_h)
             good = rs["good_hours"]
             group[0] = 2
-            dropped = {x["name"]: x for x in cs.get("dropped_constituents", [])}
-            for weak, strong in PAIRS:
-                need = rayleigh_hours(weak, strong)
-                if strong in a and good < need:
-                    ok = weak in dropped and weak not in a and dropped[weak].get("not_separable_from") == strong
-                    row(sid, f"Rayleigh {weak}/{strong} (fewer than {math.ceil(need)} h)", f"{good} h; dropped {sorted(dropped)}", f"{weak} dropped, not separable from {strong}", ok)
-            for name, x in dropped.items():
-                if x.get("dropped_reason") == "rayleigh":
-                    need = rayleigh_hours(name, x["not_separable_from"])
-                    row(sid, f"Rayleigh drop {name} is needed", f"{good} h", f"< {math.ceil(need)} h", good < need)
-            for flag in cs.get("qc_flags", []):
-                if flag["flag"] == "short_record":
-                    m = re.match(r"([\d.]+) days", flag["reason"])
-                    row(sid, "short_record reason states the good days", m and m.group(1), f"{good / 24:.0f}", bool(m) and abs(float(m.group(1)) - good / 24) < 1.0)
-                    for name, x in dropped.items():
-                        if x.get("dropped_reason") == "rayleigh":
-                            row(sid, f"short_record reason names {name}", flag["reason"][:60], f"mentions {name}", name in flag["reason"])
+            # the Rayleigh rule is OTC's fit rule; a published set keeps its publisher's choice
+            if cs.get("source_type") == "gauge":
+                dropped = {x["name"]: x for x in cs.get("dropped_constituents", [])}
+                for weak, strong in PAIRS:
+                    need = rayleigh_hours(weak, strong)
+                    if strong in a and good < need:
+                        ok = weak in dropped and weak not in a and dropped[weak].get("not_separable_from") == strong
+                        row(sid, f"Rayleigh {weak}/{strong} (fewer than {math.ceil(need)} h)", f"{good} h; dropped {sorted(dropped)}", f"{weak} dropped, not separable from {strong}", ok)
+                for name, x in dropped.items():
+                    if x.get("dropped_reason") == "rayleigh":
+                        need = rayleigh_hours(name, x["not_separable_from"])
+                        row(sid, f"Rayleigh drop {name} is needed", f"{good} h", f"< {math.ceil(need)} h", good < need)
+                for flag in cs.get("qc_flags", []):
+                    if flag["flag"] == "short_record":
+                        m = re.match(r"([\d.]+) days", flag["reason"])
+                        row(sid, "short_record reason states the good days", m and m.group(1), f"{good / 24:.0f}", bool(m) and abs(float(m.group(1)) - good / 24) < 1.0)
+                        for name, x in dropped.items():
+                            if x.get("dropped_reason") == "rayleigh":
+                                row(sid, f"short_record reason names {name}", flag["reason"][:60], f"mentions {name}", name in flag["reason"])
         # 3. levels
         group[0] = 3
         if z0 is not None and named:
@@ -396,6 +399,14 @@ def audit(doc):
         if not cands:
             continue
 
+        def hours(cs):
+            return cs.get("record_span", {}).get("good_hours", 0)
+
+        def short(cs):
+            return any(f["flag"] == "short_record" for f in cs.get("qc_flags", []))
+        # build check (2), whatever the ranks: a short record never outranks a set with more good hours
+        cands = [cs for cs in cands if not (short(cs) and any(hours(o) > hours(cs) for o in cands))]
+
         def key(cs):
             rs = cs.get("record_span")
             in_span = 0.0
@@ -405,7 +416,7 @@ def audit(doc):
                 in_span = rs.get("good_hours", 0) * max(0, (a1 - a0).days) / span if span else 0.0
             return (-SOURCE_RANK.get(cs.get("source_type"), 9), in_span, rs["end"] if rs else "")
         best = max(cands, key=key)["set_id"]
-        row(st["station_id"], "recommended set: official, then gauge fit, then analysis, then model; then most good hours in 2002-2020; then most recent",
+        row(st["station_id"], "recommended set: no outhoured short record; official, then gauge fit, then analysis, then model; then most good hours in 2002-2020; then most recent",
             st.get("recommended_set_id"), best, st.get("recommended_set_id") == best)
     return rows
 

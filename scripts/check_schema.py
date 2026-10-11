@@ -30,8 +30,12 @@ r"""Check the JSON Schema and the example document.
    with constants, and any qc_status excluded must fail; every annotation
    code, a broken record with a usable segment and a no-constants record
    must pass. An analysis set (a third party's published constants) without
-   time_base, good_hours or record_span must pass; an unknown source_type,
-   and a source_quality_note flag on a gauge or official set, must fail.
+   good_hours or record_span, or with an unverified time base, must pass; an
+   analysis set without a time base or with a disputed one, a corrected one
+   without provenance.modified, modified anywhere else, an unknown
+   source_type, a ticon-4 set that is not analysis, a gesla-fit set that is
+   not gauge, a set without source, and a source_quality_note flag on a
+   gauge, official or model set must fail.
    Retired values and fields
    (qc_status accepted and fallback, qc_flags verdict, provenance.time_base,
    provenance.build_commit, release.doi, depth_type above_bottom) must fail. Python's re lets $ match before a
@@ -460,12 +464,40 @@ def official(d):
     return next(cs for cs in station(d, "OTC-EXAMPLE-0001")["constant_sets"] if cs["source_type"] == "official")
 
 
-if "time_base" in analysis(example):
-    print("FAIL: the example's analysis set has a time_base, so it does not show that one is optional")
+def model(d):
+    return next(cs for cs in station(d, "OTC-EXAMPLE-0017")["constant_sets"] if cs["source_type"] == "model")
+
+
+def verified_analysis(d):
+    return next(cs for cs in station(d, "OTC-EXAMPLE-0017")["constant_sets"] if cs["source_type"] == "analysis")
+
+
+if analysis(example)["time_base"]["code"] != "corrected" or verified_analysis(example)["time_base"]["code"] != "verified":
+    print("FAIL: the example needs a corrected analysis set (OTC-EXAMPLE-0011) and a verified one (OTC-EXAMPLE-0017)")
     sys.exit(1)
 must_pass("analysis set without good_hours", lambda d: analysis(d)["record_span"].pop("good_hours"))
 must_pass("analysis set without record_span", lambda d: analysis(d).pop("record_span"))
+must_pass("analysis set with an unverified time base and a time_base flag",
+          lambda d: [verified_analysis(d)["time_base"].update(code="unverified", reason="no comparator gives a verdict", evidence=[]),
+                     verified_analysis(d).update(qc_status="flagged", qc_flags=[{"flag": "time_base", "reason": "time base unverified"}])])
+must_fail("analysis set without a time base", lambda d: verified_analysis(d).pop("time_base"))
+must_fail("analysis set with a disputed time base",
+          lambda d: [verified_analysis(d)["time_base"].update(code="disputed", reason="lags disagree"),
+                     verified_analysis(d).update(qc_status="flagged", qc_flags=[{"flag": "time_base", "reason": "time base disputed"}])])
+must_fail("corrected analysis set without provenance.modified", lambda d: analysis(d)["provenance"].pop("modified"))
+must_fail("verified analysis set with provenance.modified",
+          lambda d: verified_analysis(d)["provenance"].__setitem__("modified", "phases changed"))
+must_fail("provenance.modified on a gauge set", lambda d: fjord(d, "a")["provenance"].__setitem__("modified", "phases changed"))
+must_fail("provenance.modified on a model set", lambda d: model(d)["provenance"].__setitem__("modified", "phases changed"))
 must_fail("unknown source_type", lambda d: analysis(d).__setitem__("source_type", "ticon"))
+must_fail("ticon-4 set with source_type gauge (it has everything a gauge set needs)",
+          lambda d: verified_analysis(d).update(source_type="gauge", record_span={
+              "start": "2000-01-01T00:00:00Z", "end": "2020-01-01T00:00:00Z", "good_hours": 150000}))
+must_fail("gesla-fit set with source_type analysis (verified, so it has everything an analysis set needs)",
+          lambda d: station(d, "OTC-EXAMPLE-0011")["constant_sets"][0].__setitem__("source_type", "analysis"))
+must_fail("constant set without source", lambda d: first_set(d).pop("source"))
+must_fail("source_quality_note flag on a model set",
+          lambda d: model(d).update(qc_status="flagged", qc_flags=[{"flag": "source_quality_note", "reason": "x"}]))
 must_fail("source_quality_note flag on a gauge set",
           lambda d: [fjord(d, "a").__setitem__("qc_status", "flagged"),
                      fjord(d, "a").__setitem__("qc_flags", [{"flag": "source_quality_note", "reason": "x"}])])
