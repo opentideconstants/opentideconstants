@@ -15,7 +15,8 @@ r"""Check the JSON Schema and the example document.
    f_u_at_prediction, an empty astro_tables, an unknown key in a table or
    a row, a table without (or with a malformed) tables_sha256 or with a key
    that is not a constituent name, a row without f, a v0u_deg outside
-   [0, 360), a negative f, a convention without (or with an empty)
+   [0, 360), a negative f, a negative row speed (also as .meta.json),
+   a convention without (or with an empty)
    astro_table_id, a datum.named key chart, mean_level or zero, a
    datum.zero outside its enum, an empty datum.chart_datum,
    a licence without commercial_use (or with a string), a non-commercial
@@ -567,6 +568,8 @@ def m2_row(d):
 must_fail("v0u_deg 360.0", lambda d: m2_row(d)["v0u_deg"].__setitem__(0, 360.0))
 must_fail("v0u_deg -0.01", lambda d: m2_row(d)["v0u_deg"].__setitem__(0, -0.01))
 must_fail("a negative f", lambda d: m2_row(d)["f"].__setitem__(0, -0.5))
+must_fail("a negative astro table row speed", lambda d: m2_row(d).__setitem__("speed_deg_per_hour", -28.9841042))
+meta_must_fail("a negative astro table row speed", lambda d: m2_row(d).__setitem__("speed_deg_per_hour", -28.9841042))
 must_fail("an astro table row without f", lambda d: m2_row(d).pop("f"))
 must_fail("an astro table without tables_sha256", lambda d: astro_table(d).pop("tables_sha256"))
 must_fail("an astro table with a malformed tables_sha256", lambda d: astro_table(d).__setitem__("tables_sha256", "33f97cb7"))
