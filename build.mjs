@@ -241,8 +241,11 @@ for (const page of pages) {
       return `<li><a href="${p.path}"${current}>${p.meta.nav}</a></li>`;
     })
     .join("\n          ");
+  const siteCss = '<link rel="stylesheet" href="/assets/site.css">';
+  if (page.meta.stylesheet && !layout.includes(siteCss)) throw new Error(`${page.file}: layout.html has no ${siteCss} to add the page stylesheet after`);
+  if (page.meta.stylesheet && !existsSync(join(src, "assets", page.meta.stylesheet))) throw new Error(`${page.file}: no such stylesheet assets/${page.meta.stylesheet}`);
   const pageLayout = page.meta.stylesheet
-    ? layout.replace('<link rel="stylesheet" href="/assets/site.css">', `$&\n  <link rel="stylesheet" href="/assets/${page.meta.stylesheet}">`)
+    ? layout.replace(siteCss, `$&\n  <link rel="stylesheet" href="/assets/${page.meta.stylesheet}">`)
     : layout;
   const html = versionAssets(fillSite(
     pageLayout
