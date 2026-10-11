@@ -1,0 +1,201 @@
+<section class="section wrap" aria-labelledby="better">
+  <div class="section-head">
+    <h2 id="better">How OTC fits</h2>
+    <p>OTC fits its own constants from the observed water levels, with a method you can read, and publishes only what the record can support.</p>
+  </div>
+  <ul class="marked">
+    <li class="first">
+      <div>
+        <h3>The clock is checked before anything is fitted</h3>
+        <p>A gauge whose clock is read wrongly moves every high and low water at that place. OTC checks every gauge record's clock against the independent evidence that exists before it fits it. It corrects a clock only on positive evidence, marks it unverified when there is none, and does not publish a record whose clock is shown to be wrong and cannot be corrected. The build will not fit at all without a finished audit, and the verdict and its evidence ship with each set.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Only what the record can resolve</h3>
+        <p>A constituent is fitted only when the data held can separate it from its neighbours (the Rayleigh criterion, with Foreman's comparison pairs) and it stands at least twice above the noise of its band. Every line left out is listed with the reason.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>An uncertainty on every fitted line</h3>
+        <p>Every fitted constituent carries its amplitude uncertainty, from the record's own noise and the agreement of its two halves. You can see how far to trust each one.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Spikes out, weak fits refused</h3>
+        <p>Bad and duplicate samples are removed, then spikes after a first fit. A record that cannot separate its constituents stops the fit instead of giving unstable numbers.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Up to 19 years per fit</h3>
+        <p>Each fit uses the last 19 years of a record, or all of a shorter one, so the weather averages out and the record can separate as many constituents as it holds.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Bad fits refused</h3>
+        <p>Gates refuse sign-inverted fits, implausible amplitudes, short records whose two halves disagree, and short records whose accuracy cannot be measured, before a release is built.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Short records, honest numbers</h3>
+        <p>A record with under a year of data is published with a measured expected accuracy: long records of the same kind of tide are cut to the same months, refitted and compared.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>No weather in the tide</h3>
+        <p>A short record never publishes the annual terms, and its fortnightly and monthly terms only when a long record in the same water confirms them. One stormy season does not become part of every prediction.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>One convention, end to end</h3>
+        <p>Nodal factors and astronomical arguments come from the same published tables the prediction uses, and each set declares its convention. Constants and predictor agree by construction.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Every set can be traced</h3>
+        <p>Each fitted set records the SHA-256 of its input record and of the tables, and the build commit that made it. The <a href="/method/">Method</a> documents every step.</p>
+      </div>
+    </li>
+  </ul>
+</section>
+
+<section class="section proof" aria-labelledby="evidence">
+  <div class="wrap">
+    <div class="section-head">
+      <h2 id="evidence">The evidence ships with the data</h2>
+      <p>At Helgoland, the German federal gauge records are hourly means labelled as instants, which puts every time stamp half an hour off. OTC compared them with a second record, corrected them, fitted 19 years, and wrote down how it knows and how sure it is.</p>
+    </div>
+    <figure class="plot specimen">
+      <div class="plot-head"><p class="place">constant set</p><p>One Helgoland set from an OTC release build, abridged.</p></div>
+<pre class="wrap"><code><span class="ln">"time_base": {</span><span class="ln">  "code": "corrected",</span><span class="ln">  "declared": "utc_instant",</span><span class="ln">  "published": "utc_mean_start60",</span><span class="ln">  "evidence": [{</span><span class="ln">    "comparator_kind": "sibling_record",</span><span class="ln">    "lag_min": -29.61</span><span class="ln">  }]</span><span class="ln">},</span><span class="ln">"record_span": {</span><span class="ln">  "start": <span class="nw">"2007-06-29"</span>,</span><span class="ln">  "end": <span class="nw">"2026-06-28"</span></span><span class="ln">},</span><span class="ln">"constituents": [</span><span class="ln">  { "name": "M2",</span><span class="ln">    "amplitude_m": 1.09681,</span><span class="ln">    "phase_deg": 310.59,</span><span class="ln">    "amp_uncertainty_m": 0.00517 },</span><span class="ln">  { "name": "S2",</span><span class="ln">    "amplitude_m": 0.29087,</span><span class="ln">    "phase_deg": 17.82,</span><span class="ln">    "amp_uncertainty_m": 0.00371 },</span><span class="ln">  …</span><span class="ln">],</span><span class="ln">"dropped_constituents": [</span><span class="ln">  { "name": "MSF",</span><span class="ln">    "dropped_reason": "noise" }</span><span class="ln">]</span></code></pre>
+      <figcaption>
+        <p>Abridged: the set has 44 constituents, and its time-base evidence, provenance and other fields are shortened or left out; record dates are shown without times. The fields are described on <a href="/data-format/#fields">Data format</a>.</p>
+      </figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="section wrap" aria-labelledby="bigger">
+  <div class="section-head">
+    <h2 id="bigger">Ways in</h2>
+  </div>
+  <ul class="marked">
+    <li class="first">
+      <div>
+        <h3>SDKs in four languages</h3>
+        <p>Python, Ruby, TypeScript and C, with the same queries and the same error codes, all checked by one language-neutral conformance suite. Any other language can call the C library.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Every set at a place</h3>
+        <p>A station lists every set published for it, from every source, with one recommended by a published rule. If you prefer another, it is there.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Short records included</h3>
+        <p>A record with under a year of data is still published when it passes the gates, flagged <code>short_record</code>, so a place with little data is not a blank.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Many ways to find a place</h3>
+        <p>Look a station up by its OTC id or by its id in another system, search by name, or ask for the stations near a point.</p>
+      </div>
+    </li>
+  </ul>
+</section>
+
+<section class="section wrap" aria-labelledby="value">
+  <div class="section-head">
+    <h2 id="value">More value</h2>
+    <p>Data you can depend on in a product: a licence you can act on, a format that holds still, and a citation.</p>
+  </div>
+  <ul class="marked">
+    <li class="first">
+      <div>
+        <h3>A licence on every set, and an option to keep only what you may sell</h3>
+        <p>Every constant set names its own licence, and the release says whether that licence allows commercial use. A station can have open and non-commercial sets side by side. Open any SDK with <code>commercial_only</code>, and it keeps only the sets you may use in a paid product, and recommends from those.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>No licence guesswork</h3>
+        <p>Where a record's owner forbids redistribution, OTC does not publish its own fit of that record. Where TICON-4 publishes an analysis of it under CC BY 4.0, that analysis can be carried, after OTC's checks, and is labelled as a third-party analysis. Where a contributor's terms are not documented, the set is marked non-commercial, with the reason and a link to the terms.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>A format that holds still</h3>
+        <p>Format 1.0 has a published JSON Schema. Each release states <code>min_reader_version</code>, so an old reader stops instead of misreading. Pin a release by its date and upgrade when you choose.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Citable</h3>
+        <p>The repository has a <code>CITATION.cff</code>, and <a href="/about/#cite">How to cite</a> gives the text. Each release records its datestamp, build commit and source versions.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Credit written for you</h3>
+        <p>Every licence carries the exact credit text, and <code>attribution</code> in each SDK assembles it for the stations you use.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Works offline</h3>
+        <p>An SDK checks a release's SHA-256, caches it and then answers with no network. Or bundle a release with your app and open it from a file.</p>
+      </div>
+    </li>
+    <li>
+      <div>
+        <h3>Open process</h3>
+        <p>The site source and the <a href="{{site.repoUrl}}/issues">issue tracker</a> are public on GitHub. Anyone can report a problem with a station there, and the code is MIT.</p>
+      </div>
+    </li>
+  </ul>
+</section>
+
+<section class="section proof" aria-labelledby="in-code">
+  <div class="wrap">
+    <div class="section-head">
+      <h2 id="in-code">In your code</h2>
+      <p>The same steps work in Ruby, TypeScript and C. The SDK downloads the latest release once, checks it and caches it; after that it answers from the cache.</p>
+    </div>
+    <figure class="plot specimen">
+      <div class="plot-head"><p class="place">Python</p><p>The nearest station to Helgoland, its M2 constituent and the credit to show.</p></div>
+<pre><code>from opentideconstants import OpenTideConstants
+
+with OpenTideConstants(commercial_only=True) as otc:
+    st = otc.nearest(lat=54.18, lon=7.89).station
+    m2 = st.recommended_set.constituent("M2")
+    print(st.name, m2.amplitude_m, m2.phase_deg)
+    print(otc.attribution([st]))</code></pre>
+      <figcaption>
+        <p>At Helgoland, <code>commercial_only=True</code> moves the recommendation from a set licensed for non-commercial use to an open one, and the credit text follows. Amplitudes are in metres and phases in degrees, in the convention that the set declares.</p>
+      </figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="section wrap" aria-labelledby="start">
+  <div class="section-head">
+    <h2 id="start">See for yourself</h2>
+    <p>Read the format, the method and the conventions. Everything a release says about a set is described there.</p>
+  </div>
+  <div class="actions">
+    <a class="button" href="/data-format/">Read the format <span aria-hidden="true">→</span></a>
+    <a class="more" href="/method/">Read the method</a>
+    <a class="more" href="/conventions/">Read the conventions</a>
+  </div>
+</section>

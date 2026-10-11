@@ -21,3 +21,11 @@
   .page-home-a .release::before,
   .page-home-b .release::before { display: none; }
 }
+
+/* Hero proof points: diamond-marked, as in the release box */
+.title-block .points { list-style: none; margin: var(--space-5) 0 0; padding: 0; display: grid; gap: var(--space-2); }
+.title-block .points li { margin: 0; padding-left: 1.5rem; position: relative; font-size: var(--font-size-small); color: var(--color-prose); }
+.title-block .points li strong { color: var(--color-text); font-weight: 600; }
+.title-block .points li::before { content: ""; position: absolute; left: 0.15rem; top: 0.5rem; width: 0.6rem; height: 0.6rem; border: 2px solid var(--color-accent); transform: rotate(45deg); }
+.page-home-a .actions, .page-home-b .actions { margin-top: var(--space-5); }
+.specimen .nw { white-space: nowrap; }   /* a date in a specimen does not break at its hyphens */
