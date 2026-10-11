@@ -32,11 +32,10 @@ order: 5
 </ol>
 
 <h2 id="broken-records">Broken-record checks</h2>
-<p>A broken record is published only when the release build accepts its fit, and its set then states what is wrong. The checks look for a datum step, a flat line, spikes, gaps, a clock step, quantised or out-of-range values, main constituents that are not stable from year to year or between the two halves of the span, and a record that does not correlate with a nearby gauge that correlates with its own neighbours. Each finding is listed with where it is and its numbers.</p>
+<p>A broken record is published only when the release build accepts its fit. The checks look for a datum step, a flat line, spikes, gaps, a clock step, quantised or out-of-range values, main constituents that are not stable from year to year or between the two halves of the span, and a record that does not correlate with a nearby gauge that correlates with its own neighbours. Each finding is listed with where it is and its numbers.</p>
 <ul>
   <li>When part of the record is usable, the constants are fitted to that segment, and the set names the segment.</li>
   <li>When no segment gives a usable fit, or the fit is implausible, or the main constituents differ between the two halves of the record, the record is not published. The Hirtshals record (no tide in the input) is the reference case.</li>
-  <li>A set with a broken record is flagged, so it is easy to find and to leave out.</li>
 </ul>
 <p>The thresholds are calibrated on the data and published with each release. The fields are on <a href="/data-format/#fields">Data format</a>.</p>
 
@@ -63,7 +62,7 @@ order: 5
 </ul>
 
 <h2 id="source-checks">Per-source convention check</h2>
-<p>Every source is compared on every build with an independent comparator at the same gauges: our own GESLA fit, predicted with the reference predictor. The pass rule is that the median M2, S2, K1 and O1 differences are within 1 cm and 2° over at least 3 overlapping gauges. When a source fails its checks in a build, its stations stay listed with that source's last good constants, flagged <code>carried_over</code> and marked with the release they come from (<code>carried_from_release</code>), until its declared convention is fixed. No station disappears because a source failed, and a failed source check never drops a GESLA record. A source with no overlapping gauge cannot be added.</p>
+<p>Every source is compared on every build with an independent comparator at the same gauges: our own GESLA fit, predicted with the reference predictor. The pass rule is that the median M2, S2, K1 and O1 differences are within 1 cm and 2° over at least 3 overlapping gauges. The first release has no earlier release to carry constants from, so no set in it is flagged <code>carried_over</code>. A failed source check never drops a GESLA record. A source with no overlapping gauge cannot be added.</p>
 
 <h2 id="automation">Automation</h2>
 <ul>
