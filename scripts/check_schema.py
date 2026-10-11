@@ -32,12 +32,16 @@ r"""Check the JSON Schema and the example document.
    code, a broken record with a usable segment and a no-constants record
    must pass. An analysis set (a third party's published constants) without
    good_hours or record_span, or with an unverified time base, must pass; an
-   analysis set without a time base or with a disputed one, a corrected one
+   analysis set without a time base or with an unlabelled disputed one, a corrected one
    without provenance.modified, modified anywhere else, an unknown
    source_type, a ticon-4 set that is not analysis, a gesla-fit set that is
    not gauge, a set without source, and a source_quality_note flag on a
    gauge, official or model set must fail, as must a ticon-4 set under
-   another licence and the ticon-4 licence on another source.
+   another licence and the ticon-4 licence on another source. Labelled fallbacks
+   require their exact reason flag and flagged status. A disputed analysis
+   requires a time_base_disputed, time_base_unresolved or reliability_withheld
+   fallback; preferred references resolve to a non-fallback set at the same
+   station, and the recommendation marker is true only for a fallback.
    Retired values and fields
    (qc_status accepted and fallback, qc_flags verdict, provenance.time_base,
    provenance.build_commit, release.doi, depth_type above_bottom) must fail. Python's re lets $ match before a
@@ -109,6 +113,21 @@ def duplicate_aliases(doc):
 def problems(doc):
     found = [f"{list(e.path)} {e.message}" for e in validator.iter_errors(doc)]
     found += [f"duplicate alias {system}:{alias}" for system, alias in duplicate_aliases(doc)]
+    for st in doc["stations"]:
+        sets = {cs["set_id"]: cs for cs in st.get("constant_sets", [])}
+        recommended = sets.get(st.get("recommended_set_id"), {})
+        if "fallback" in recommended:
+            if st.get("recommended_is_fallback") is not True:
+                found.append(f"{st['station_id']}: fallback recommendation requires recommended_is_fallback true")
+        elif "recommended_is_fallback" in st:
+            found.append(f"{st['station_id']}: omit recommended_is_fallback for a non-fallback recommendation")
+        for cs in sets.values():
+            fallback = cs.get("fallback")
+            if not isinstance(fallback, dict):
+                continue  # JSON Schema reports an invalid fallback shape.
+            preferred = fallback.get("preferred_set_id")
+            if isinstance(preferred, str) and (preferred not in sets or "fallback" in sets[preferred]):
+                found.append(f"{cs['set_id']}: preferred_set_id must name a non-fallback set at the same station")
     return found
 
 
@@ -513,6 +532,97 @@ must_fail("source_quality_note flag on an official set",
                      official(d).__setitem__("qc_flags", [{"flag": "source_quality_note", "reason": "x"}])])
 must_fail("reference station with no constant sets",
           lambda d: station(d, "OTC-EXAMPLE-0005").update(constant_sets=[], recommended_set_id=None))
+
+# --- labelled publication fallbacks -------------------------------------------------------------
+
+FALLBACK_REASONS = (
+    "time_base_disputed", "time_base_unresolved", "refused_fit", "short_record_uncalibrated",
+    "short_record_long_period", "published_full_list", "reliability_withheld", "licence_reading",
+    "datum_gate_failed", "not_in_otc_input",
+)
+
+
+def label_fallback(d, cs, reason):
+    cs["fallback"] = {"reason": reason, "basis": "original published constants", "otc_finding": "record retained with the finding"}
+    cs["qc_status"] = "flagged"
+    cs.setdefault("qc_flags", []).append({"flag": f"fallback:{reason}", "reason": "record retained with the finding"})
+    for st in d["stations"]:
+        if st.get("recommended_set_id") == cs["set_id"]:
+            st["recommended_is_fallback"] = True
+
+
+def disputed_fallback(d, reason):
+    cs = verified_analysis(d)
+    cs["time_base"].update(code="disputed", reason="lags disagree")
+    cs.update(qc_status="flagged", qc_flags=[{"flag": "time_base", "reason": "time base disputed"}])
+    label_fallback(d, cs, reason)
+
+
+for value in (None, "licence_reading", []):
+    must_fail(f"fallback must be an object: {value!r}",
+              lambda d, v=value: first_set(d).__setitem__("fallback", v))
+for value in ([], {}, 1):
+    must_fail(f"fallback preferred reference must be a string: {value!r}",
+              lambda d, v=value: [label_fallback(d, first_set(d), "refused_fit"),
+                                first_set(d)["fallback"].__setitem__("preferred_set_id", v)])
+for reason in ("time_base_disputed", "time_base_unresolved", "reliability_withheld"):
+    must_pass(f"labelled disputed analysis: {reason}", lambda d, r=reason: disputed_fallback(d, r))
+for reason in FALLBACK_REASONS:
+    must_pass(f"fallback reason {reason}", lambda d, r=reason: label_fallback(d, first_set(d), r))
+    must_fail(f"fallback {reason} without its matching flag",
+              lambda d, r=reason: [label_fallback(d, first_set(d), r), no_flag(first_set(d), f"fallback:{r}")])
+    must_fail(f"fallback flag {reason} without a label",
+              lambda d, r=reason: [label_fallback(d, first_set(d), r), first_set(d).pop("fallback")])
+    must_fail(f"fallback {reason} with a mismatched flag",
+              lambda d, r=reason: [label_fallback(d, first_set(d), r), first_set(d)["fallback"].__setitem__(
+                  "reason", "refused_fit" if r != "refused_fit" else "licence_reading")])
+for reason in FALLBACK_REASONS:
+    if reason in {"time_base_disputed", "time_base_unresolved", "reliability_withheld"}:
+        continue
+    must_fail(f"disputed analysis with an unrelated fallback: {reason}", lambda d, r=reason: disputed_fallback(d, r))
+for field in ("reason", "basis", "otc_finding"):
+    must_fail(f"fallback without {field}",
+              lambda d, f=field: [label_fallback(d, first_set(d), "refused_fit"), first_set(d)["fallback"].pop(f)])
+for field in ("basis", "otc_finding", "preferred_set_id"):
+    must_fail(f"fallback with empty {field}",
+              lambda d, f=field: [label_fallback(d, first_set(d), "refused_fit"), first_set(d)["fallback"].__setitem__(f, "")])
+must_fail("fallback with an unknown reason",
+          lambda d: [label_fallback(d, first_set(d), "refused_fit"), first_set(d)["fallback"].__setitem__("reason", "other")])
+must_fail("fallback with an extra field",
+          lambda d: [label_fallback(d, first_set(d), "refused_fit"), first_set(d)["fallback"].__setitem__("extra", True)])
+must_fail("fallback with qc_status ok",
+          lambda d: [label_fallback(d, first_set(d), "refused_fit"), first_set(d).update(qc_status="ok", qc_flags=[])])
+must_fail("fallback with qc_status no_constants",
+          lambda d: [label_fallback(d, fjord(d, "d"), "refused_fit"), fjord(d, "d").__setitem__("qc_status", "no_constants")])
+must_fail("recommended marker missing on fallback",
+          lambda d: [label_fallback(d, official(d), "refused_fit"), station(d, "OTC-EXAMPLE-0001").pop("recommended_is_fallback")])
+must_fail("recommended marker false on fallback",
+          lambda d: [label_fallback(d, official(d), "refused_fit"), station(d, "OTC-EXAMPLE-0001").__setitem__("recommended_is_fallback", False)])
+must_fail("recommended marker on a normal recommendation",
+          lambda d: station(d, "OTC-EXAMPLE-0001").__setitem__("recommended_is_fallback", True))
+must_fail("recommended false marker on a normal recommendation",
+          lambda d: station(d, "OTC-EXAMPLE-0001").__setitem__("recommended_is_fallback", False))
+for preferred in ("missing-set", current_set(example)["set_id"], first_set(example)["set_id"]):
+    must_fail(f"fallback preferred reference is unresolved, foreign or itself: {preferred}",
+              lambda d, p=preferred: [label_fallback(d, first_set(d), "refused_fit"), first_set(d)["fallback"].__setitem__("preferred_set_id", p)])
+must_pass("fallback prefers an existing non-fallback set at the station",
+          lambda d: [label_fallback(d, first_set(d), "refused_fit"), first_set(d)["fallback"].__setitem__(
+              "preferred_set_id", official(d)["set_id"])])
+must_fail("fallback prefers another fallback",
+          lambda d: [label_fallback(d, first_set(d), "refused_fit"), label_fallback(d, official(d), "licence_reading"),
+                     first_set(d)["fallback"].__setitem__("preferred_set_id", official(d)["set_id"])])
+must_pass("short uncalibrated fallback retains length and dropped evidence without invented accuracy",
+          lambda d: [label_fallback(d, fjord(d, "c"), "short_record_uncalibrated"), fjord(d, "c").pop("expected_accuracy")])
+for reason in FALLBACK_REASONS:
+    if reason == "short_record_uncalibrated":
+        continue
+    must_fail(f"short record without accuracy under unrelated fallback {reason}",
+              lambda d, r=reason: [label_fallback(d, fjord(d, "c"), r), fjord(d, "c").pop("expected_accuracy")])
+for field in ("dropped_constituents", "record_span"):
+    must_fail(f"short uncalibrated fallback without {field}",
+              lambda d, f=field: [label_fallback(d, fjord(d, "c"), "short_record_uncalibrated"), fjord(d, "c").pop(f)])
+must_fail("short uncalibrated fallback without good_hours",
+          lambda d: [label_fallback(d, fjord(d, "c"), "short_record_uncalibrated"), fjord(d, "c")["record_span"].pop("good_hours")])
 
 must_pass("D9 a set carried over from the previous release", lambda d: carried(fjord(d, "a")))
 must_pass("D9 a gate fallback carried over", lambda d: [carried(fjord(d, "a")), fjord(d, "a")["provenance"].__setitem__(

@@ -65,9 +65,9 @@ plausible. For each active station, and each water-level constant set with const
     level. A computed level is compared with the reference's otc_ level; the reference must have
     that level (and the same key for a published one), or the check fails.
 11. Recommended set: for each station with water-level sets, recommended_set_id is the set the
-    published rule picks among those with constants: official before gauge fit before analysis
+    published rule picks among those with constants: non-fallbacks first, then official before gauge fit before analysis
     (a third party's published constants) before model, after leaving out every short_record set
-    that another set of the station outhours (whatever its rank);
+    that another set in the same fallback group outhours (whatever its rank);
     then the most good hours in 2002-2020, estimated as good_hours times the share of the record
     span's days inside 2002-01-01 to 2021-01-01; then the most recent end.
 
@@ -404,8 +404,9 @@ def audit(doc):
 
         def short(cs):
             return any(f["flag"] == "short_record" for f in cs.get("qc_flags", []))
-        # build check (2), whatever the ranks: a short record never outranks a set with more good hours
-        cands = [cs for cs in cands if not (short(cs) and any(hours(o) > hours(cs) for o in cands))]
+        # Within each fallback group, a short record never outranks a set with more good hours.
+        cands = [cs for cs in cands if not (short(cs) and any(
+            ("fallback" in o) == ("fallback" in cs) and hours(o) > hours(cs) for o in cands))]
 
         def key(cs):
             rs = cs.get("record_span")
@@ -414,10 +415,14 @@ def audit(doc):
                 a0, a1 = max(day(rs["start"]), date(2002, 1, 1)), min(day(rs["end"]), date(2021, 1, 1))
                 span = (day(rs["end"]) - day(rs["start"])).days
                 in_span = rs.get("good_hours", 0) * max(0, (a1 - a0).days) / span if span else 0.0
-            return (-SOURCE_RANK.get(cs.get("source_type"), 9), in_span, rs["end"] if rs else "")
+            return ("fallback" not in cs, -SOURCE_RANK.get(cs.get("source_type"), 9), in_span, rs["end"] if rs else "")
         best = max(cands, key=key)["set_id"]
-        row(st["station_id"], "recommended set: no outhoured short record; official, then gauge fit, then analysis, then model; then most good hours in 2002-2020; then most recent",
+        row(st["station_id"], "recommended set: non-fallbacks first; no outhoured short record within its group; official, then gauge fit, then analysis, then model; then most good hours in 2002-2020; then most recent",
             st.get("recommended_set_id"), best, st.get("recommended_set_id") == best)
+        selected = next((cs for cs in cands if cs["set_id"] == st.get("recommended_set_id")), {})
+        marker_ok = st.get("recommended_is_fallback") is True if "fallback" in selected else "recommended_is_fallback" not in st
+        row(st["station_id"], "recommended_is_fallback matches the selected set",
+            st.get("recommended_is_fallback"), "true for fallback, otherwise omitted", marker_ok)
     return rows
 
 
