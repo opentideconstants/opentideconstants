@@ -39,7 +39,7 @@ order: 5
   <dt>Data providers</dt>
   <dd>Each GESLA record comes from a national or regional agency, and each fitted set names its provider. The release files carry the full attribution text per set.</dd>
   <dt>TICON-4</dt>
-  <dd>For TICON-4 constants, cite “TICON-4: TIdal CONstants based on GESLA-4”, <a href="https://doi.org/10.17882/109129">doi:10.17882/109129</a>, and give the GESLA citations above, because its constants are fitted from GESLA records. Where a set's <code>provenance.modified</code> is present, say that OTC changed the constants as it states.</dd>
+  <dd>TICON-4 constants are by Michael Hart-Davis, Denise Dettmering and Florian Seitz (DGFI-TUM), under CC BY 4.0. Cite them as SEANOE asks: “Hart-Davis, M., Dettmering, D., Seitz, F. (2025). TICON-4: TIdal CONstants based on GESLA-4 sea-level records. SEANOE. <a href="https://doi.org/10.17882/109129">doi:10.17882/109129</a>”, together with Piccioni et al. (2019), and give the GESLA citations above, because its constants are fitted from GESLA records. Where a set's <code>provenance.modified</code> is present, say that OTC changed the constants as it states.</dd>
   <dt>NOAA CO-OPS</dt>
   <dd>Credit NOAA's Center for Operational Oceanographic Products and Services for NOAA constants and offsets.</dd>
   <dt>Kartverket</dt>
@@ -52,7 +52,7 @@ order: 5
 <p>The complete list of providers, with the citation text each one requires, is generated from the data by the release build. A release fails its build if a provider in the data is missing from this list.</p>
 
 <h3 id="thanks">Thanks</h3>
-<p>OTC depends on the work of the agencies that run tide gauges, the GESLA team that assembles their records, and the TICON team, whose constants and methods are the reference this project compares against, and whose TICON-4 constants OTC carries where its own fit cannot be published.</p>
+<p>OTC depends on the work of the agencies that run tide gauges, the GESLA team that assembles their records, and the TICON team at DGFI-TUM, whose constants and methods are the reference this project compares against, and whose TICON-4 constants OTC carries where its own fit cannot be published.</p>
 
 <h2 id="cite">How to cite</h2>
 <p>A citation lets a reader get the exact data you used. Every release that changes the data is published at <code>{{site.dataUrl}}</code>, at most once a week, and every release stays available. <a href="https://zenodo.org/">Zenodo</a> archives one version a month, which holds the latest release of that month. A material change gets its own Zenodo version at once: a source added or removed, a format change, or a large accuracy change. All Zenodo versions share one concept DOI.</p>
@@ -65,4 +65,4 @@ order: 5
 <p>The citation, with the release year, the datestamp and the concept DOI:</p>
 <pre><code>OpenTideConstants contributors ({YYYY}). OpenTideConstants, release {YYYYMMDD} [Data set]. https://doi.org/{concept_doi}</code></pre>
 <p>If the release has a version DOI, add <code>(version DOI: https://doi.org/{zenodo_version_doi})</code> at the end.</p>
-<p>Also cite the upstream data of the stations you used, as listed under <a href="#attribution">Attribution</a>. GESLA asks for Haigh et al. (2023) and Woodworth et al. (2017), and Caldwell et al. (2015) for its records that come from UHSLC. Where you use OTC's TICON-4 sets or compare with TICON, cite the TICON release, for example TICON-4, <a href="https://doi.org/10.17882/109129">doi:10.17882/109129</a>.</p>
+<p>Also cite the upstream data of the stations you used, as listed under <a href="#attribution">Attribution</a>. GESLA asks for Haigh et al. (2023) and Woodworth et al. (2017), and Caldwell et al. (2015) for its records that come from UHSLC. Where you use OTC's TICON-4 sets or compare with TICON, cite the TICON release, for example TICON-4: Hart-Davis, M., Dettmering, D., Seitz, F. (2025). TICON-4: TIdal CONstants based on GESLA-4 sea-level records. SEANOE. <a href="https://doi.org/10.17882/109129">doi:10.17882/109129</a>.</p>
