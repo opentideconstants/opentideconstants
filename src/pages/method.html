@@ -32,10 +32,9 @@ order: 5
 </ol>
 
 <h2 id="broken-records">Broken-record checks</h2>
-<p>A broken record is published only when the release build accepts its fit. The checks look for a datum step, a flat line, spikes, gaps, a clock step, quantised or out-of-range values, main constituents that are not stable from year to year or between the two halves of the span, and a record that does not correlate with a nearby gauge that correlates with its own neighbours. Each finding is listed with where it is and its numbers.</p>
+<p>A broken record is published only when the release build accepts its fit. The checks look for a datum step, a flat line, spikes, gaps, a clock step, quantised or out-of-range values, main constituents that are not stable from year to year or between the two halves of the span, and a record that does not correlate with a nearby gauge that correlates with its own neighbours.</p>
 <ul>
-  <li>When part of the record is usable, the constants are fitted to that segment, and the set names the segment.</li>
-  <li>When no segment gives a usable fit, or the fit is implausible, or the main constituents differ between the two halves of the record, the record is not published. The Hirtshals record (no tide in the input) is the reference case.</li>
+  <li>When the record gives no usable fit, or the fit is implausible, or the main constituents differ between the two halves of the record, the record is not published. The Hirtshals record (no tide in the input) is the reference case.</li>
 </ul>
 <p>The thresholds are calibrated on the data and published with each release. The fields are on <a href="/data-format/#fields">Data format</a>.</p>
 
@@ -77,6 +76,6 @@ order: 5
 <ol>
   <li><strong>Fixed rules</strong> decide every case they can classify: pass, fail or fall back.</li>
   <li><strong>One batched automated review per build</strong> handles the cases the rules cannot classify. Each answer is either <em>accept</em> or <em>fall back</em>, with a reason that cites the evidence. Answers are stored in a public table keyed by the evidence, and reused while the evidence is unchanged, so a rebuild is reproducible.</li>
-  <li><strong>Fallback:</strong> anything still undecided keeps the station's data from the last release, and the reason is listed in the release's changes on <a href="/downloads/#releases">Downloads</a>.</li>
+  <li><strong>Fallback:</strong> the first release has no earlier release to fall back to.</li>
 </ol>
 <p>A release is published only when every whole-release gate passes, including the round-trip checks of the converters and the uploads. If any gate fails, nothing is published, the last good release stays live, and an alert opens a public issue. Licence and publication policy stay with the project owner and never block a build.</p>
