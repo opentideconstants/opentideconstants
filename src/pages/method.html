@@ -36,7 +36,7 @@ order: 5
 <p>The fields are on <a href="/data-format/#fields">Data format</a>.</p>
 
 <h2 id="selection">Record selection</h2>
-<p>When several records exist at one gauge, the build picks one by fixed rules, in this order: the most good data in the 19-year span; recent records before records that ended long ago; the gauge operator's own record before a re-distribution of it; instantaneous before averaged; sub-hourly before hourly; then the lowest file id. A short record never comes before a record with constants and more hours of good data, and a record with no constants is never chosen. When two eligible records disagree beyond their uncertainty, the record with the lower error against an official reference is chosen. Every choice and its reason is recorded. A third party's published constants for a gauge (source type <code>analysis</code>) are not a record that OTC fits, so they take no part in this selection: they rank below any OTC gauge fit at the station (see <a href="/sources/#ranking">How sources rank</a>).</p>
+<p>When several records exist at one gauge, the build picks one by fixed rules, in this order: a record whose time base is not disputed; a record that is not short; instantaneous before averaged; sub-hourly before hourly; a current record (one that ends within 2 years of the newest) before older ones; the gauge operator's own record before a re-distribution of it; a licence that allows commercial use; the most good data in 2002–2020; the most recent; research-quality before fast-delivery data; then the record id. A short record never comes before a record with constants and more hours of good data, and a record with no constants is never chosen. When two eligible records disagree beyond their uncertainty, the record with the lower error against an official reference is chosen. The build records every choice and the rule that decided it. A third party's published constants for a gauge (source type <code>analysis</code>) are not a record that OTC fits, so they take no part in this selection: they rank below any OTC gauge fit at the station (see <a href="/sources/#ranking">How sources rank</a>).</p>
 
 <h2 id="constituents">Constituent selection</h2>
 <ol>
@@ -46,7 +46,7 @@ order: 5
   <li><strong>Long-period constituents</strong> (SA, SSA, MM, MF, MSF) are left out of the published set at river and lake gauges, and where SA is 0.25 m or more, because official predictions do not contain river and seasonal discharge signals.</li>
   <li><strong>Non-tidal daily cycles</strong> (S1, S3, S4) are left out at river and lake gauges, and where they are larger than both M2 and K1.</li>
 </ol>
-<p>At the validation stations this keeps 41–45 constituents for 19-year records and 23–28 for records of 1.5–2.5 years. Every constituent in a release records why it was kept or dropped.</p>
+<p>At the validation stations this keeps 41–45 constituents for 19-year records and 23–28 for records of 1.5–2.5 years. Every dropped constituent in a release records why it was dropped.</p>
 
 <h2 id="short-records">Short records</h2>
 <p>A short record is published when the accuracy calibration covers it. Otherwise it is not published.</p>
@@ -62,17 +62,12 @@ order: 5
 
 <h2 id="automation">Automation</h2>
 <ul>
-  <li>Watchers check every source weekly and produce a list of changed records.</li>
-  <li>Only changed sets are rebuilt. A new GESLA release, a change in the predictor's tables, or a format change triggers a full rebuild.</li>
-  <li>Builds run on GitHub Actions, so the build history is public.</li>
-  <li>After a release, the webcaltides app receives the new release through an automated, pinned update that merges only when its own checks pass.</li>
+  <li>Builds run locally, not on GitHub Actions. Every build is a full rebuild.</li>
+  <li>A monthly GitHub Actions workflow (<code>harmonics-data-monitor.yml</code>, in the webcaltides repository) checks for new XTide and TICON releases and for changes to NOAA's station types.</li>
+  <li>A daily GitHub Actions workflow (<code>pegelonline-harvest.yml</code>) harvests PEGELONLINE records into OTC's own archive.</li>
+  <li>There is no weekly watcher for each source.</li>
 </ul>
 
-<h2 id="release-gate">The release gate (no person in the loop)</h2>
-<p>Every judgement in a build is made in three tiers, and nothing waits for a person:</p>
-<ol>
-  <li><strong>Fixed rules</strong> decide every case they can classify: pass, fail or fall back.</li>
-  <li><strong>One batched automated review per build</strong> handles the cases the rules cannot classify. Each answer is either <em>accept</em> or <em>fall back</em>, with a reason that cites the evidence. Answers are stored in a public table keyed by the evidence, and reused while the evidence is unchanged, so a rebuild is reproducible.</li>
-  <li><strong>Fallback:</strong> the first release has no earlier release to fall back to, so the build refuses a case it cannot decide.</li>
-</ol>
-<p>A release is published only when every whole-release gate passes, including the round-trip checks of the converters and the uploads. If any gate fails, nothing is published; after the first release, the last good release stays live, and an alert opens a public issue. Licence and publication policy stay with the project owner and never block a build.</p>
+<h2 id="release-gate">The release gate</h2>
+<p>Every judgement in a build is made by fixed rules, and the build refuses what the rules cannot accept. Reviewed exceptions are kept in public files in the pipeline repository: <code>timebase_reviewed_withhold.json</code> (records withheld for their time base after a review), and <code>station_decisions.json</code> and <code>station_review.json</code> (which records form one station).</p>
+<p>A release is written only when the release document passes the schema and cross-reference checks. The release files are complete only when the checksum file names every file and matches it, and an upload must pass that check first. If a check fails, nothing is published; after the first release, the last good release stays live. Licence and publication policy stay with the project owner and never block a build.</p>

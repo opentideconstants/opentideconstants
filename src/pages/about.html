@@ -8,11 +8,11 @@ order: 5
 
 <p>OTC is developed and run by <a href="https://orcid.org/0009-0005-6930-8040">Jordan Ritter</a>, a <a href="https://github.com/jpr5">prolific software architect</a> and <a href="https://www.linkedin.com/in/jordanritter">serial entrepreneur</a>. He is a lifelong contributor to open-source software, having authored <a href="https://github.com/jpr5/ngrep">ngrep</a>, included in every major Linux distribution today, <a href="https://aimock.copilotkit.dev">aimock</a>, used by many AI developers to add LLM determinism to developing and testing AI products and services, and many other projects.</p>
 <p>OpenTideConstants started as the data work behind <a href="{{site.webcaltidesUrl}}">webcaltides.org</a>, a service that publishes tide and current predictions as calendar feeds. The webcaltides prediction engine is the reference predictor for OTC, and webcaltides uses OTC releases.</p>
-<p>The automation keeps the data current without a person in the loop. Changes to the code and the rules are made in public, through the repository.</p>
+<p>Changes to the code and the rules are made in public, through the repository.</p>
 
 <h2 id="contact">Report a problem or ask a question</h2>
 <p>Use the <a href="{{site.repoUrl}}/issues">GitHub issue tracker</a>. Issues are public, so others can see what was reported and how it was resolved. For a problem with a station, include the <code>station_id</code>, the release date, and what you compared it with.</p>
-<p>Every automated decision in a release is stored in a public table with its evidence. If you think a decision is wrong, open an issue that names the station; a confirmed issue reverses the decision in the next release.</p>
+<p>Reviewed decisions are kept in public files in the pipeline repository, with their reasons. If you think a decision is wrong, open an issue that names the station.</p>
 
 <h2 id="privacy">Privacy</h2>
 <p>This website uses no cookies, no analytics and no third-party scripts.</p>
@@ -37,7 +37,7 @@ order: 5
   <dt>GESLA</dt>
   <dd>Constants fitted from GESLA records: acknowledge the <a href="https://gesla787883612.wordpress.com/">GESLA website</a> and cite Haigh et al. (2023) and Woodworth et al. (2017), as the GESLA downloads page asks. For GESLA records that come from UHSLC, also cite Caldwell et al. (2015).</dd>
   <dt>Data providers</dt>
-  <dd>Each GESLA record comes from a national or regional agency, and each fitted set names its provider. The release files carry the full attribution text per set.</dd>
+  <dd>Each GESLA record comes from a national or regional agency, and each fitted set names its provider. The release files carry the full attribution text for each set's licence.</dd>
   <dt>TICON-4</dt>
   <dd>TICON-4 constants are by Michael Hart-Davis, Denise Dettmering and Florian Seitz (DGFI-TUM), under CC BY 4.0. Cite them as SEANOE asks: “Hart-Davis, M., Dettmering, D., Seitz, F. (2025). TICON-4: TIdal CONstants based on GESLA-4 sea-level records. SEANOE. <a href="https://doi.org/10.17882/109129">doi:10.17882/109129</a>”, together with Piccioni et al. (2019), and give the GESLA citations above, because its constants are fitted from GESLA records. Where a set's <code>provenance.modified</code> is present, say that OTC changed the constants as it states.</dd>
   <dt>NOAA CO-OPS</dt>

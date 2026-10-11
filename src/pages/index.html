@@ -14,7 +14,7 @@ layout: full
       </div>
       <div class="title-block">
         <h1 id="hero-title">Open tide data, combined into <em>one dataset.</em></h1>
-        <p class="lead">OpenTideConstants (OTC) combines official agency constants, constants that we fit from gauge records, third-party analyses of gauge records, and tide-model constants into one consistent dataset: one format, declared conventions, provenance for every record, and the accuracy of every station against official predictions. It is rebuilt automatically from the latest upstream data, and each constant set carries a licence from its source's terms; some sets are for non-commercial use only. Every release is citable by one concept DOI and its datestamp.</p>
+        <p class="lead">OpenTideConstants (OTC) combines official agency constants, constants that we fit from gauge records, third-party analyses of gauge records, and tide-model constants into one consistent dataset: one format, declared conventions, provenance for every record, and the accuracy of every station against official predictions. It is built from the latest upstream data, and each constant set carries a licence from its source's terms; some sets are for non-commercial use only. Every release is citable by one concept DOI and its datestamp.</p>
         <div class="actions">
           <a class="button" href="/downloads/">Downloads <span aria-hidden="true">→</span></a>
           <a class="more" href="/method/">Read the method</a>
@@ -130,7 +130,7 @@ layout: full
     <li>
       <div>
         <h3>Accuracy for every station</h3>
-        <p>Every release publishes, per station, how well the constants reproduce official predictions: time and height errors, missed and extra events, and the same numbers for the previous release.</p>
+        <p>Every release publishes, per station, how well the constants reproduce official predictions: time and height errors, and missed and extra events.</p>
       </div>
     </li>
     <li>
@@ -147,8 +147,8 @@ layout: full
     </li>
     <li>
       <div>
-        <h3>Automatic and current</h3>
-        <p>Weekly watchers detect upstream changes. A build that passes all gates is published with no person in the loop. A build that fails keeps the last good release live.</p>
+        <h3>Gated releases</h3>
+        <p>A release is published only when its whole-release checks pass. If a check fails, nothing is published.</p>
       </div>
     </li>
     <li>
