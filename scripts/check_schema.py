@@ -2666,3 +2666,12 @@ if not any("annotation row must name an existing original row" in error for erro
     print("FAIL: the direct semantic checker ignored an out-of-bounds original-row annotation")
     sys.exit(1)
 print("ok: direct source semantics reject an extra out-of-bounds original-row annotation")
+
+# Unknown country is explicit null; known alpha-3 strings retain their exact existing shape.
+must_pass("required country with unknown value null",
+          lambda d: d["stations"][0].__setitem__("country", None))
+must_fail("active station without required country",
+          lambda d: d["stations"][0].pop("country"))
+for invalid_country in ("", "us", "usa", "US", "USAA", "USA\n", 123, False):
+    must_fail(f"invalid country value {invalid_country!r}",
+              lambda d, value=invalid_country: d["stations"][0].__setitem__("country", value))
