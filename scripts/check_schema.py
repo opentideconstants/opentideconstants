@@ -37,7 +37,10 @@ r"""Check the JSON Schema and the example document.
    source_type, a ticon-4 set that is not analysis, a gesla-fit set that is
    not gauge, a set without source, and a source_quality_note flag on a
    gauge, official or model set must fail, as must a ticon-4 set under
-   another licence and the ticon-4 licence on another source. Labelled fallbacks
+   an unapproved licence and a dedicated TICON licence on another source.
+   The exact restricted BODC policy requires NOASSERTION, false commercial
+   use, a licence-reading fallback and the retained restriction/attribution/terms.
+   Labelled fallbacks
    require their exact reason flag and flagged status. A disputed analysis
    requires a time_base_disputed, time_base_unresolved or reliability_withheld
    fallback; preferred references resolve to a non-fallback set at the same
@@ -78,6 +81,18 @@ schema_dir = root / "src/schema"
 schema = json.loads((schema_dir / "otc-1.0.schema.json").read_text())
 example = json.loads((schema_dir / "example.json").read_text())
 
+RESTRICTED_POLICY = {
+  "licence_id": "ticon-4-bodc-restricted",
+  "provider": "TICON-4 (DGFI-TUM); underlying record: British Oceanographic Data Centre (BODC) via GESLA",
+  "citation": "Hart-Davis, M., Dettmering, D., Seitz, F. (2025). TICON-4: TIdal CONstants based on GESLA-4 sea-level records. SEANOE. doi:10.17882/109129\nUnderlying record citation (stored metadata): Haigh, I.D., et al. (2023), GESLA Version 3: A major update to the global higher-frequency sea-level dataset, Geoscience Data Journal, https://doi.org/10.1002/gdj3.174",
+  "attribution": "Internal restricted policy: NOASSERTION means OTC does not conclude a combined licence. Published TICON attribution: Contains constants from TICON-4 (DGFI-TUM), CC BY 4.0. Hart-Davis, M., Dettmering, D., Seitz, F. (2025). TICON-4: TIdal CONstants based on GESLA-4 sea-level records. SEANOE. doi:10.17882/109129.\nUnderlying record attribution (stored metadata): This uses data provided by the British Oceanographic Data Centre, via GESLA-4.1. CC BY-NC 4.0: non-commercial use only.",
+  "url": "https://doi.org/10.17882/109129",
+  "commercial_use": False,
+  "restriction": "Non-commercial use only: the BODC data licence says 'Users should not give any data or products to third parties without prior consent from BODC' and that commercial use 'might require additional permission from the data source and may incur a charge'.",
+  "terms_url": "https://www.bodc.ac.uk/data/documents/nodb/267795/",
+  "spdx": "NOASSERTION"
+}
+
 for path in sorted(schema_dir.glob("otc-*.schema.json")):
     Draft202012Validator.check_schema(json.loads(path.read_text()))
 FORMATS = Draft202012Validator.FORMAT_CHECKER
@@ -113,8 +128,15 @@ def duplicate_aliases(doc):
 def problems(doc):
     found = [f"{list(e.path)} {e.message}" for e in validator.iter_errors(doc)]
     found += [f"duplicate alias {system}:{alias}" for system, alias in duplicate_aliases(doc)]
+    restricted = next((lic for lic in doc["licences"] if lic.get("licence_id") == "ticon-4-bodc-restricted"), None)
+    if restricted is not None:
+        for key in ("restriction", "terms_url", "attribution"):
+            if restricted.get(key) != RESTRICTED_POLICY[key]:
+                found.append(f"ticon-4-bodc-restricted: {key} must retain the stored source metadata and policy explanation")
     for st in doc["stations"]:
         sets = {cs["set_id"]: cs for cs in st.get("constant_sets", [])}
+        if restricted is None and any(cs.get("licence_id") == "ticon-4-bodc-restricted" for cs in sets.values()):
+            found.append(f"{st['station_id']}: restricted TICON policy row is missing")
         recommended = sets.get(st.get("recommended_set_id"), {})
         if "fallback" in recommended:
             if st.get("recommended_is_fallback") is not True:
@@ -632,6 +654,61 @@ must_pass("an official set without record_span", lambda d: d["stations"][0]["con
 must_pass("a reference station whose only sets have no constants (no recommended set)",
           lambda d: station(d, "OTC-EXAMPLE-0005").update(
               constant_sets=[fjord(d, "d"), fjord(d, "e")], recommended_set_id=None))
+
+# --- exact restricted TICON policy --------------------------------------------------------------
+
+
+
+
+def restricted_licence(d):
+    return next(lic for lic in d["licences"] if lic["licence_id"] == "ticon-4-bodc-restricted")
+
+
+def restricted_control(d):
+    if not any(lic["licence_id"] == "ticon-4-bodc-restricted" for lic in d["licences"]):
+        d["licences"].append(copy.deepcopy(RESTRICTED_POLICY))
+    cs = verified_analysis(d)
+    cs["licence_id"] = "ticon-4-bodc-restricted"
+    label_fallback(d, cs, "licence_reading")
+    return cs
+
+
+must_pass("restricted TICON analysis with exact policy row", restricted_control)
+must_fail("NOASSERTION on an ordinary licence",
+          lambda d: d["licences"][0].__setitem__("spdx", "NOASSERTION"))
+for field in ("spdx", "commercial_use", "restriction", "terms_url", "provider", "attribution"):
+    must_fail(f"restricted policy without {field}",
+              lambda d, f=field: [restricted_control(d), restricted_licence(d).pop(f)])
+for field in ("provider", "attribution", "restriction"):
+    must_fail(f"restricted policy with empty {field}",
+              lambda d, f=field: [restricted_control(d), restricted_licence(d).__setitem__(f, "")])
+for value in (None, "", "CC-BY-4.0", "CC-BY-NC-4.0", "LicenseRef-TICON-BODC"):
+    must_fail(f"restricted policy with wrong SPDX {value!r}",
+              lambda d, v=value: [restricted_control(d), restricted_licence(d).__setitem__("spdx", v)])
+must_fail("restricted policy promotes commercial use",
+          lambda d: [restricted_control(d), restricted_licence(d).__setitem__("commercial_use", True)])
+must_fail("restricted policy replaces the retained BODC terms",
+          lambda d: [restricted_control(d), restricted_licence(d).__setitem__("terms_url", "https://example.org/terms")])
+must_fail("restricted policy loses the actual consent condition",
+          lambda d: [restricted_control(d), restricted_licence(d).__setitem__("restriction", "Non-commercial use only.")])
+must_fail("restricted policy loses the original attribution and no-conclusion explanation",
+          lambda d: [restricted_control(d), restricted_licence(d).__setitem__("attribution", "TICON-4")])
+must_fail("restricted TICON set without its registered policy row",
+          lambda d: [restricted_control(d), d.__setitem__("licences", [
+              lic for lic in d["licences"] if lic["licence_id"] != "ticon-4-bodc-restricted"])])
+must_fail("restricted TICON source binding cannot name another source",
+          lambda d: restricted_control(d).__setitem__("source", "ticon"))
+must_fail("restricted TICON binding cannot name an OTC gauge fit",
+          lambda d: first_set(d).__setitem__("licence_id", "ticon-4-bodc-restricted"))
+must_fail("restricted TICON binding requires analysis",
+          lambda d: restricted_control(d).__setitem__("source_type", "model"))
+must_fail("restricted TICON binding requires the fallback label",
+          lambda d: restricted_control(d).pop("fallback"))
+must_fail("restricted TICON binding requires the matching fallback flag",
+          lambda d: no_flag(restricted_control(d), "fallback:licence_reading"))
+must_fail("restricted TICON binding cannot use another fallback reason",
+          lambda d: [restricted_control(d), no_flag(verified_analysis(d), "fallback:licence_reading"),
+                     label_fallback(d, verified_analysis(d), "refused_fit")])
 
 # Astronomical tables and datum fields.
 def no_astro_tables(d):
