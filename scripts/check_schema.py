@@ -38,8 +38,9 @@ r"""Check the JSON Schema and the example document.
    not gauge, a set without source, and a source_quality_note flag on a
    gauge, official or model set must fail, as must a ticon-4 set under
    an unapproved licence and a dedicated TICON licence on another source.
-   The exact restricted BODC policy requires NOASSERTION, false commercial
-   use, a licence-reading fallback and the retained restriction/attribution/terms.
+   The exact restricted BODC and CMEMS policies require NOASSERTION, false commercial
+   use and the retained source metadata. Disputed annotations require a time-base-disputed
+   primary fallback; other valid annotations require a licence-reading primary fallback.
    Labelled fallbacks
    require their exact reason flag and flagged status. A disputed analysis
    requires a time_base_disputed, time_base_unresolved or reliability_withheld
@@ -93,6 +94,18 @@ RESTRICTED_POLICY = {
   "spdx": "NOASSERTION"
 }
 
+CMEMS_POLICY = {
+  "licence_id": "ticon-4-cmems-restricted",
+  "spdx": "NOASSERTION",
+  "provider": "TICON-4 (DGFI-TUM); underlying record: Copernicus Marine Service (CMEMS) via GESLA",
+  "citation": "Hart-Davis, M., Dettmering, D., Seitz, F. (2025). TICON-4: TIdal CONstants based on GESLA-4 sea-level records. SEANOE. doi:10.17882/109129\nUnderlying record citation (stored metadata): Haigh, I.D., et al. (2023), GESLA Version 3: A major update to the global higher-frequency sea-level dataset, Geoscience Data Journal, https://doi.org/10.1002/gdj3.174",
+  "attribution": "Internal restricted policy: NOASSERTION means OTC does not conclude a combined licence. Published TICON attribution: Contains constants from TICON-4 (DGFI-TUM), CC BY 4.0. Hart-Davis, M., Dettmering, D., Seitz, F. (2025). TICON-4: TIdal CONstants based on GESLA-4 sea-level records. SEANOE. doi:10.17882/109129.\nUnderlying record attribution (stored metadata): Generated using E.U. Copernicus Marine Service Information; https://doi.org/10.48670/moi-00036, via GESLA-4.1. CC BY-NC 4.0: non-commercial use only.",
+  "url": "https://doi.org/10.17882/109129",
+  "commercial_use": False,
+  "restriction": "Non-commercial use only: the GESLA licence page lists CMEMS records for research use; commercial use needs the data owner's permission.",
+  "terms_url": "https://gesla787883612.wordpress.com/license/"
+}
+
 for path in sorted(schema_dir.glob("otc-*.schema.json")):
     Draft202012Validator.check_schema(json.loads(path.read_text()))
 FORMATS = Draft202012Validator.FORMAT_CHECKER
@@ -128,14 +141,20 @@ def duplicate_aliases(doc):
 def problems(doc):
     found = [f"{list(e.path)} {e.message}" for e in validator.iter_errors(doc)]
     found += [f"duplicate alias {system}:{alias}" for system, alias in duplicate_aliases(doc)]
-    restricted = next((lic for lic in doc["licences"] if lic.get("licence_id") == "ticon-4-bodc-restricted"), None)
-    if restricted is not None:
-        for key in ("restriction", "terms_url", "attribution"):
-            if restricted.get(key) != RESTRICTED_POLICY[key]:
-                found.append(f"ticon-4-bodc-restricted: {key} must retain the stored source metadata and policy explanation")
+    restricted = {}
+    for policy in (RESTRICTED_POLICY, CMEMS_POLICY):
+        policy_id = policy["licence_id"]
+        row = next((lic for lic in doc["licences"] if lic.get("licence_id") == policy_id), None)
+        if row is not None:
+            restricted[policy_id] = row
+            keys = tuple(policy) if policy_id == "ticon-4-cmems-restricted" else ("restriction", "terms_url", "attribution")
+            for key in keys:
+                if row.get(key) != policy[key]:
+                    found.append(f"{policy_id}: {key} must retain the stored source metadata and policy explanation")
     for st in doc["stations"]:
         sets = {cs["set_id"]: cs for cs in st.get("constant_sets", [])}
-        if restricted is None and any(cs.get("licence_id") == "ticon-4-bodc-restricted" for cs in sets.values()):
+        if any(cs.get("licence_id") in {"ticon-4-bodc-restricted", "ticon-4-cmems-restricted"}
+               and cs["licence_id"] not in restricted for cs in sets.values()):
             found.append(f"{st['station_id']}: restricted TICON policy row is missing")
         recommended = sets.get(st.get("recommended_set_id"), {})
         if "fallback" in recommended:
@@ -709,6 +728,72 @@ must_fail("restricted TICON binding requires the matching fallback flag",
 must_fail("restricted TICON binding cannot use another fallback reason",
           lambda d: [restricted_control(d), no_flag(verified_analysis(d), "fallback:licence_reading"),
                      label_fallback(d, verified_analysis(d), "refused_fit")])
+
+def cmems_licence(d):
+    return next(lic for lic in d["licences"] if lic["licence_id"] == "ticon-4-cmems-restricted")
+
+
+def cmems_control(d):
+    if not any(lic["licence_id"] == "ticon-4-cmems-restricted" for lic in d["licences"]):
+        d["licences"].append(copy.deepcopy(CMEMS_POLICY))
+    cs = verified_analysis(d)
+    cs["licence_id"] = "ticon-4-cmems-restricted"
+    label_fallback(d, cs, "licence_reading")
+    return cs
+
+
+def restricted_primary_control(d, control, reason, disputed):
+    cs = control(d)
+    no_flag(cs, "fallback:licence_reading")
+    if disputed:
+        cs["time_base"].update(code="disputed", reason="record-level evidence disagrees")
+        cs.setdefault("qc_flags", []).append({"flag": "time_base", "reason": "time base disputed"})
+    label_fallback(d, cs, reason)
+    return cs
+
+
+for label, control in (("BODC", restricted_control), ("CMEMS", cmems_control)):
+    must_pass(f"{label} restricted disputed analysis retains truthful primary reason",
+              lambda d, c=control: restricted_primary_control(d, c, "time_base_disputed", True))
+    must_pass(f"{label} restricted non-disputed analysis retains licence-reading primary reason", control)
+    must_fail(f"{label} non-disputed analysis cannot claim a time-base dispute",
+              lambda d, c=control: restricted_primary_control(d, c, "time_base_disputed", False))
+    for reason in ("licence_reading", "refused_fit", "time_base_unresolved", "reliability_withheld"):
+        must_fail(f"{label} restricted disputed analysis rejects primary {reason}",
+                  lambda d, c=control, r=reason: restricted_primary_control(d, c, r, True))
+    must_fail(f"{label} restricted disputed analysis needs its matching flag",
+              lambda d, c=control: no_flag(restricted_primary_control(d, c, "time_base_disputed", True),
+                                          "fallback:time_base_disputed"))
+    must_fail(f"{label} restricted disputed analysis cannot carry a conflicting licence-reading flag",
+              lambda d, c=control: restricted_primary_control(d, c, "time_base_disputed", True)["qc_flags"].append(
+                  {"flag": "fallback:licence_reading", "reason": "source restriction retained separately"}))
+
+for field in CMEMS_POLICY:
+    must_fail(f"CMEMS policy loses exact stored {field}",
+              lambda d, f=field: [cmems_control(d), cmems_licence(d).pop(f)])
+for field in ("provider", "citation", "attribution", "restriction", "terms_url", "url"):
+    must_fail(f"CMEMS policy replaces exact stored {field}",
+              lambda d, f=field: [cmems_control(d), cmems_licence(d).__setitem__(f, "changed")])
+for value in (None, "", "CC-BY-4.0", "CC-BY-NC-4.0", "LicenseRef-TICON-CMEMS"):
+    must_fail(f"CMEMS policy rejects wrong SPDX {value!r}",
+              lambda d, v=value: [cmems_control(d), cmems_licence(d).__setitem__("spdx", v)])
+must_fail("CMEMS policy cannot promote commercial use",
+          lambda d: [cmems_control(d), cmems_licence(d).__setitem__("commercial_use", True)])
+must_fail("CMEMS TICON binding needs its registered policy row",
+          lambda d: [cmems_control(d), d.__setitem__("licences", [
+              lic for lic in d["licences"] if lic["licence_id"] != "ticon-4-cmems-restricted"])])
+must_fail("CMEMS TICON binding cannot name another source",
+          lambda d: cmems_control(d).__setitem__("source", "ticon"))
+must_fail("CMEMS TICON binding cannot name a gauge fit",
+          lambda d: first_set(d).__setitem__("licence_id", "ticon-4-cmems-restricted"))
+must_fail("CMEMS TICON binding requires analysis",
+          lambda d: cmems_control(d).__setitem__("source_type", "model"))
+must_fail("CMEMS TICON binding requires fallback",
+          lambda d: cmems_control(d).pop("fallback"))
+must_fail("CMEMS TICON binding requires its matching licence-reading flag",
+          lambda d: no_flag(cmems_control(d), "fallback:licence_reading"))
+must_fail("NOASSERTION cannot name an unapproved restricted policy",
+          lambda d: [cmems_control(d), cmems_licence(d).__setitem__("licence_id", "ticon-4-other-restricted")])
 
 # Astronomical tables and datum fields.
 def no_astro_tables(d):

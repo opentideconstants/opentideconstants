@@ -151,6 +151,17 @@
       "restriction": "Non-commercial use only: the BODC data licence says 'Users should not give any data or products to third parties without prior consent from BODC' and that commercial use 'might require additional permission from the data source and may incur a charge'.",
       "terms_url": "https://www.bodc.ac.uk/data/documents/nodb/267795/",
       "spdx": "NOASSERTION"
+    },
+    {
+      "licence_id": "ticon-4-cmems-restricted",
+      "spdx": "NOASSERTION",
+      "provider": "TICON-4 (DGFI-TUM); underlying record: Copernicus Marine Service (CMEMS) via GESLA",
+      "citation": "Hart-Davis, M., Dettmering, D., Seitz, F. (2025). TICON-4: TIdal CONstants based on GESLA-4 sea-level records. SEANOE. doi:10.17882/109129\nUnderlying record citation (stored metadata): Haigh, I.D., et al. (2023), GESLA Version 3: A major update to the global higher-frequency sea-level dataset, Geoscience Data Journal, https://doi.org/10.1002/gdj3.174",
+      "attribution": "Internal restricted policy: NOASSERTION means OTC does not conclude a combined licence. Published TICON attribution: Contains constants from TICON-4 (DGFI-TUM), CC BY 4.0. Hart-Davis, M., Dettmering, D., Seitz, F. (2025). TICON-4: TIdal CONstants based on GESLA-4 sea-level records. SEANOE. doi:10.17882/109129.\nUnderlying record attribution (stored metadata): Generated using E.U. Copernicus Marine Service Information; https://doi.org/10.48670/moi-00036, via GESLA-4.1. CC BY-NC 4.0: non-commercial use only.",
+      "url": "https://doi.org/10.17882/109129",
+      "commercial_use": false,
+      "restriction": "Non-commercial use only: the GESLA licence page lists CMEMS records for research use; commercial use needs the data owner's permission.",
+      "terms_url": "https://gesla787883612.wordpress.com/license/"
     }
   ],
   "constituents": [
@@ -1791,6 +1802,372 @@
       "timezone": "Europe/London",
       "type": "reference",
       "recommended_is_fallback": true
+    },
+    {
+      "aliases": {
+        "gesla": [
+          "a121tg-a12-nld-cmems"
+        ],
+        "webcaltides": "T6a8bcde"
+      },
+      "country": "NLD",
+      "lat": 55.400002,
+      "lon": 3.8099999,
+      "name": "A121TG",
+      "station_id": "OTC-657a5879",
+      "status": "active",
+      "timezone": "Etc/GMT",
+      "type": "reference",
+      "recommended_set_id": "OTC-657a5879/ticon-4/a121tg-a12-nld-cmems",
+      "recommended_is_fallback": true,
+      "constant_sets": [
+        {
+          "set_id": "OTC-657a5879/ticon-4/a121tg-a12-nld-cmems",
+          "source": "ticon-4",
+          "source_type": "analysis",
+          "quantity": "water_level",
+          "source_record_id": "a121tg-a12-nld-cmems",
+          "source_version": "4",
+          "record_span": {
+            "end": "2025-06-30T23:59:59Z",
+            "start": "2015-06-28T00:00:00Z"
+          },
+          "convention_id": "ticon4-greenwich-schureman-v1",
+          "licence_id": "ticon-4-cmems-restricted",
+          "qc_status": "flagged",
+          "time_base": {
+            "code": "unverified",
+            "decided_build_commit": "ecd91f6c64b7f116e521fb31ab0a2a7d65effc69",
+            "decided_in": "20261011",
+            "declared": "utc_instant",
+            "published": "utc_instant",
+            "reason": "declared utc_instant kept; no comparator; provider CMEMS (interval 600 s) has 85 judged records with verdicts ['unexplained', 'utc_instant']; weak evidence insufficient: EOT20 n/a (constituent lags disagree (> 30.0 min from tau)); served n/a (built from the record under test (a121tg-a12-nld-cmems): agrees by construction); DST no_step"
+          },
+          "constituents": [
+            {
+              "name": "M2",
+              "speed_deg_per_hour": 28.9841042,
+              "amplitude_m": 0.27384,
+              "phase_deg": 131.041803
+            }
+          ],
+          "qc_flags": [
+            {
+              "flag": "time_base",
+              "reason": "time base unverified: declared utc_instant kept; no comparator; provider CMEMS (interval 600 s) has 85 judged records with verdicts ['unexplained', 'utc_instant']; weak evidence insufficient: EOT20 n/a (constituent lags disagree (> 30.0 min from tau)); served n/a (built from the record under test (a121tg-a12-nld-cmems): agrees by construction); DST no_step"
+            },
+            {
+              "flag": "fallback:licence_reading",
+              "reason": "a121tg-a12-nld-cmems: CMEMS-relayed (CC BY-NC); the ticon-4 licence does not cover it"
+            },
+            {
+              "flag": "source_quality_note",
+              "reason": "TICON-4 record quality: Possible datum and quality control issues"
+            }
+          ],
+          "fallback": {
+            "reason": "licence_reading",
+            "basis": "TICON-4 publication: CC BY 4.0, doi:10.17882/109129. Underlying record: gesla-cmems-nc; Non-commercial use only: the GESLA licence page lists CMEMS records for research use; commercial use needs the data owner's permission. Terms: https://gesla787883612.wordpress.com/license/. NOASSERTION means OTC does not conclude a combined licence. No additional permission evidence is recorded.",
+            "otc_finding": "a121tg-a12-nld-cmems: CMEMS-relayed (CC BY-NC); the ticon-4 licence does not cover it"
+          },
+          "provenance": {
+            "build": {
+              "build_commit": "8f92a1351f6772458b29d20c553763dda0011a5a"
+            },
+            "input_sha256": [
+              "cea4a8d11cea3d7a5db02d3b75662c32a1459c262c4427b0eb28bb4fca5de366",
+              "394951d30c4c0794df9e7d8b616e0311fe70ab40200137d304c0f3eb2b7b98a9"
+            ],
+            "selection_reason": "Controlled schema projection from actual native inputs, not publisher output. Underlying record licence resolves to gesla-cmems-nc; actual source identity a121tg-a12-nld-cmems."
+          }
+        }
+      ]
+    },
+    {
+      "aliases": {
+        "gesla": [
+          "immingham-imm-gbr-bodc"
+        ],
+        "ticon": [
+          "immingham-imm-gbr-bodc"
+        ],
+        "webcaltides": "T6c5fb97"
+      },
+      "country": "GBR",
+      "lat": 53.630417,
+      "lon": -0.187528,
+      "name": "Immingham",
+      "station_id": "OTC-db83a9a9",
+      "status": "active",
+      "timezone": "Europe/London",
+      "type": "reference",
+      "recommended_set_id": "OTC-db83a9a9/ticon-4/immingham-imm-gbr-cmems",
+      "recommended_is_fallback": true,
+      "constant_sets": [
+        {
+          "set_id": "OTC-db83a9a9/ticon-4/immingham-imm-gbr-cmems",
+          "source": "ticon-4",
+          "source_type": "analysis",
+          "quantity": "water_level",
+          "source_record_id": "immingham-imm-gbr-cmems",
+          "source_version": "4",
+          "record_span": {
+            "end": "2025-06-30T23:59:59Z",
+            "start": "1990-01-01T00:00:00Z"
+          },
+          "convention_id": "ticon4-greenwich-schureman-v1",
+          "licence_id": "ticon-4-bodc-restricted",
+          "qc_status": "flagged",
+          "time_base": {
+            "code": "disputed",
+            "decided_build_commit": "ecd91f6c64b7f116e521fb31ab0a2a7d65effc69",
+            "decided_in": "20261011",
+            "declared": "utc_instant",
+            "evidence": [
+              {
+                "comparator_id": "eot20",
+                "comparator_kind": "model",
+                "detail": "off (+30.5)",
+                "lag_min": 30.5
+              },
+              {
+                "comparator_id": "T6c5fb97",
+                "comparator_kind": "served_constants",
+                "detail": "0 (-1.5) T6c5fb97 dependent",
+                "lag_min": -1.5
+              },
+              {
+                "comparator_id": "immingham-imm-gbr-cmems",
+                "comparator_kind": "dst_selftest",
+                "detail": "no_step (+3.3)"
+              }
+            ],
+            "published": "utc_instant",
+            "reason": "declared utc_instant kept; evidence disagrees: EOT20 off, served constants 0 (whole hours / off)"
+          },
+          "constituents": [
+            {
+              "name": "M2",
+              "speed_deg_per_hour": 28.9841042,
+              "amplitude_m": 2.240237,
+              "phase_deg": 161.584807
+            }
+          ],
+          "qc_flags": [
+            {
+              "flag": "time_base",
+              "reason": "time base disputed: declared utc_instant kept; evidence disagrees: EOT20 off, served constants 0 (whole hours / off)"
+            },
+            {
+              "flag": "fallback:time_base_disputed",
+              "reason": "immingham-imm-gbr-cmems: CMEMS-relayed (CC BY-NC); the ticon-4 licence does not cover it\nOTC time-base finding: declared utc_instant kept; evidence disagrees: EOT20 off, served constants 0 (whole hours / off)"
+            }
+          ],
+          "fallback": {
+            "reason": "time_base_disputed",
+            "basis": "TICON-4 publication: CC BY 4.0, doi:10.17882/109129. Underlying record: gesla-bodc-nc; Non-commercial use only: the BODC data licence says 'Users should not give any data or products to third parties without prior consent from BODC' and that commercial use 'might require additional permission from the data source and may incur a charge'. Terms: https://www.bodc.ac.uk/data/documents/nodb/267795/. NOASSERTION means OTC does not conclude a combined licence. No additional permission evidence is recorded.",
+            "otc_finding": "immingham-imm-gbr-cmems: CMEMS-relayed (CC BY-NC); the ticon-4 licence does not cover it\nOTC time-base finding: declared utc_instant kept; evidence disagrees: EOT20 off, served constants 0 (whole hours / off)"
+          },
+          "provenance": {
+            "build": {
+              "build_commit": "8f92a1351f6772458b29d20c553763dda0011a5a"
+            },
+            "input_sha256": [
+              "cea4a8d11cea3d7a5db02d3b75662c32a1459c262c4427b0eb28bb4fca5de366",
+              "394951d30c4c0794df9e7d8b616e0311fe70ab40200137d304c0f3eb2b7b98a9"
+            ],
+            "selection_reason": "Controlled schema projection from actual native inputs, not publisher output. Underlying record licence resolves to gesla-bodc-nc; actual source identity immingham-imm-gbr-cmems."
+          }
+        }
+      ]
+    },
+    {
+      "aliases": {
+        "gesla": [
+          "port_louis-103-mus-uhslc_fd",
+          "port_louis-103a-mus-uhslc_rq",
+          "port_louis-103c-mus-uhslc_rq"
+        ],
+        "ticon": [
+          "port_louis-103a-mus-uhslc_rq"
+        ],
+        "webcaltides": "T33cc693"
+      },
+      "country": "MUS",
+      "lat": -20.155,
+      "lon": 57.495,
+      "name": "Port Louis",
+      "station_id": "OTC-51c65693",
+      "status": "active",
+      "timezone": "Indian/Mauritius",
+      "type": "reference",
+      "recommended_set_id": "OTC-51c65693/ticon-4/port_louis-103b-mus-uhslc_rq",
+      "recommended_is_fallback": true,
+      "constant_sets": [
+        {
+          "set_id": "OTC-51c65693/ticon-4/port_louis-103b-mus-uhslc_rq",
+          "source": "ticon-4",
+          "source_type": "analysis",
+          "quantity": "water_level",
+          "source_record_id": "port_louis-103b-mus-uhslc_rq",
+          "source_version": "4",
+          "record_span": {
+            "end": "1965-12-31T23:59:59Z",
+            "start": "1964-03-01T00:00:00Z"
+          },
+          "convention_id": "ticon4-greenwich-schureman-v1",
+          "licence_id": "ticon-4-bodc-restricted",
+          "qc_status": "flagged",
+          "time_base": {
+            "code": "disputed",
+            "decided_build_commit": "ecd91f6c64b7f116e521fb31ab0a2a7d65effc69",
+            "decided_in": "20261011",
+            "declared": "utc_instant",
+            "evidence": [
+              {
+                "comparator_id": "T33cc693",
+                "comparator_kind": "served_constants",
+                "detail": "off (-7.5) T33cc693 dependent",
+                "lag_min": -7.5
+              }
+            ],
+            "published": "utc_instant",
+            "reason": "declared utc_instant kept; evidence disagrees: EOT20 n/a, served constants off (whole hours / off)"
+          },
+          "constituents": [
+            {
+              "name": "M2",
+              "speed_deg_per_hour": 28.9841042,
+              "amplitude_m": 0.142149,
+              "phase_deg": 268.341441
+            }
+          ],
+          "qc_flags": [
+            {
+              "flag": "time_base",
+              "reason": "time base disputed: declared utc_instant kept; evidence disagrees: EOT20 n/a, served constants off (whole hours / off)"
+            },
+            {
+              "flag": "fallback:time_base_disputed",
+              "reason": "port_louis-103b-mus-uhslc_rq: OTC disputes the record's time base: declared utc_instant kept; evidence disagrees: EOT20 n/a, served constants off (whole hours / off)"
+            }
+          ],
+          "fallback": {
+            "reason": "time_base_disputed",
+            "basis": "TICON-4 publication: CC BY 4.0, doi:10.17882/109129. Underlying record: gesla-bodc-nc; Non-commercial use only: the BODC data licence says 'Users should not give any data or products to third parties without prior consent from BODC' and that commercial use 'might require additional permission from the data source and may incur a charge'. Terms: https://www.bodc.ac.uk/data/documents/nodb/267795/. NOASSERTION means OTC does not conclude a combined licence. No additional permission evidence is recorded.",
+            "otc_finding": "port_louis-103b-mus-uhslc_rq: OTC disputes the record's time base: declared utc_instant kept; evidence disagrees: EOT20 n/a, served constants off (whole hours / off)"
+          },
+          "provenance": {
+            "build": {
+              "build_commit": "8f92a1351f6772458b29d20c553763dda0011a5a"
+            },
+            "input_sha256": [
+              "cea4a8d11cea3d7a5db02d3b75662c32a1459c262c4427b0eb28bb4fca5de366",
+              "394951d30c4c0794df9e7d8b616e0311fe70ab40200137d304c0f3eb2b7b98a9"
+            ],
+            "selection_reason": "Controlled schema projection from actual native inputs, not publisher output. Underlying record licence resolves to gesla-bodc-nc; actual source identity port_louis-103b-mus-uhslc_rq."
+          }
+        }
+      ]
+    },
+    {
+      "aliases": {
+        "gesla": [
+          "takoradi-231a-gha-uhslc_rq",
+          "takoradi-231c-gha-uhslc_rq"
+        ],
+        "ticon": [
+          "takoradi-231c-gha-uhslc_rq"
+        ],
+        "webcaltides": "Tff0e6cf"
+      },
+      "country": "GHA",
+      "lat": 4.883,
+      "lon": -1.75,
+      "name": "Takoradi",
+      "station_id": "OTC-8b79d129",
+      "status": "active",
+      "timezone": "Africa/Accra",
+      "type": "reference",
+      "recommended_set_id": "OTC-8b79d129/ticon-4/takoradi-231-gha-uhslc_fd",
+      "recommended_is_fallback": true,
+      "constant_sets": [
+        {
+          "set_id": "OTC-8b79d129/ticon-4/takoradi-231-gha-uhslc_fd",
+          "source": "ticon-4",
+          "source_type": "analysis",
+          "quantity": "water_level",
+          "source_record_id": "takoradi-231-gha-uhslc_fd",
+          "source_version": "4",
+          "record_span": {
+            "end": "2012-09-08T23:59:59Z",
+            "start": "2007-01-04T00:00:00Z"
+          },
+          "convention_id": "ticon4-greenwich-schureman-v1",
+          "licence_id": "ticon-4-bodc-restricted",
+          "qc_status": "flagged",
+          "time_base": {
+            "code": "disputed",
+            "decided_build_commit": "ecd91f6c64b7f116e521fb31ab0a2a7d65effc69",
+            "decided_in": "20261011",
+            "declared": "utc_instant",
+            "evidence": [
+              {
+                "comparator_id": "eot20",
+                "comparator_kind": "model",
+                "detail": "0 (+1.5)",
+                "lag_min": 1.5
+              },
+              {
+                "comparator_id": "Tff0e6cf",
+                "comparator_kind": "served_constants",
+                "detail": "off (-7.5) Tff0e6cf dependent",
+                "lag_min": -7.5
+              },
+              {
+                "comparator_id": "takoradi-231-gha-uhslc_fd",
+                "comparator_kind": "dst_selftest",
+                "detail": "no_step (+0.2)"
+              }
+            ],
+            "published": "utc_instant",
+            "reason": "declared utc_instant kept; evidence disagrees: EOT20 0, served constants off (whole hours / off)"
+          },
+          "constituents": [
+            {
+              "name": "M2",
+              "speed_deg_per_hour": 28.9841042,
+              "amplitude_m": 0.472493,
+              "phase_deg": 112.260872
+            }
+          ],
+          "qc_flags": [
+            {
+              "flag": "time_base",
+              "reason": "time base disputed: declared utc_instant kept; evidence disagrees: EOT20 0, served constants off (whole hours / off)"
+            },
+            {
+              "flag": "fallback:time_base_disputed",
+              "reason": "takoradi-231-gha-uhslc_fd: OTC disputes the record's time base: declared utc_instant kept; evidence disagrees: EOT20 0, served constants off (whole hours / off)"
+            }
+          ],
+          "fallback": {
+            "reason": "time_base_disputed",
+            "basis": "TICON-4 publication: CC BY 4.0, doi:10.17882/109129. Underlying record: gesla-bodc-nc; Non-commercial use only: the BODC data licence says 'Users should not give any data or products to third parties without prior consent from BODC' and that commercial use 'might require additional permission from the data source and may incur a charge'. Terms: https://www.bodc.ac.uk/data/documents/nodb/267795/. NOASSERTION means OTC does not conclude a combined licence. No additional permission evidence is recorded.",
+            "otc_finding": "takoradi-231-gha-uhslc_fd: OTC disputes the record's time base: declared utc_instant kept; evidence disagrees: EOT20 0, served constants off (whole hours / off)"
+          },
+          "provenance": {
+            "build": {
+              "build_commit": "8f92a1351f6772458b29d20c553763dda0011a5a"
+            },
+            "input_sha256": [
+              "cea4a8d11cea3d7a5db02d3b75662c32a1459c262c4427b0eb28bb4fca5de366",
+              "394951d30c4c0794df9e7d8b616e0311fe70ab40200137d304c0f3eb2b7b98a9"
+            ],
+            "selection_reason": "Controlled schema projection from actual native inputs, not publisher output. Underlying record licence resolves to gesla-bodc-nc; actual source identity takoradi-231-gha-uhslc_fd."
+          }
+        }
+      ]
     }
   ]
 }
