@@ -69,7 +69,9 @@ this script stops if they are missing.
 """
 import collections
 import copy
+import hashlib
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -138,9 +140,97 @@ def duplicate_aliases(doc):
     return dups
 
 
+def source_record_problems(doc):
+    """Check source-record references and original-row annotations without predicting them."""
+    found = []
+    seen = {}
+    licences = {lic.get("licence_id"): lic for lic in doc["licences"] if isinstance(lic.get("licence_id"), str)}
+    unsupported = {"3L2", "3N2", "MSQM", "MTM", "R3", "T3"}
+    for st in doc["stations"]:
+        records = st.get("source_records", [])
+        if not isinstance(records, list):
+            continue  # The schema reports malformed collections.
+        sets = {cs["set_id"]: cs for cs in st.get("constant_sets", [])}
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            identity = tuple(record.get(key) for key in ("source", "source_version", "source_record_id"))
+            if not all(isinstance(value, str) for value in identity):
+                continue
+            where = f"{st['station_id']} source record {identity}"
+            if identity in seen:
+                found.append(f"{where}: duplicate source tuple, already at {seen[identity]}")
+            else:
+                seen[identity] = st["station_id"]
+            for key in ("licence_id", "upstream_licence_id"):
+                licence_id = record.get(key)
+                if isinstance(licence_id, str) and licence_id not in licences:
+                    found.append(f"{where}: {key} does not resolve")
+            licence = licences.get(record.get("licence_id")) if isinstance(record.get("licence_id"), str) else None
+            if record.get("disposition") == "licence_restricted" and licence is not None:
+                if licence.get("commercial_use") is not False or not licence.get("restriction") or not licence.get("terms_url"):
+                    found.append(f"{where}: licence_restricted requires the actual noncommercial restriction and terms")
+            published = record.get("published_set_ids", [])
+            for set_id in published if isinstance(published, list) else []:
+                if not isinstance(set_id, str):
+                    continue
+                cs = sets.get(set_id)
+                if cs is None:
+                    found.append(f"{where}: published_set_ids must resolve at the same station")
+                else:
+                    source = {"gesla": "gesla-fit", "ticon": "ticon-4"}.get(identity[0], identity[0])
+                    if (cs.get("source"), cs.get("source_version"), cs.get("source_record_id")) != (source, identity[1], identity[2]):
+                        found.append(f"{where}: published_set_ids must come from the original source tuple")
+            metadata = record.get("original_metadata", {})
+            if isinstance(metadata, dict) and any(isinstance(value, float) and not math.isfinite(value)
+                                                   for value in metadata.values()):
+                found.append(f"{where}: original metadata numbers must be finite")
+            raw = record.get("original_harmonics")
+            if not isinstance(raw, dict):
+                continue
+            if licence is None:
+                found.append(f"{where}: original harmonics require resolved applicable terms")
+            predictive = [c for cs in sets.values() for c in cs.get("constituents", [])]
+            predictive += [c for cs in sets.values() for current_bin in cs.get("current_bins", [])
+                           for c in current_bin.get("constituents", [])]
+            if any(c.get("name") in unsupported or c.get("source_name") in unsupported for c in predictive):
+                found.append(f"{where}: unsupported original rows must not become predictive constituents")
+            if any(c.get("name") in unsupported for c in doc.get("constituents", [])):
+                found.append(f"{where}: unsupported original rows must not create constituent definitions")
+            if any(unsupported.intersection(table.get("constituents", {})) for table in doc.get("astro_tables", [])):
+                found.append(f"{where}: unsupported original rows must not create astro definitions")
+            rows = raw.get("rows")
+            annotations = raw.get("annotations")
+            if not isinstance(rows, list) or not all(isinstance(row, list) and len(row) == 18 and
+                                                      all(isinstance(cell, str) for cell in row) for row in rows):
+                continue  # The schema reports malformed original rows.
+            if any(row[13] != identity[2] for row in rows):
+                found.append(f"{where}: original harmonic rows must retain this source_record_id")
+            if not isinstance(annotations, list):
+                continue
+            indexes = []
+            for annotation in annotations:
+                if not isinstance(annotation, dict):
+                    continue
+                index = annotation.get("row")
+                if not isinstance(index, int) or isinstance(index, bool) or not 0 <= index < len(rows):
+                    found.append(f"{where}: annotation row must name an existing original row")
+                    continue
+                indexes.append(index)
+                name = rows[index][2]
+                expected = f"TICON-4 {name} has no definition in the TCD the release predicts with"
+                if annotation.get("detail") != expected:
+                    found.append(f"{where}: unsupported annotation must retain the native refusal")
+            expected_indexes = [i for i, row in enumerate(rows) if row[2] in unsupported]
+            if sorted(indexes) != expected_indexes:
+                found.append(f"{where}: annotate exactly the original unsupported-definition rows once")
+    return found
+
+
 def problems(doc):
     found = [f"{list(e.path)} {e.message}" for e in validator.iter_errors(doc)]
     found += [f"duplicate alias {system}:{alias}" for system, alias in duplicate_aliases(doc)]
+    found += source_record_problems(doc)
     restricted = {}
     for policy in (RESTRICTED_POLICY, CMEMS_POLICY):
         policy_id = policy["licence_id"]
@@ -2365,3 +2455,214 @@ if datum_failures:
     print(f"FAIL: {len(datum_failures)} datum checks failed")
     sys.exit(1)
 print("ok: every datum check")
+
+
+# Actual original DMI20043 capture: metadata without invented fit fields.
+IDENTITY_DMI = json.loads(r"""
+{
+  "station_id": "OTC-a2722283",
+  "status": "active",
+  "name": "Hirtshals Havn II",
+  "country": "DNK",
+  "lat": 57.5951,
+  "lon": 9.9625,
+  "timezone": "Europe/Copenhagen",
+  "type": "reference",
+  "aliases": {
+    "dmi": "20043"
+  },
+  "recommended_set_id": null,
+  "constant_sets": [],
+  "source_records": [
+    {
+      "source": "dmi",
+      "source_version": "capture:aede9cfe9c3eb7ff8e336b936134b2bffcb2d5d720e1532b097a963297660b46",
+      "source_record_id": "20043",
+      "role": "gauge_station",
+      "disposition": "metadata_only",
+      "detail": "Original station metadata is cached; no acquired observations or actual fit outcome is recorded for this capture.",
+      "licence_id": "dmi-cc-by-4.0",
+      "published_set_ids": [],
+      "original_metadata": {
+        "source": "dmi",
+        "id": "dmi:20043",
+        "name": "Hirtshals Havn II",
+        "lat": 57.5951,
+        "lon": 9.9625,
+        "quantity": "water_level",
+        "kind": "gauge_station",
+        "country": "DNK",
+        "cached_obs": false
+      },
+      "provenance": {
+        "input_sha256": [
+          "aede9cfe9c3eb7ff8e336b936134b2bffcb2d5d720e1532b097a963297660b46"
+        ],
+        "inventory_sha256": "28c1d1391164a736add779dd92e61210fe2d0e633085a4e893d19fd379c9dcd1"
+      }
+    }
+  ]
+}
+""")
+
+def put_source_identity(doc, identity):
+    doc["stations"] = [st for st in doc["stations"] if st["station_id"] != identity["station_id"]]
+    doc["stations"].append(copy.deepcopy(identity))
+
+
+def real_dmi_identity(doc):
+    put_source_identity(doc, IDENTITY_DMI)
+    if not any(lic["licence_id"] == "dmi-cc-by-4.0" for lic in doc["licences"]):
+        doc["licences"].append(json.loads(r"""{"licence_id":"dmi-cc-by-4.0","spdx":"CC-BY-4.0","provider":"Danish Meteorological Institute (DMI)","attribution":"Contains data from the Danish Meteorological Institute (DMI), licensed under CC BY 4.0.","url":"https://www.dmi.dk/friedata/dokumentation/terms-of-use","commercial_use":true}"""))
+
+
+must_pass("actual DMI metadata-only identity without fit or constants", real_dmi_identity)
+
+
+def source_record(doc, station_id="OTC-a2722283"):
+    return station(doc, station_id)["source_records"][0]
+
+
+def raw_harmonics(doc):
+    return source_record(doc, "OTC-e00b60ee")["original_harmonics"]
+
+
+def source_reference_must_fail(label, mutate, expected):
+    doc = copy.deepcopy(example)
+    mutate(doc)
+    if not validator.is_valid(doc):
+        print(f"FAIL: semantic source control has an invalid schema shape: {label}")
+        sys.exit(1)
+    errors = problems(doc)
+    if not any(expected in error for error in errors):
+        print(f"FAIL: source semantic control did not reject {label}: {errors}")
+        sys.exit(1)
+    print(f"ok: rejected {label} by its source semantic rule")
+
+
+def unsupported_predictive(doc):
+    st = station(doc, "OTC-e00b60ee")
+    cs = copy.deepcopy(first_set(doc))
+    cs["set_id"] = "OTC-e00b60ee/unsupported-control"
+    cs["constituents"] = [{"name": "3L2", "source_name": "3L2", "speed_deg_per_hour": 1,
+                           "amplitude_m": 0.02864466, "phase_deg": 164.427813}]
+    st["constant_sets"] = [cs]
+    st["recommended_set_id"] = cs["set_id"]
+
+
+source_reference_must_fail("an unsupported original row with an invented predictive speed", unsupported_predictive,
+                           "unsupported original rows must not become predictive constituents")
+
+must_fail("an empty reference without source identities",
+          lambda d: station(d, "OTC-a2722283").pop("source_records"))
+must_fail("empty source identities", lambda d: station(d, "OTC-a2722283").__setitem__("source_records", []))
+must_fail("an identity-only reference with a recommendation",
+          lambda d: station(d, "OTC-a2722283").__setitem__("recommended_set_id", "missing-set"))
+must_fail("an identity-only reference marked as a numeric fallback",
+          lambda d: station(d, "OTC-a2722283").__setitem__("recommended_is_fallback", True))
+must_fail("an identity-only reference with a current bin",
+          lambda d: station(d, "OTC-a2722283").__setitem__("default_current_bin", 1))
+must_fail("an identity-only reference with subordinate offsets",
+          lambda d: station(d, "OTC-a2722283").__setitem__("subordinate_offsets", copy.deepcopy(station(d, "OTC-EXAMPLE-0007")["subordinate_offsets"])))
+must_fail("an identity-only reference with current offsets",
+          lambda d: station(d, "OTC-a2722283").__setitem__("current_offsets", copy.deepcopy(station(d, "OTC-EXAMPLE-0004")["current_offsets"])))
+must_fail("an identity with no original source id", lambda d: source_record(d).pop("source_record_id"))
+must_fail("a source record with an invented fit field", lambda d: source_record(d).__setitem__("good_hours", 0))
+must_fail("a source record with no input hashes", lambda d: source_record(d)["provenance"].__setitem__("input_sha256", []))
+must_fail("a source record with no pinned inventory", lambda d: source_record(d)["provenance"].pop("inventory_sha256"))
+must_fail("a source record with an unknown disposition", lambda d: source_record(d).__setitem__("disposition", "fit_unusable"))
+must_fail("a source record with an unknown role", lambda d: source_record(d).__setitem__("role", "otc_fit"))
+must_fail("restricted identity without applicable terms", lambda d: source_record(d, "OTC-215da48c").__setitem__("licence_id", None))
+must_fail("original harmonic material with unresolved permission", lambda d: source_record(d, "OTC-e00b60ee").__setitem__("licence_id", None))
+must_fail("original harmonics on a gauge rather than the actual harmonic-record role",
+          lambda d: source_record(d, "OTC-e00b60ee").__setitem__("role", "gauge_station"))
+must_fail("original harmonics from a different source", lambda d: source_record(d, "OTC-e00b60ee").__setitem__("source", "gesla"))
+must_fail("raw source material with a fabricated speed", lambda d: raw_harmonics(d).__setitem__("speed_deg_per_hour", 1))
+must_fail("lost original uncertainty column", lambda d: raw_harmonics(d)["columns"].remove("pha_std"))
+must_fail("lost original coefficient row", lambda d: raw_harmonics(d)["rows"].pop())
+must_fail("lost original string cell", lambda d: raw_harmonics(d)["rows"][0].pop())
+must_fail("an original amplitude normalized into a number", lambda d: raw_harmonics(d)["rows"][0].__setitem__(3, 0.0))
+must_fail("an original phase asserted as UTC", lambda d: raw_harmonics(d).__setitem__("phase_convention", "greenwich_utc"))
+must_fail("an unsupported annotation outside the raw rows", lambda d: raw_harmonics(d)["annotations"][0].__setitem__("row", 50))
+
+source_reference_must_fail("an unresolved applicable source licence",
+                           lambda d: source_record(d).__setitem__("licence_id", "missing"), "licence_id does not resolve")
+source_reference_must_fail("unresolved separately published source terms",
+                           lambda d: source_record(d).__setitem__("upstream_licence_id", "missing"), "upstream_licence_id does not resolve")
+source_reference_must_fail("restricted identity relabelled with commercial terms",
+                           lambda d: source_record(d, "OTC-215da48c").__setitem__("licence_id", "ticon-4"),
+                           "licence_restricted requires the actual noncommercial restriction and terms")
+source_reference_must_fail("a repeated original source tuple",
+                           lambda d: station(d, "OTC-a2722283")["source_records"].append(copy.deepcopy(source_record(d))),
+                           "duplicate source tuple")
+source_reference_must_fail("a source set link outside the station",
+                           lambda d: source_record(d, "OTC-e00b60ee")["published_set_ids"].append(first_set(d)["set_id"]),
+                           "published_set_ids must resolve at the same station")
+source_reference_must_fail("non-finite original numeric metadata",
+                           lambda d: source_record(d)["original_metadata"].__setitem__("lat", float("inf")),
+                           "original metadata numbers must be finite")
+source_reference_must_fail("an original row relabelled as another record",
+                           lambda d: raw_harmonics(d)["rows"][0].__setitem__(13, "another-record"),
+                           "original harmonic rows must retain this source_record_id")
+source_reference_must_fail("missing unsupported-definition labels", lambda d: raw_harmonics(d)["annotations"].pop(),
+                           "annotate exactly the original unsupported-definition rows once")
+source_reference_must_fail("a duplicated unsupported-definition label",
+                           lambda d: raw_harmonics(d)["annotations"].append(copy.deepcopy(raw_harmonics(d)["annotations"][0])),
+                           "annotate exactly the original unsupported-definition rows once")
+source_reference_must_fail("an unsupported label attached to a supported original row",
+                           lambda d: raw_harmonics(d)["annotations"][0].__setitem__("row", next(i for i, row in enumerate(raw_harmonics(d)["rows"]) if row[2] == "M2")),
+                           "annotate exactly the original unsupported-definition rows once")
+source_reference_must_fail("an altered native unsupported refusal",
+                           lambda d: raw_harmonics(d)["annotations"][0].__setitem__("detail", "invented definition available"),
+                           "unsupported annotation must retain the native refusal")
+
+
+def wrong_source_set(doc):
+    st = station(doc, "OTC-e00b60ee")
+    cs = copy.deepcopy(first_set(doc))
+    cs["set_id"] = "OTC-e00b60ee/wrong-source-control"
+    st["constant_sets"] = [cs]
+    st["recommended_set_id"] = cs["set_id"]
+    source_record(doc, "OTC-e00b60ee")["published_set_ids"] = [cs["set_id"]]
+
+
+def unsupported_definition(doc):
+    definition = copy.deepcopy(doc["constituents"][0])
+    definition["name"] = "3L2"
+    doc["constituents"].append(definition)
+
+
+def unsupported_astro(doc):
+    table = doc["astro_tables"][0]["constituents"]
+    table["3L2"] = copy.deepcopy(table["M2"])
+
+
+source_reference_must_fail("a same-station set from a different original source tuple", wrong_source_set,
+                           "published_set_ids must come from the original source tuple")
+source_reference_must_fail("a fabricated definition for an unsupported original row", unsupported_definition,
+                           "unsupported original rows must not create constituent definitions")
+source_reference_must_fail("a fabricated astro definition for an unsupported original row", unsupported_astro,
+                           "unsupported original rows must not create astro definitions")
+
+must_pass("unresolved identity terms without a coefficient payload", lambda d: source_record(d).__setitem__("licence_id", None))
+for disposition in ("not_fitted", "unavailable"):
+    must_pass(f"source identity disposition {disposition} without invented fit fields",
+              lambda d, value=disposition: source_record(d).__setitem__("disposition", value))
+print("ok: original source identities and harmonic rows remain separate from prediction")
+
+# Independent golden from the pinned original TICON CSV (cea4a8d1...), all 50 x 18 source strings.
+raw_rows = raw_harmonics(example)["rows"]
+raw_sha256 = hashlib.sha256(json.dumps(raw_rows, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
+if raw_sha256 != "e6a49362958bcc3ea9a4c0bda3b0076aec28ccaf93b54de8bba2781fb13c92a2":
+    print("FAIL: example.json changed the original San Felipe coefficient strings")
+    sys.exit(1)
+print("ok: all 900 original San Felipe string cells match the pinned source")
+
+doc = copy.deepcopy(example)
+extra_annotation = copy.deepcopy(raw_harmonics(doc)["annotations"][0])
+extra_annotation["row"] = 500
+raw_harmonics(doc)["annotations"].append(extra_annotation)
+if not any("annotation row must name an existing original row" in error for error in source_record_problems(doc)):
+    print("FAIL: the direct semantic checker ignored an out-of-bounds original-row annotation")
+    sys.exit(1)
+print("ok: direct source semantics reject an extra out-of-bounds original-row annotation")
