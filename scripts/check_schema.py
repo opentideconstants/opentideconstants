@@ -227,10 +227,84 @@ def source_record_problems(doc):
     return found
 
 
+def historical_offset_problems(doc):
+    """Check historical source/rights/reference links without claiming present-day accuracy."""
+    found = []
+    stations = {st.get("station_id"): st for st in doc["stations"]}
+    licences = {lic.get("licence_id"): lic for lic in doc["licences"]}
+    for st in doc["stations"]:
+        offsets = st.get("subordinate_offsets")
+        if not isinstance(offsets, dict) or not offsets.get("offset_id"):
+            continue
+        provenance = offsets.get("provenance")
+        if not isinstance(provenance, dict):
+            continue  # The schema reports malformed or missing historical fields.
+        where = f"{st['station_id']} historical offsets"
+        if offsets.get("licence_id") not in licences:
+            found.append(f"{where}: own licence_id must resolve")
+        binding = provenance.get("reference_binding", {})
+        if not isinstance(binding, dict):
+            continue  # JSON Schema rejects malformed reference bindings.
+        reference = stations.get(offsets.get("reference_station_id"))
+        if reference is None:
+            found.append(f"{where}: reference_station_id must resolve")
+        elif isinstance(binding, dict):
+            if (binding.get("station_id") != reference["station_id"]
+                    or reference.get("aliases", {}).get("noaa") != binding.get("noaa_id")):
+                found.append(f"{where}: reference binding must match the actual NOAA identity")
+            selected = next((cs for cs in reference.get("constant_sets", [])
+                             if cs.get("set_id") == reference.get("recommended_set_id")), {})
+            datum = selected.get("datum", {})
+            basis = datum.get("basis", {}).get("mllw", {})
+            if (selected.get("quantity") != "water_level" or selected.get("source") != "noaa"
+                    or selected.get("licence_id") not in licences
+                    or datum.get("chart_datum") != "mllw" or "mllw" not in datum.get("named", {})
+                    or basis.get("kind") != "published" or basis.get("method") != "source"):
+                found.append(f"{where}: reference requires actual NOAA water-level source rights and published MLLW")
+        crosswalk = provenance.get("id_crosswalk", {})
+        if isinstance(crosswalk, dict) and st.get("aliases", {}).get("noaa") == crosswalk.get("legacy_id"):
+            found.append(f"{where}: inferred legacy association must not become a NOAA alias")
+        try:
+            raw = json.loads(provenance.get("raw_values_json", ""))
+        except (TypeError, ValueError):
+            raw = None
+        numbers = ("height_adjusted_type", "time_offset_high_min", "time_offset_low_min",
+                   "height_offset_high", "height_offset_low")
+        book = provenance.get("book")
+        expected_clock = -5 if book == "atlantic" else -8
+        if (not isinstance(raw, dict)
+                or raw.get("contract_numeric_representation") != {key: offsets.get(key) for key in numbers}
+                or raw.get("chart_datum") != "MLLW"
+                or raw.get("table_fixed_utc_offset_hours") != expected_clock
+                or raw.get("daylight_saving_applied_in_book") is not False
+                or raw.get("annual_table_row") != provenance.get("annual_table_row")
+                or raw.get("candidate_reference_noaa_id") != binding.get("noaa_id")):
+            found.append(f"{where}: raw_values_json must retain the actual source numbers, fixed clock, MLLW and reference")
+        records = [record for record in st.get("source_records", []) if isinstance(record, dict)
+                   if (record.get("source"), record.get("source_version"), record.get("source_record_id"))
+                   == (offsets.get("source"), offsets.get("source_version"), offsets.get("source_record_id"))]
+        if len(records) != 1:
+            found.append(f"{where}: retain exactly one original source tuple")
+            continue
+        record = records[0]
+        metadata = record.get("original_metadata", {})
+        record_provenance = record.get("provenance", {})
+        if (record.get("role") != "reference" or record.get("disposition") != "retained"
+                or record.get("published_set_ids") != [] or record.get("licence_id") != offsets.get("licence_id")
+                or record_provenance.get("inventory_sha256") != provenance.get("source_manifest_sha256")
+                or record_provenance.get("input_sha256") != provenance.get("input_sha256")
+                or metadata.get("offset_id") != offsets.get("offset_id")
+                or metadata.get("raw_row_text") != provenance.get("raw_row_text")
+                or metadata.get("raw_values_json") != provenance.get("raw_values_json")):
+            found.append(f"{where}: original source record must retain the same raw row, source rights and provenance")
+    return found
+
+
 def problems(doc):
     found = [f"{list(e.path)} {e.message}" for e in validator.iter_errors(doc)]
     found += [f"duplicate alias {system}:{alias}" for system, alias in duplicate_aliases(doc)]
     found += source_record_problems(doc)
+    found += historical_offset_problems(doc)
     restricted = {}
     for policy in (RESTRICTED_POLICY, CMEMS_POLICY):
         policy_id = policy["licence_id"]
