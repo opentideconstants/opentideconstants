@@ -1,0 +1,66 @@
+---
+title: Home (alternate C)
+description: OpenTideConstants carries every tide set you have now, at more places, fitted from real water levels and closer to the official tables, with drop-in files and packages for the tools you already use.
+unlisted: true
+stylesheet: home-cd.css
+layout: full
+---
+<section class="sheet" aria-labelledby="hero-title">
+  <div class="wrap">
+    <div class="sheet-frame">
+      <div class="sheet-art">
+        {{include chart-sheet.svg}}
+        <span class="lat l1" aria-hidden="true">54°15′N</span><span class="lat l2" aria-hidden="true">54°10′N</span><span class="lon o1" aria-hidden="true">7°50′E</span><span class="lon o2" aria-hidden="true">7°55′E</span>
+      </div>
+      <div class="title-block">
+        <h1 id="hero-title">Everything you have now, <em>more accurate.</em></h1>
+        <p class="lead">OpenTideConstants (OTC) carries every tide set the other open tide database ships. Then it adds places, fits its own constants from real water levels, and labels every set so you know which one to trust. Switch with one line.</p>
+        <div class="actions">
+          <a class="button" href="#drop-in">See the drop-ins <span aria-hidden="true">→</span></a>
+          <a class="more" href="/method/">Read the method</a>
+        </div>
+      </div>
+      {{include home-cd-pillars.html}}
+    </div>
+  </div>
+</section>
+{{include home-cd-grid.html}}
+{{include home-cd-proof-1.html}}{{include tide-wide.svg}}{{include tide-compact.svg}}{{include home-cd-proof-2.html}}
+
+<section class="section wrap dropin" aria-labelledby="drop-in">
+  <div class="section-head">
+    <h2 id="drop-in">Drop-in replacement for what you use now</h2>
+    <p>Keep your code and your tools. Swap the data underneath them, and you get OTC's places, sets and labels with no other change.</p>
+  </div>
+  <ol class="swaps">
+    <li>
+      <p class="from"><span class="was">You use</span><code>@slackwater/database</code></p>
+      <p class="to"><span class="now">Switch to</span><code>@opentideconstants/tide-database</code></p>
+      <p class="how">One line in <code>package.json</code>, as an npm alias. Your imports and calls keep working, on Node, in the browser and on Workers, and every station id with an OTC match resolves as before. Use <code>overrides</code> where the database comes in through another package.</p>
+    </li>
+    <li>
+      <p class="from"><span class="was">You use</span><code>slackwater-&lt;date&gt;.tcdb</code> and <code>SlackwaterDatabase</code> in Swift</p>
+      <p class="to"><span class="now">Switch to</span><code>OTC_&lt;date&gt;.tcdb</code></p>
+      <p class="how">The same database format, so the reader in your iOS or macOS app opens it. An OTC Swift package is published too.</p>
+    </li>
+    <li>
+      <p class="from"><span class="was">You use</span>XTide and OpenCPN <code>.tcd</code> files</p>
+      <p class="to"><span class="now">Switch to</span><code>OTC_&lt;date&gt;.tcd</code></p>
+      <p class="how">Point XTide or OpenCPN at the file. Every current bin is its own station, and the file carries OTC's own constituent tables, which XTide reads.</p>
+    </li>
+    <li>
+      <p class="from"><span class="was">You use</span>the Slackwater station JSON files</p>
+      <p class="to"><span class="now">Switch to</span><code>OTC_&lt;date&gt;.slackwater.zip</code></p>
+      <p class="how">One file per station, in the same schema and at the same id-based paths, with a map from each id to its OTC station.</p>
+    </li>
+  </ol>
+  <figure class="plot specimen swap-spec">
+    <div class="plot-head"><p class="place">package.json</p><p>The whole change for an npm user.</p></div>
+<pre><code><span class="del">-  "@slackwater/database": "^1.0.0-beta.0"</span>
+<span class="add">+  "@slackwater/database": "npm:@opentideconstants/tide-database@^1"</span></code></pre>
+  </figure>
+  <p class="dropin-note">A drop-in runs on the engine you already have. For OTC's own predictions, ten times closer to the official tables, use an OTC SDK.</p>
+</section>
+
+{{include home-cd-sdk-1.html}}{{include engine-check-wide.svg}}{{include engine-check-compact.svg}}{{include home-cd-sdk-2.html}}
+{{include home-cd-end.html}}

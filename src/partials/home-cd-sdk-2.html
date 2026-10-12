@@ -1,0 +1,162 @@
+</div>
+      <figcaption>
+        <ul class="plot-key">
+          <li><i class="k-dot" aria-hidden="true"></i>OTC predictor</li>
+          <li><i class="k-dot open" aria-hidden="true"></i>Another open engine</li>
+        </ul>
+        <p>Each dot is one gauge: the mean time error of its high and low waters against NOAA's published predictions. OTC's predictor is within 0.3 min at 170 of the 178 gauges. The other engine is 1 min or more off at 169, and closer at none. Every OTC SDK must match this predictor to 1 s.</p>
+      </figcaption>
+    </figure>
+
+    <div class="plot stations">
+      <div class="plot-head"><p class="place">Every set at a place, and the switch you need</p><p>Real stations from an OTC release-candidate build.</p></div>
+      <div class="tabs" role="radiogroup" aria-label="Station">
+        <label><input type="radio" name="station" value="suva" checked> Suva, Fiji</label>
+        <label><input type="radio" name="station" value="helgoland"> Helgoland, Germany</label>
+      </div>
+
+      <div class="sets st-suva">
+        <p class="st-id">OTC-211d111f · 18.13°S 178.43°E · Pacific/Fiji · 6 constant sets</p>
+        <div class="switches">
+          <label class="switch"><input type="checkbox" class="sw-fl"><span class="track" aria-hidden="true"></span>Hide flagged sets</label>
+          <label class="switch"><input type="checkbox" class="sw-co"><span class="track" aria-hidden="true"></span><code>commercial_only</code></label>
+        </div>
+        <p class="m2-head" aria-hidden="true">M2 amplitude, with its uncertainty where the set gives one</p>
+        <ol class="set-list">
+      <li class="set rec rec-co">
+        <div class="set-main">
+          <p class="set-name"><span class="badge">Recommended</span>NOAA CO-OPS</p>
+          <p class="set-kind">Official constants</p>
+          <p class="set-facts">37 constituents · Public domain (US Government)</p>
+        </div>
+        <div class="set-m2"><p><span class="k">M2</span> 0.565 m<span class="nou">no uncertainty given</span></p><svg class="m2" viewBox="0 0 160 26" aria-hidden="true"><path class="ax" d="M6 22 H154"/><circle class="pt open" cx="90.6" cy="13" r="4"/></svg></div>
+      </li>
+      <li class="set nc">
+        <div class="set-main">
+          <p class="set-name"><span class="badge">Recommended</span>OTC fit of the UHSLC record 018a</p>
+          <p class="set-kind">OTC gauge fit</p>
+          <p class="set-facts">record 1978–1997 · clock verified · 41 constituents · CC BY-NC 4.0, non-commercial</p>
+        </div>
+        <div class="set-m2"><p><span class="k">M2</span> 0.558 ± 0.010 m</p><svg class="m2" viewBox="0 0 160 26" aria-hidden="true"><path class="ax" d="M6 22 H154"/><path class="wh" d="M17.0 13 H101.1 M17.0 8 V18 M101.1 8 V18"/><circle class="pt" cx="59.0" cy="13" r="4"/></svg></div>
+        <p class="set-out"><span class="out-co">Left out by <code>commercial_only</code>: OTC fit of the UHSLC record 018a, CC BY-NC 4.0</span></p>
+      </li>
+      <li class="set">
+        <div class="set-main">
+          <p class="set-name"><span class="badge">Recommended</span>OTC fit of the NOAA record</p>
+          <p class="set-kind">OTC gauge fit</p>
+          <p class="set-facts">record 1994–1997 · clock verified · 38 constituents · Public domain (US Government)</p>
+        </div>
+        <div class="set-m2"><p><span class="k">M2</span> 0.566 ± 0.004 m</p><svg class="m2" viewBox="0 0 160 26" aria-hidden="true"><path class="ax" d="M6 22 H154"/><path class="wh" d="M80.4 13 H112.7 M80.4 8 V18 M112.7 8 V18"/><circle class="pt" cx="96.6" cy="13" r="4"/></svg></div>
+      </li>
+      <li class="set flagged">
+        <div class="set-main">
+          <p class="set-name"><span class="badge">Recommended</span>TICON-4, UHSLC record 018</p>
+          <p class="set-kind">Third-party analysis</p>
+          <p class="set-facts">record 1998–2025 · clock unverified · 40 constituents · CC BY 4.0</p>
+          <p class="flag">Flagged: time base unverified for the span TICON-4 analysed.</p>
+        </div>
+        <div class="set-m2"><p><span class="k">M2</span> 0.563 m<span class="nou">no uncertainty given</span></p><svg class="m2" viewBox="0 0 160 26" aria-hidden="true"><path class="ax" d="M6 22 H154"/><circle class="pt open" cx="82.4" cy="13" r="4"/></svg></div>
+        <p class="set-out"><span class="out-fl">Hidden: TICON-4, UHSLC record 018, flagged</span></p>
+      </li>
+      <li class="set flagged">
+        <div class="set-main">
+          <p class="set-name"><span class="badge">Recommended</span>TICON-4, UHSLC record 018b</p>
+          <p class="set-kind">Third-party analysis</p>
+          <p class="set-facts">record 1998–2021 · clock unverified · 40 constituents · CC BY 4.0</p>
+          <p class="flag">Flagged: time base unverified for the span TICON-4 analysed.</p>
+        </div>
+        <div class="set-m2"><p><span class="k">M2</span> 0.566 m<span class="nou">no uncertainty given</span></p><svg class="m2" viewBox="0 0 160 26" aria-hidden="true"><path class="ax" d="M6 22 H154"/><circle class="pt open" cx="93.0" cy="13" r="4"/></svg></div>
+        <p class="set-out"><span class="out-fl">Hidden: TICON-4, UHSLC record 018b, flagged</span></p>
+      </li>
+      <li class="set flagged">
+        <div class="set-main">
+          <p class="set-name"><span class="badge">Recommended</span>TICON-4, BOM record 67050</p>
+          <p class="set-kind">Third-party analysis</p>
+          <p class="set-facts">record 1997–2022 · clock unverified · 40 constituents · CC BY 4.0</p>
+          <p class="flag">Flagged: time base unverified for the span TICON-4 analysed.</p>
+        </div>
+        <div class="set-m2"><p><span class="k">M2</span> 0.565 m<span class="nou">no uncertainty given</span></p><svg class="m2" viewBox="0 0 160 26" aria-hidden="true"><path class="ax" d="M6 22 H154"/><circle class="pt open" cx="90.9" cy="13" r="4"/></svg></div>
+        <p class="set-out"><span class="out-fl">Hidden: TICON-4, BOM record 67050, flagged</span></p>
+      </li>
+        </ol>
+        <p class="why" aria-live="polite">Recommended: NOAA's official set, because official constants rank first. The two OTC fits agree with it within their stated uncertainty. The three TICON-4 analyses are flagged: their clock could not be checked for the years they cover.</p>
+      </div>
+
+      <div class="sets st-helgoland">
+        <p class="st-id">OTC-53956f2c · 54.18°N 7.89°E · Europe/Berlin · 3 constant sets</p>
+        <div class="switches">
+          <label class="switch"><input type="checkbox" class="sw-co"><span class="track" aria-hidden="true"></span><code>commercial_only</code></label>
+        </div>
+        <p class="m2-head" aria-hidden="true">M2 amplitude, with its uncertainty</p>
+        <ol class="set-list">
+      <li class="set rec nc">
+        <div class="set-main">
+          <p class="set-name"><span class="badge">Recommended</span>OTC fit of the CMEMS record</p>
+          <p class="set-kind">OTC gauge fit</p>
+          <p class="set-facts">record 2007–2026 · clock verified · 56 constituents · CC BY-NC 4.0, non-commercial</p>
+        </div>
+        <div class="set-m2"><p><span class="k">M2</span> 1.091 ± 0.008 m</p><svg class="m2" viewBox="0 0 160 26" aria-hidden="true"><path class="ax" d="M6 22 H154"/><path class="wh" d="M17.1 13 H79.3 M17.1 8 V18 M79.3 8 V18"/><circle class="pt" cx="48.2" cy="13" r="4"/></svg></div>
+        <p class="set-out"><span class="out-co">Left out by <code>commercial_only</code>: OTC fit of the CMEMS record, CC BY-NC 4.0</span></p>
+      </li>
+      <li class="set rec-co">
+        <div class="set-main">
+          <p class="set-name"><span class="badge">Recommended</span>OTC fit of the WSV Binnenhafen record</p>
+          <p class="set-kind">OTC gauge fit</p>
+          <p class="set-facts">record 2007–2026 · clock corrected, −29.6 min · 53 constituents · DL-DE-Zero-2.0</p>
+        </div>
+        <div class="set-m2"><p><span class="k">M2</span> 1.097 ± 0.005 m</p><svg class="m2" viewBox="0 0 160 26" aria-hidden="true"><path class="ax" d="M6 22 H154"/><path class="wh" d="M49.5 13 H86.6 M49.5 8 V18 M86.6 8 V18"/><circle class="pt" cx="68.0" cy="13" r="4"/></svg></div>
+      </li>
+      <li class="set">
+        <div class="set-main">
+          <p class="set-name"><span class="badge">Recommended</span>OTC fit of the WSV Südhafen record</p>
+          <p class="set-kind">OTC gauge fit</p>
+          <p class="set-facts">record 2007–2026 · clock corrected, −29.3 min · 52 constituents · DL-DE-Zero-2.0</p>
+        </div>
+        <div class="set-m2"><p><span class="k">M2</span> 1.103 ± 0.013 m</p><svg class="m2" viewBox="0 0 160 26" aria-hidden="true"><path class="ax" d="M6 22 H154"/><path class="wh" d="M41.7 13 H139.1 M41.7 8 V18 M139.1 8 V18"/><circle class="pt" cx="90.4" cy="13" r="4"/></svg></div>
+      </li>
+        </ol>
+        <p class="why why-default" aria-live="polite">Recommended: the CMEMS record, because a record of instantaneous readings ranks before hourly means. The two WSV records were hourly means labelled as instants; OTC measured the half-hour shift and corrected it.</p>
+        <p class="why why-co" aria-live="polite">With <code>commercial_only</code>, the CMEMS set's non-commercial licence leaves it out, and the recommendation moves to the WSV Binnenhafen fit, whose licence allows commercial use. The credit text follows.</p>
+      </div>
+      <p class="sets-note">In code, <code>commercial_only</code> is one option when you open a release. Every set carries <code>qc_status</code> and <code>qc_flags</code> with their reasons, so a filter is one line.</p>
+    </div>
+
+    <div class="plot langs">
+      <div class="plot-head"><p class="place">One answer in four languages</p><p>Helgoland, <code>commercial_only</code> on: the M2 constituent of the recommended set.</p></div>
+      <div class="tabs" role="radiogroup" aria-label="Language">
+        <label><input type="radio" name="lang" value="py" checked> Python</label>
+        <label><input type="radio" name="lang" value="rb"> Ruby</label>
+        <label><input type="radio" name="lang" value="ts"> TypeScript</label>
+        <label><input type="radio" name="lang" value="c"> C</label>
+      </div>
+<pre class="code l-py"><code>with OpenTideConstants(file="OTC_20261011.jsonl", commercial_only=True) as otc:
+    st = otc.nearest(lat=54.18, lon=7.89).station
+    m2 = st.recommended_set.constituent("M2")
+    print(m2.amplitude_m, m2.phase_deg)</code></pre>
+<pre class="code l-rb"><code>otc = OpenTideConstants.new(file: "OTC_20261011.jsonl", commercial_only: true)
+st  = otc.nearest(lat: 54.18, lon: 7.89).station
+m2  = st.recommended_set.constituent("M2")
+puts "#{m2.amplitude_m} #{m2.phase_deg}"</code></pre>
+<pre class="code l-ts"><code>const otc = await OpenTideConstants.open({ file: "OTC_20261011.jsonl", commercialOnly: true });
+const st = otc.nearest({ lat: 54.18, lon: 7.89 }).station;
+const m2 = st.recommendedSet.constituent("M2");
+console.log(m2.amplitude_m, m2.phase_deg);</code></pre>
+<pre class="code l-c"><code>otc_open_options_init(&amp;o);
+o.commercial_only = true;
+otc_open_file("OTC_20261011.jsonl", &amp;o, &amp;rel);
+otc_nearest(rel, 54.18, 7.89, INFINITY, NULL, &amp;hit);
+otc_station(rel, hit.id, &amp;st);
+otc_station_recommended_set(st, &amp;set);
+otc_set_constituent(set, "M2", &amp;m2);
+printf("%g %g\n", m2-&gt;amplitude_m, m2-&gt;phase_deg);</code></pre>
+      <p class="out"><span class="out-label">Output, in all four</span><samp>1.09677 310.58</samp></p>
+      <p class="sets-note">Run on the OTC_20261011 release-candidate build. A release gives its own numbers, the same in every SDK.</p>
+    </div>
+
+    <ul class="also">
+      <li><strong>Local time.</strong> Results are in UTC, or in the station's own zone when you ask. Every station has an IANA time zone.</li>
+      <li><strong>Offline.</strong> The SDK checks a release's SHA-256, caches it and then answers with no network. Or bundle a dated release with your app.</li>
+      <li><strong>Fallbacks hidden by default.</strong> Sets OTC would not recommend are there, each labelled with its reason, and one option shows them.</li>
+    </ul>
+  </div>
+</section>
