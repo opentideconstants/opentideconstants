@@ -32,12 +32,20 @@ r"""Check the JSON Schema and the example document.
    code, a broken record with a usable segment and a no-constants record
    must pass. An analysis set (a third party's published constants) without
    good_hours or record_span, or with an unverified time base, must pass; an
-   analysis set without a time base or with a disputed one, a corrected one
+   analysis set without a time base or with an unlabelled disputed one, a corrected one
    without provenance.modified, modified anywhere else, an unknown
    source_type, a ticon-4 set that is not analysis, a gesla-fit set that is
    not gauge, a set without source, and a source_quality_note flag on a
    gauge, official or model set must fail, as must a ticon-4 set under
-   another licence and the ticon-4 licence on another source.
+   an unapproved licence and a dedicated TICON licence on another source.
+   The exact restricted BODC and CMEMS policies require NOASSERTION, false commercial
+   use and the retained source metadata. Disputed annotations require a time-base-disputed
+   primary fallback; other valid annotations require a licence-reading primary fallback.
+   Labelled fallbacks
+   require their exact reason flag and flagged status. A disputed analysis
+   requires a time_base_disputed, time_base_unresolved or reliability_withheld
+   fallback; preferred references resolve to a non-fallback set at the same
+   station, and the recommendation marker is true only for a fallback.
    Retired values and fields
    (qc_status accepted and fallback, qc_flags verdict, provenance.time_base,
    provenance.build_commit, release.doi, depth_type above_bottom) must fail. Python's re lets $ match before a
@@ -61,7 +69,9 @@ this script stops if they are missing.
 """
 import collections
 import copy
+import hashlib
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -73,6 +83,30 @@ root = Path(__file__).resolve().parent.parent
 schema_dir = root / "src/schema"
 schema = json.loads((schema_dir / "otc-1.0.schema.json").read_text())
 example = json.loads((schema_dir / "example.json").read_text())
+
+RESTRICTED_POLICY = {
+  "licence_id": "ticon-4-bodc-restricted",
+  "provider": "TICON-4 (DGFI-TUM); underlying record: British Oceanographic Data Centre (BODC) via GESLA",
+  "citation": "Hart-Davis, M., Dettmering, D., Seitz, F. (2025). TICON-4: TIdal CONstants based on GESLA-4 sea-level records. SEANOE. doi:10.17882/109129\nUnderlying record citation (stored metadata): Haigh, I.D., et al. (2023), GESLA Version 3: A major update to the global higher-frequency sea-level dataset, Geoscience Data Journal, https://doi.org/10.1002/gdj3.174",
+  "attribution": "Internal restricted policy: NOASSERTION means OTC does not conclude a combined licence. Published TICON attribution: Contains constants from TICON-4 (DGFI-TUM), CC BY 4.0. Hart-Davis, M., Dettmering, D., Seitz, F. (2025). TICON-4: TIdal CONstants based on GESLA-4 sea-level records. SEANOE. doi:10.17882/109129.\nUnderlying record attribution (stored metadata): This uses data provided by the British Oceanographic Data Centre, via GESLA-4.1. CC BY-NC 4.0: non-commercial use only.",
+  "url": "https://doi.org/10.17882/109129",
+  "commercial_use": False,
+  "restriction": "Non-commercial use only: the BODC data licence says 'Users should not give any data or products to third parties without prior consent from BODC' and that commercial use 'might require additional permission from the data source and may incur a charge'.",
+  "terms_url": "https://www.bodc.ac.uk/data/documents/nodb/267795/",
+  "spdx": "NOASSERTION"
+}
+
+CMEMS_POLICY = {
+  "licence_id": "ticon-4-cmems-restricted",
+  "spdx": "NOASSERTION",
+  "provider": "TICON-4 (DGFI-TUM); underlying record: Copernicus Marine Service (CMEMS) via GESLA",
+  "citation": "Hart-Davis, M., Dettmering, D., Seitz, F. (2025). TICON-4: TIdal CONstants based on GESLA-4 sea-level records. SEANOE. doi:10.17882/109129\nUnderlying record citation (stored metadata): Haigh, I.D., et al. (2023), GESLA Version 3: A major update to the global higher-frequency sea-level dataset, Geoscience Data Journal, https://doi.org/10.1002/gdj3.174",
+  "attribution": "Internal restricted policy: NOASSERTION means OTC does not conclude a combined licence. Published TICON attribution: Contains constants from TICON-4 (DGFI-TUM), CC BY 4.0. Hart-Davis, M., Dettmering, D., Seitz, F. (2025). TICON-4: TIdal CONstants based on GESLA-4 sea-level records. SEANOE. doi:10.17882/109129.\nUnderlying record attribution (stored metadata): Generated using E.U. Copernicus Marine Service Information; https://doi.org/10.48670/moi-00036, via GESLA-4.1. CC BY-NC 4.0: non-commercial use only.",
+  "url": "https://doi.org/10.17882/109129",
+  "commercial_use": False,
+  "restriction": "Non-commercial use only: the GESLA licence page lists CMEMS records for research use; commercial use needs the data owner's permission.",
+  "terms_url": "https://gesla787883612.wordpress.com/license/"
+}
 
 for path in sorted(schema_dir.glob("otc-*.schema.json")):
     Draft202012Validator.check_schema(json.loads(path.read_text()))
@@ -106,9 +140,199 @@ def duplicate_aliases(doc):
     return dups
 
 
+def source_record_problems(doc):
+    """Check source-record references and original-row annotations without predicting them."""
+    found = []
+    seen = {}
+    licences = {lic.get("licence_id"): lic for lic in doc["licences"] if isinstance(lic.get("licence_id"), str)}
+    unsupported = {"3L2", "3N2", "MSQM", "MTM", "R3", "T3"}
+    for st in doc["stations"]:
+        records = st.get("source_records", [])
+        if not isinstance(records, list):
+            continue  # The schema reports malformed collections.
+        sets = {cs["set_id"]: cs for cs in st.get("constant_sets", [])}
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            identity = tuple(record.get(key) for key in ("source", "source_version", "source_record_id"))
+            if not all(isinstance(value, str) for value in identity):
+                continue
+            where = f"{st['station_id']} source record {identity}"
+            if identity in seen:
+                found.append(f"{where}: duplicate source tuple, already at {seen[identity]}")
+            else:
+                seen[identity] = st["station_id"]
+            for key in ("licence_id", "upstream_licence_id"):
+                licence_id = record.get(key)
+                if isinstance(licence_id, str) and licence_id not in licences:
+                    found.append(f"{where}: {key} does not resolve")
+            licence = licences.get(record.get("licence_id")) if isinstance(record.get("licence_id"), str) else None
+            if record.get("disposition") == "licence_restricted" and licence is not None:
+                if licence.get("commercial_use") is not False or not licence.get("restriction") or not licence.get("terms_url"):
+                    found.append(f"{where}: licence_restricted requires the actual noncommercial restriction and terms")
+            published = record.get("published_set_ids", [])
+            for set_id in published if isinstance(published, list) else []:
+                if not isinstance(set_id, str):
+                    continue
+                cs = sets.get(set_id)
+                if cs is None:
+                    found.append(f"{where}: published_set_ids must resolve at the same station")
+                else:
+                    source = {"gesla": "gesla-fit", "ticon": "ticon-4"}.get(identity[0], identity[0])
+                    if (cs.get("source"), cs.get("source_version"), cs.get("source_record_id")) != (source, identity[1], identity[2]):
+                        found.append(f"{where}: published_set_ids must come from the original source tuple")
+            metadata = record.get("original_metadata", {})
+            if isinstance(metadata, dict) and any(isinstance(value, float) and not math.isfinite(value)
+                                                   for value in metadata.values()):
+                found.append(f"{where}: original metadata numbers must be finite")
+            raw = record.get("original_harmonics")
+            if not isinstance(raw, dict):
+                continue
+            if licence is None:
+                found.append(f"{where}: original harmonics require resolved applicable terms")
+            predictive = [c for cs in sets.values() for c in cs.get("constituents", [])]
+            predictive += [c for cs in sets.values() for current_bin in cs.get("current_bins", [])
+                           for c in current_bin.get("constituents", [])]
+            if any(c.get("name") in unsupported or c.get("source_name") in unsupported for c in predictive):
+                found.append(f"{where}: unsupported original rows must not become predictive constituents")
+            if any(c.get("name") in unsupported for c in doc.get("constituents", [])):
+                found.append(f"{where}: unsupported original rows must not create constituent definitions")
+            if any(unsupported.intersection(table.get("constituents", {})) for table in doc.get("astro_tables", [])):
+                found.append(f"{where}: unsupported original rows must not create astro definitions")
+            rows = raw.get("rows")
+            annotations = raw.get("annotations")
+            if not isinstance(rows, list) or not all(isinstance(row, list) and len(row) == 18 and
+                                                      all(isinstance(cell, str) for cell in row) for row in rows):
+                continue  # The schema reports malformed original rows.
+            if any(row[13] != identity[2] for row in rows):
+                found.append(f"{where}: original harmonic rows must retain this source_record_id")
+            if not isinstance(annotations, list):
+                continue
+            indexes = []
+            for annotation in annotations:
+                if not isinstance(annotation, dict):
+                    continue
+                index = annotation.get("row")
+                if not isinstance(index, int) or isinstance(index, bool) or not 0 <= index < len(rows):
+                    found.append(f"{where}: annotation row must name an existing original row")
+                    continue
+                indexes.append(index)
+                name = rows[index][2]
+                expected = f"TICON-4 {name} has no definition in the TCD the release predicts with"
+                if annotation.get("detail") != expected:
+                    found.append(f"{where}: unsupported annotation must retain the native refusal")
+            expected_indexes = [i for i, row in enumerate(rows) if row[2] in unsupported]
+            if sorted(indexes) != expected_indexes:
+                found.append(f"{where}: annotate exactly the original unsupported-definition rows once")
+    return found
+
+
+def historical_offset_problems(doc):
+    """Check historical source/rights/reference links without claiming present-day accuracy."""
+    found = []
+    stations = {st.get("station_id"): st for st in doc["stations"]}
+    licences = {lic.get("licence_id"): lic for lic in doc["licences"]}
+    for st in doc["stations"]:
+        offsets = st.get("subordinate_offsets")
+        if not isinstance(offsets, dict) or not offsets.get("offset_id"):
+            continue
+        provenance = offsets.get("provenance")
+        if not isinstance(provenance, dict):
+            continue  # The schema reports malformed or missing historical fields.
+        where = f"{st['station_id']} historical offsets"
+        if offsets.get("licence_id") not in licences:
+            found.append(f"{where}: own licence_id must resolve")
+        binding = provenance.get("reference_binding", {})
+        if not isinstance(binding, dict):
+            continue  # JSON Schema rejects malformed reference bindings.
+        reference = stations.get(offsets.get("reference_station_id"))
+        if reference is None:
+            found.append(f"{where}: reference_station_id must resolve")
+        elif isinstance(binding, dict):
+            if (binding.get("station_id") != reference["station_id"]
+                    or reference.get("aliases", {}).get("noaa") != binding.get("noaa_id")):
+                found.append(f"{where}: reference binding must match the actual NOAA identity")
+            selected = next((cs for cs in reference.get("constant_sets", [])
+                             if cs.get("set_id") == reference.get("recommended_set_id")), {})
+            datum = selected.get("datum", {})
+            basis = datum.get("basis", {}).get("mllw", {})
+            if (selected.get("quantity") != "water_level" or selected.get("source") != "noaa"
+                    or selected.get("licence_id") not in licences
+                    or datum.get("chart_datum") != "mllw" or "mllw" not in datum.get("named", {})
+                    or basis.get("kind") != "published" or basis.get("method") != "source"):
+                found.append(f"{where}: reference requires actual NOAA water-level source rights and published MLLW")
+        crosswalk = provenance.get("id_crosswalk", {})
+        if isinstance(crosswalk, dict) and st.get("aliases", {}).get("noaa") == crosswalk.get("legacy_id"):
+            found.append(f"{where}: inferred legacy association must not become a NOAA alias")
+        try:
+            raw = json.loads(provenance.get("raw_values_json", ""))
+        except (TypeError, ValueError):
+            raw = None
+        numbers = ("height_adjusted_type", "time_offset_high_min", "time_offset_low_min",
+                   "height_offset_high", "height_offset_low")
+        book = provenance.get("book")
+        expected_clock = -5 if book == "atlantic" else -8
+        if (not isinstance(raw, dict)
+                or raw.get("contract_numeric_representation") != {key: offsets.get(key) for key in numbers}
+                or raw.get("chart_datum") != "MLLW"
+                or raw.get("table_fixed_utc_offset_hours") != expected_clock
+                or raw.get("daylight_saving_applied_in_book") is not False
+                or raw.get("annual_table_row") != provenance.get("annual_table_row")
+                or raw.get("candidate_reference_noaa_id") != binding.get("noaa_id")):
+            found.append(f"{where}: raw_values_json must retain the actual source numbers, fixed clock, MLLW and reference")
+        records = [record for record in st.get("source_records", []) if isinstance(record, dict)
+                   if (record.get("source"), record.get("source_version"), record.get("source_record_id"))
+                   == (offsets.get("source"), offsets.get("source_version"), offsets.get("source_record_id"))]
+        if len(records) != 1:
+            found.append(f"{where}: retain exactly one original source tuple")
+            continue
+        record = records[0]
+        metadata = record.get("original_metadata", {})
+        record_provenance = record.get("provenance", {})
+        if (record.get("role") != "reference" or record.get("disposition") != "retained"
+                or record.get("published_set_ids") != [] or record.get("licence_id") != offsets.get("licence_id")
+                or record_provenance.get("inventory_sha256") != provenance.get("source_manifest_sha256")
+                or record_provenance.get("input_sha256") != provenance.get("input_sha256")
+                or metadata.get("offset_id") != offsets.get("offset_id")
+                or metadata.get("raw_row_text") != provenance.get("raw_row_text")
+                or metadata.get("raw_values_json") != provenance.get("raw_values_json")):
+            found.append(f"{where}: original source record must retain the same raw row, source rights and provenance")
+    return found
+
+
 def problems(doc):
     found = [f"{list(e.path)} {e.message}" for e in validator.iter_errors(doc)]
     found += [f"duplicate alias {system}:{alias}" for system, alias in duplicate_aliases(doc)]
+    found += source_record_problems(doc)
+    found += historical_offset_problems(doc)
+    restricted = {}
+    for policy in (RESTRICTED_POLICY, CMEMS_POLICY):
+        policy_id = policy["licence_id"]
+        row = next((lic for lic in doc["licences"] if lic.get("licence_id") == policy_id), None)
+        if row is not None:
+            restricted[policy_id] = row
+            keys = tuple(policy) if policy_id == "ticon-4-cmems-restricted" else ("restriction", "terms_url", "attribution")
+            for key in keys:
+                if row.get(key) != policy[key]:
+                    found.append(f"{policy_id}: {key} must retain the stored source metadata and policy explanation")
+    for st in doc["stations"]:
+        sets = {cs["set_id"]: cs for cs in st.get("constant_sets", [])}
+        if any(cs.get("licence_id") in {"ticon-4-bodc-restricted", "ticon-4-cmems-restricted"}
+               and cs["licence_id"] not in restricted for cs in sets.values()):
+            found.append(f"{st['station_id']}: restricted TICON policy row is missing")
+        recommended = sets.get(st.get("recommended_set_id"), {})
+        if "fallback" in recommended:
+            if st.get("recommended_is_fallback") is not True:
+                found.append(f"{st['station_id']}: fallback recommendation requires recommended_is_fallback true")
+        elif "recommended_is_fallback" in st:
+            found.append(f"{st['station_id']}: omit recommended_is_fallback for a non-fallback recommendation")
+        for cs in sets.values():
+            fallback = cs.get("fallback")
+            if not isinstance(fallback, dict):
+                continue  # JSON Schema reports an invalid fallback shape.
+            preferred = fallback.get("preferred_set_id")
+            if isinstance(preferred, str) and (preferred not in sets or "fallback" in sets[preferred]):
+                found.append(f"{cs['set_id']}: preferred_set_id must name a non-fallback set at the same station")
     return found
 
 
@@ -514,6 +738,97 @@ must_fail("source_quality_note flag on an official set",
 must_fail("reference station with no constant sets",
           lambda d: station(d, "OTC-EXAMPLE-0005").update(constant_sets=[], recommended_set_id=None))
 
+# --- labelled publication fallbacks -------------------------------------------------------------
+
+FALLBACK_REASONS = (
+    "time_base_disputed", "time_base_unresolved", "refused_fit", "short_record_uncalibrated",
+    "short_record_long_period", "published_full_list", "reliability_withheld", "licence_reading",
+    "datum_gate_failed", "not_in_otc_input",
+)
+
+
+def label_fallback(d, cs, reason):
+    cs["fallback"] = {"reason": reason, "basis": "original published constants", "otc_finding": "record retained with the finding"}
+    cs["qc_status"] = "flagged"
+    cs.setdefault("qc_flags", []).append({"flag": f"fallback:{reason}", "reason": "record retained with the finding"})
+    for st in d["stations"]:
+        if st.get("recommended_set_id") == cs["set_id"]:
+            st["recommended_is_fallback"] = True
+
+
+def disputed_fallback(d, reason):
+    cs = verified_analysis(d)
+    cs["time_base"].update(code="disputed", reason="lags disagree")
+    cs.update(qc_status="flagged", qc_flags=[{"flag": "time_base", "reason": "time base disputed"}])
+    label_fallback(d, cs, reason)
+
+
+for value in (None, "licence_reading", []):
+    must_fail(f"fallback must be an object: {value!r}",
+              lambda d, v=value: first_set(d).__setitem__("fallback", v))
+for value in ([], {}, 1):
+    must_fail(f"fallback preferred reference must be a string: {value!r}",
+              lambda d, v=value: [label_fallback(d, first_set(d), "refused_fit"),
+                                first_set(d)["fallback"].__setitem__("preferred_set_id", v)])
+for reason in ("time_base_disputed", "time_base_unresolved", "reliability_withheld"):
+    must_pass(f"labelled disputed analysis: {reason}", lambda d, r=reason: disputed_fallback(d, r))
+for reason in FALLBACK_REASONS:
+    must_pass(f"fallback reason {reason}", lambda d, r=reason: label_fallback(d, first_set(d), r))
+    must_fail(f"fallback {reason} without its matching flag",
+              lambda d, r=reason: [label_fallback(d, first_set(d), r), no_flag(first_set(d), f"fallback:{r}")])
+    must_fail(f"fallback flag {reason} without a label",
+              lambda d, r=reason: [label_fallback(d, first_set(d), r), first_set(d).pop("fallback")])
+    must_fail(f"fallback {reason} with a mismatched flag",
+              lambda d, r=reason: [label_fallback(d, first_set(d), r), first_set(d)["fallback"].__setitem__(
+                  "reason", "refused_fit" if r != "refused_fit" else "licence_reading")])
+for reason in FALLBACK_REASONS:
+    if reason in {"time_base_disputed", "time_base_unresolved", "reliability_withheld"}:
+        continue
+    must_fail(f"disputed analysis with an unrelated fallback: {reason}", lambda d, r=reason: disputed_fallback(d, r))
+for field in ("reason", "basis", "otc_finding"):
+    must_fail(f"fallback without {field}",
+              lambda d, f=field: [label_fallback(d, first_set(d), "refused_fit"), first_set(d)["fallback"].pop(f)])
+for field in ("basis", "otc_finding", "preferred_set_id"):
+    must_fail(f"fallback with empty {field}",
+              lambda d, f=field: [label_fallback(d, first_set(d), "refused_fit"), first_set(d)["fallback"].__setitem__(f, "")])
+must_fail("fallback with an unknown reason",
+          lambda d: [label_fallback(d, first_set(d), "refused_fit"), first_set(d)["fallback"].__setitem__("reason", "other")])
+must_fail("fallback with an extra field",
+          lambda d: [label_fallback(d, first_set(d), "refused_fit"), first_set(d)["fallback"].__setitem__("extra", True)])
+must_fail("fallback with qc_status ok",
+          lambda d: [label_fallback(d, first_set(d), "refused_fit"), first_set(d).update(qc_status="ok", qc_flags=[])])
+must_fail("fallback with qc_status no_constants",
+          lambda d: [label_fallback(d, fjord(d, "d"), "refused_fit"), fjord(d, "d").__setitem__("qc_status", "no_constants")])
+must_fail("recommended marker missing on fallback",
+          lambda d: [label_fallback(d, official(d), "refused_fit"), station(d, "OTC-EXAMPLE-0001").pop("recommended_is_fallback")])
+must_fail("recommended marker false on fallback",
+          lambda d: [label_fallback(d, official(d), "refused_fit"), station(d, "OTC-EXAMPLE-0001").__setitem__("recommended_is_fallback", False)])
+must_fail("recommended marker on a normal recommendation",
+          lambda d: station(d, "OTC-EXAMPLE-0001").__setitem__("recommended_is_fallback", True))
+must_fail("recommended false marker on a normal recommendation",
+          lambda d: station(d, "OTC-EXAMPLE-0001").__setitem__("recommended_is_fallback", False))
+for preferred in ("missing-set", current_set(example)["set_id"], first_set(example)["set_id"]):
+    must_fail(f"fallback preferred reference is unresolved, foreign or itself: {preferred}",
+              lambda d, p=preferred: [label_fallback(d, first_set(d), "refused_fit"), first_set(d)["fallback"].__setitem__("preferred_set_id", p)])
+must_pass("fallback prefers an existing non-fallback set at the station",
+          lambda d: [label_fallback(d, first_set(d), "refused_fit"), first_set(d)["fallback"].__setitem__(
+              "preferred_set_id", official(d)["set_id"])])
+must_fail("fallback prefers another fallback",
+          lambda d: [label_fallback(d, first_set(d), "refused_fit"), label_fallback(d, official(d), "licence_reading"),
+                     first_set(d)["fallback"].__setitem__("preferred_set_id", official(d)["set_id"])])
+must_pass("short uncalibrated fallback retains length and dropped evidence without invented accuracy",
+          lambda d: [label_fallback(d, fjord(d, "c"), "short_record_uncalibrated"), fjord(d, "c").pop("expected_accuracy")])
+for reason in FALLBACK_REASONS:
+    if reason == "short_record_uncalibrated":
+        continue
+    must_fail(f"short record without accuracy under unrelated fallback {reason}",
+              lambda d, r=reason: [label_fallback(d, fjord(d, "c"), r), fjord(d, "c").pop("expected_accuracy")])
+for field in ("dropped_constituents", "record_span"):
+    must_fail(f"short uncalibrated fallback without {field}",
+              lambda d, f=field: [label_fallback(d, fjord(d, "c"), "short_record_uncalibrated"), fjord(d, "c").pop(f)])
+must_fail("short uncalibrated fallback without good_hours",
+          lambda d: [label_fallback(d, fjord(d, "c"), "short_record_uncalibrated"), fjord(d, "c")["record_span"].pop("good_hours")])
+
 must_pass("D9 a set carried over from the previous release", lambda d: carried(fjord(d, "a")))
 must_pass("D9 a gate fallback carried over", lambda d: [carried(fjord(d, "a")), fjord(d, "a")["provenance"].__setitem__(
     "decision", {"tier": "fallback", "outcome": "fallback", "reason": "the source failed its convention check"})])
@@ -522,6 +837,127 @@ must_pass("an official set without record_span", lambda d: d["stations"][0]["con
 must_pass("a reference station whose only sets have no constants (no recommended set)",
           lambda d: station(d, "OTC-EXAMPLE-0005").update(
               constant_sets=[fjord(d, "d"), fjord(d, "e")], recommended_set_id=None))
+
+# --- exact restricted TICON policy --------------------------------------------------------------
+
+
+
+
+def restricted_licence(d):
+    return next(lic for lic in d["licences"] if lic["licence_id"] == "ticon-4-bodc-restricted")
+
+
+def restricted_control(d):
+    if not any(lic["licence_id"] == "ticon-4-bodc-restricted" for lic in d["licences"]):
+        d["licences"].append(copy.deepcopy(RESTRICTED_POLICY))
+    cs = verified_analysis(d)
+    cs["licence_id"] = "ticon-4-bodc-restricted"
+    label_fallback(d, cs, "licence_reading")
+    return cs
+
+
+must_pass("restricted TICON analysis with exact policy row", restricted_control)
+must_fail("NOASSERTION on an ordinary licence",
+          lambda d: d["licences"][0].__setitem__("spdx", "NOASSERTION"))
+for field in ("spdx", "commercial_use", "restriction", "terms_url", "provider", "attribution"):
+    must_fail(f"restricted policy without {field}",
+              lambda d, f=field: [restricted_control(d), restricted_licence(d).pop(f)])
+for field in ("provider", "attribution", "restriction"):
+    must_fail(f"restricted policy with empty {field}",
+              lambda d, f=field: [restricted_control(d), restricted_licence(d).__setitem__(f, "")])
+for value in (None, "", "CC-BY-4.0", "CC-BY-NC-4.0", "LicenseRef-TICON-BODC"):
+    must_fail(f"restricted policy with wrong SPDX {value!r}",
+              lambda d, v=value: [restricted_control(d), restricted_licence(d).__setitem__("spdx", v)])
+must_fail("restricted policy promotes commercial use",
+          lambda d: [restricted_control(d), restricted_licence(d).__setitem__("commercial_use", True)])
+must_fail("restricted policy replaces the retained BODC terms",
+          lambda d: [restricted_control(d), restricted_licence(d).__setitem__("terms_url", "https://example.org/terms")])
+must_fail("restricted policy loses the actual consent condition",
+          lambda d: [restricted_control(d), restricted_licence(d).__setitem__("restriction", "Non-commercial use only.")])
+must_fail("restricted policy loses the original attribution and no-conclusion explanation",
+          lambda d: [restricted_control(d), restricted_licence(d).__setitem__("attribution", "TICON-4")])
+must_fail("restricted TICON set without its registered policy row",
+          lambda d: [restricted_control(d), d.__setitem__("licences", [
+              lic for lic in d["licences"] if lic["licence_id"] != "ticon-4-bodc-restricted"])])
+must_fail("restricted TICON source binding cannot name another source",
+          lambda d: restricted_control(d).__setitem__("source", "ticon"))
+must_fail("restricted TICON binding cannot name an OTC gauge fit",
+          lambda d: first_set(d).__setitem__("licence_id", "ticon-4-bodc-restricted"))
+must_fail("restricted TICON binding requires analysis",
+          lambda d: restricted_control(d).__setitem__("source_type", "model"))
+must_fail("restricted TICON binding requires the fallback label",
+          lambda d: restricted_control(d).pop("fallback"))
+must_fail("restricted TICON binding requires the matching fallback flag",
+          lambda d: no_flag(restricted_control(d), "fallback:licence_reading"))
+must_fail("restricted TICON binding cannot use another fallback reason",
+          lambda d: [restricted_control(d), no_flag(verified_analysis(d), "fallback:licence_reading"),
+                     label_fallback(d, verified_analysis(d), "refused_fit")])
+
+def cmems_licence(d):
+    return next(lic for lic in d["licences"] if lic["licence_id"] == "ticon-4-cmems-restricted")
+
+
+def cmems_control(d):
+    if not any(lic["licence_id"] == "ticon-4-cmems-restricted" for lic in d["licences"]):
+        d["licences"].append(copy.deepcopy(CMEMS_POLICY))
+    cs = verified_analysis(d)
+    cs["licence_id"] = "ticon-4-cmems-restricted"
+    label_fallback(d, cs, "licence_reading")
+    return cs
+
+
+def restricted_primary_control(d, control, reason, disputed):
+    cs = control(d)
+    no_flag(cs, "fallback:licence_reading")
+    if disputed:
+        cs["time_base"].update(code="disputed", reason="record-level evidence disagrees")
+        cs.setdefault("qc_flags", []).append({"flag": "time_base", "reason": "time base disputed"})
+    label_fallback(d, cs, reason)
+    return cs
+
+
+for label, control in (("BODC", restricted_control), ("CMEMS", cmems_control)):
+    must_pass(f"{label} restricted disputed analysis retains truthful primary reason",
+              lambda d, c=control: restricted_primary_control(d, c, "time_base_disputed", True))
+    must_pass(f"{label} restricted non-disputed analysis retains licence-reading primary reason", control)
+    must_fail(f"{label} non-disputed analysis cannot claim a time-base dispute",
+              lambda d, c=control: restricted_primary_control(d, c, "time_base_disputed", False))
+    for reason in ("licence_reading", "refused_fit", "time_base_unresolved", "reliability_withheld"):
+        must_fail(f"{label} restricted disputed analysis rejects primary {reason}",
+                  lambda d, c=control, r=reason: restricted_primary_control(d, c, r, True))
+    must_fail(f"{label} restricted disputed analysis needs its matching flag",
+              lambda d, c=control: no_flag(restricted_primary_control(d, c, "time_base_disputed", True),
+                                          "fallback:time_base_disputed"))
+    must_fail(f"{label} restricted disputed analysis cannot carry a conflicting licence-reading flag",
+              lambda d, c=control: restricted_primary_control(d, c, "time_base_disputed", True)["qc_flags"].append(
+                  {"flag": "fallback:licence_reading", "reason": "source restriction retained separately"}))
+
+for field in CMEMS_POLICY:
+    must_fail(f"CMEMS policy loses exact stored {field}",
+              lambda d, f=field: [cmems_control(d), cmems_licence(d).pop(f)])
+for field in ("provider", "citation", "attribution", "restriction", "terms_url", "url"):
+    must_fail(f"CMEMS policy replaces exact stored {field}",
+              lambda d, f=field: [cmems_control(d), cmems_licence(d).__setitem__(f, "changed")])
+for value in (None, "", "CC-BY-4.0", "CC-BY-NC-4.0", "LicenseRef-TICON-CMEMS"):
+    must_fail(f"CMEMS policy rejects wrong SPDX {value!r}",
+              lambda d, v=value: [cmems_control(d), cmems_licence(d).__setitem__("spdx", v)])
+must_fail("CMEMS policy cannot promote commercial use",
+          lambda d: [cmems_control(d), cmems_licence(d).__setitem__("commercial_use", True)])
+must_fail("CMEMS TICON binding needs its registered policy row",
+          lambda d: [cmems_control(d), d.__setitem__("licences", [
+              lic for lic in d["licences"] if lic["licence_id"] != "ticon-4-cmems-restricted"])])
+must_fail("CMEMS TICON binding cannot name another source",
+          lambda d: cmems_control(d).__setitem__("source", "ticon"))
+must_fail("CMEMS TICON binding cannot name a gauge fit",
+          lambda d: first_set(d).__setitem__("licence_id", "ticon-4-cmems-restricted"))
+must_fail("CMEMS TICON binding requires analysis",
+          lambda d: cmems_control(d).__setitem__("source_type", "model"))
+must_fail("CMEMS TICON binding requires fallback",
+          lambda d: cmems_control(d).pop("fallback"))
+must_fail("CMEMS TICON binding requires its matching licence-reading flag",
+          lambda d: no_flag(cmems_control(d), "fallback:licence_reading"))
+must_fail("NOASSERTION cannot name an unapproved restricted policy",
+          lambda d: [cmems_control(d), cmems_licence(d).__setitem__("licence_id", "ticon-4-other-restricted")])
 
 # Astronomical tables and datum fields.
 def no_astro_tables(d):
@@ -2093,3 +2529,223 @@ if datum_failures:
     print(f"FAIL: {len(datum_failures)} datum checks failed")
     sys.exit(1)
 print("ok: every datum check")
+
+
+# Actual original DMI20043 capture: metadata without invented fit fields.
+IDENTITY_DMI = json.loads(r"""
+{
+  "station_id": "OTC-a2722283",
+  "status": "active",
+  "name": "Hirtshals Havn II",
+  "country": "DNK",
+  "lat": 57.5951,
+  "lon": 9.9625,
+  "timezone": "Europe/Copenhagen",
+  "type": "reference",
+  "aliases": {
+    "dmi": "20043"
+  },
+  "recommended_set_id": null,
+  "constant_sets": [],
+  "source_records": [
+    {
+      "source": "dmi",
+      "source_version": "capture:aede9cfe9c3eb7ff8e336b936134b2bffcb2d5d720e1532b097a963297660b46",
+      "source_record_id": "20043",
+      "role": "gauge_station",
+      "disposition": "metadata_only",
+      "detail": "Original station metadata is cached; no acquired observations or actual fit outcome is recorded for this capture.",
+      "licence_id": "dmi-cc-by-4.0",
+      "published_set_ids": [],
+      "original_metadata": {
+        "source": "dmi",
+        "id": "dmi:20043",
+        "name": "Hirtshals Havn II",
+        "lat": 57.5951,
+        "lon": 9.9625,
+        "quantity": "water_level",
+        "kind": "gauge_station",
+        "country": "DNK",
+        "cached_obs": false
+      },
+      "provenance": {
+        "input_sha256": [
+          "aede9cfe9c3eb7ff8e336b936134b2bffcb2d5d720e1532b097a963297660b46"
+        ],
+        "inventory_sha256": "28c1d1391164a736add779dd92e61210fe2d0e633085a4e893d19fd379c9dcd1"
+      }
+    }
+  ]
+}
+""")
+
+def put_source_identity(doc, identity):
+    doc["stations"] = [st for st in doc["stations"] if st["station_id"] != identity["station_id"]]
+    doc["stations"].append(copy.deepcopy(identity))
+
+
+def real_dmi_identity(doc):
+    put_source_identity(doc, IDENTITY_DMI)
+    if not any(lic["licence_id"] == "dmi-cc-by-4.0" for lic in doc["licences"]):
+        doc["licences"].append(json.loads(r"""{"licence_id":"dmi-cc-by-4.0","spdx":"CC-BY-4.0","provider":"Danish Meteorological Institute (DMI)","attribution":"Contains data from the Danish Meteorological Institute (DMI), licensed under CC BY 4.0.","url":"https://www.dmi.dk/friedata/dokumentation/terms-of-use","commercial_use":true}"""))
+
+
+must_pass("actual DMI metadata-only identity without fit or constants", real_dmi_identity)
+
+
+def source_record(doc, station_id="OTC-a2722283"):
+    return station(doc, station_id)["source_records"][0]
+
+
+def raw_harmonics(doc):
+    return source_record(doc, "OTC-e00b60ee")["original_harmonics"]
+
+
+def source_reference_must_fail(label, mutate, expected):
+    doc = copy.deepcopy(example)
+    mutate(doc)
+    if not validator.is_valid(doc):
+        print(f"FAIL: semantic source control has an invalid schema shape: {label}")
+        sys.exit(1)
+    errors = problems(doc)
+    if not any(expected in error for error in errors):
+        print(f"FAIL: source semantic control did not reject {label}: {errors}")
+        sys.exit(1)
+    print(f"ok: rejected {label} by its source semantic rule")
+
+
+def unsupported_predictive(doc):
+    st = station(doc, "OTC-e00b60ee")
+    cs = copy.deepcopy(first_set(doc))
+    cs["set_id"] = "OTC-e00b60ee/unsupported-control"
+    cs["constituents"] = [{"name": "3L2", "source_name": "3L2", "speed_deg_per_hour": 1,
+                           "amplitude_m": 0.02864466, "phase_deg": 164.427813}]
+    st["constant_sets"] = [cs]
+    st["recommended_set_id"] = cs["set_id"]
+
+
+source_reference_must_fail("an unsupported original row with an invented predictive speed", unsupported_predictive,
+                           "unsupported original rows must not become predictive constituents")
+
+must_fail("an empty reference without source identities",
+          lambda d: station(d, "OTC-a2722283").pop("source_records"))
+must_fail("empty source identities", lambda d: station(d, "OTC-a2722283").__setitem__("source_records", []))
+must_fail("an identity-only reference with a recommendation",
+          lambda d: station(d, "OTC-a2722283").__setitem__("recommended_set_id", "missing-set"))
+must_fail("an identity-only reference marked as a numeric fallback",
+          lambda d: station(d, "OTC-a2722283").__setitem__("recommended_is_fallback", True))
+must_fail("an identity-only reference with a current bin",
+          lambda d: station(d, "OTC-a2722283").__setitem__("default_current_bin", 1))
+must_fail("an identity-only reference with subordinate offsets",
+          lambda d: station(d, "OTC-a2722283").__setitem__("subordinate_offsets", copy.deepcopy(station(d, "OTC-EXAMPLE-0007")["subordinate_offsets"])))
+must_fail("an identity-only reference with current offsets",
+          lambda d: station(d, "OTC-a2722283").__setitem__("current_offsets", copy.deepcopy(station(d, "OTC-EXAMPLE-0004")["current_offsets"])))
+must_fail("an identity with no original source id", lambda d: source_record(d).pop("source_record_id"))
+must_fail("a source record with an invented fit field", lambda d: source_record(d).__setitem__("good_hours", 0))
+must_fail("a source record with no input hashes", lambda d: source_record(d)["provenance"].__setitem__("input_sha256", []))
+must_fail("a source record with no pinned inventory", lambda d: source_record(d)["provenance"].pop("inventory_sha256"))
+must_fail("a source record with an unknown disposition", lambda d: source_record(d).__setitem__("disposition", "fit_unusable"))
+must_fail("a source record with an unknown role", lambda d: source_record(d).__setitem__("role", "otc_fit"))
+must_fail("restricted identity without applicable terms", lambda d: source_record(d, "OTC-215da48c").__setitem__("licence_id", None))
+must_fail("original harmonic material with unresolved permission", lambda d: source_record(d, "OTC-e00b60ee").__setitem__("licence_id", None))
+must_fail("original harmonics on a gauge rather than the actual harmonic-record role",
+          lambda d: source_record(d, "OTC-e00b60ee").__setitem__("role", "gauge_station"))
+must_fail("original harmonics from a different source", lambda d: source_record(d, "OTC-e00b60ee").__setitem__("source", "gesla"))
+must_fail("raw source material with a fabricated speed", lambda d: raw_harmonics(d).__setitem__("speed_deg_per_hour", 1))
+must_fail("lost original uncertainty column", lambda d: raw_harmonics(d)["columns"].remove("pha_std"))
+must_fail("lost original coefficient row", lambda d: raw_harmonics(d)["rows"].pop())
+must_fail("lost original string cell", lambda d: raw_harmonics(d)["rows"][0].pop())
+must_fail("an original amplitude normalized into a number", lambda d: raw_harmonics(d)["rows"][0].__setitem__(3, 0.0))
+must_fail("an original phase asserted as UTC", lambda d: raw_harmonics(d).__setitem__("phase_convention", "greenwich_utc"))
+must_fail("an unsupported annotation outside the raw rows", lambda d: raw_harmonics(d)["annotations"][0].__setitem__("row", 50))
+
+source_reference_must_fail("an unresolved applicable source licence",
+                           lambda d: source_record(d).__setitem__("licence_id", "missing"), "licence_id does not resolve")
+source_reference_must_fail("unresolved separately published source terms",
+                           lambda d: source_record(d).__setitem__("upstream_licence_id", "missing"), "upstream_licence_id does not resolve")
+source_reference_must_fail("restricted identity relabelled with commercial terms",
+                           lambda d: source_record(d, "OTC-215da48c").__setitem__("licence_id", "ticon-4"),
+                           "licence_restricted requires the actual noncommercial restriction and terms")
+source_reference_must_fail("a repeated original source tuple",
+                           lambda d: station(d, "OTC-a2722283")["source_records"].append(copy.deepcopy(source_record(d))),
+                           "duplicate source tuple")
+source_reference_must_fail("a source set link outside the station",
+                           lambda d: source_record(d, "OTC-e00b60ee")["published_set_ids"].append(first_set(d)["set_id"]),
+                           "published_set_ids must resolve at the same station")
+source_reference_must_fail("non-finite original numeric metadata",
+                           lambda d: source_record(d)["original_metadata"].__setitem__("lat", float("inf")),
+                           "original metadata numbers must be finite")
+source_reference_must_fail("an original row relabelled as another record",
+                           lambda d: raw_harmonics(d)["rows"][0].__setitem__(13, "another-record"),
+                           "original harmonic rows must retain this source_record_id")
+source_reference_must_fail("missing unsupported-definition labels", lambda d: raw_harmonics(d)["annotations"].pop(),
+                           "annotate exactly the original unsupported-definition rows once")
+source_reference_must_fail("a duplicated unsupported-definition label",
+                           lambda d: raw_harmonics(d)["annotations"].append(copy.deepcopy(raw_harmonics(d)["annotations"][0])),
+                           "annotate exactly the original unsupported-definition rows once")
+source_reference_must_fail("an unsupported label attached to a supported original row",
+                           lambda d: raw_harmonics(d)["annotations"][0].__setitem__("row", next(i for i, row in enumerate(raw_harmonics(d)["rows"]) if row[2] == "M2")),
+                           "annotate exactly the original unsupported-definition rows once")
+source_reference_must_fail("an altered native unsupported refusal",
+                           lambda d: raw_harmonics(d)["annotations"][0].__setitem__("detail", "invented definition available"),
+                           "unsupported annotation must retain the native refusal")
+
+
+def wrong_source_set(doc):
+    st = station(doc, "OTC-e00b60ee")
+    cs = copy.deepcopy(first_set(doc))
+    cs["set_id"] = "OTC-e00b60ee/wrong-source-control"
+    st["constant_sets"] = [cs]
+    st["recommended_set_id"] = cs["set_id"]
+    source_record(doc, "OTC-e00b60ee")["published_set_ids"] = [cs["set_id"]]
+
+
+def unsupported_definition(doc):
+    definition = copy.deepcopy(doc["constituents"][0])
+    definition["name"] = "3L2"
+    doc["constituents"].append(definition)
+
+
+def unsupported_astro(doc):
+    table = doc["astro_tables"][0]["constituents"]
+    table["3L2"] = copy.deepcopy(table["M2"])
+
+
+source_reference_must_fail("a same-station set from a different original source tuple", wrong_source_set,
+                           "published_set_ids must come from the original source tuple")
+source_reference_must_fail("a fabricated definition for an unsupported original row", unsupported_definition,
+                           "unsupported original rows must not create constituent definitions")
+source_reference_must_fail("a fabricated astro definition for an unsupported original row", unsupported_astro,
+                           "unsupported original rows must not create astro definitions")
+
+must_pass("unresolved identity terms without a coefficient payload", lambda d: source_record(d).__setitem__("licence_id", None))
+for disposition in ("not_fitted", "unavailable"):
+    must_pass(f"source identity disposition {disposition} without invented fit fields",
+              lambda d, value=disposition: source_record(d).__setitem__("disposition", value))
+print("ok: original source identities and harmonic rows remain separate from prediction")
+
+# Independent golden from the pinned original TICON CSV (cea4a8d1...), all 50 x 18 source strings.
+raw_rows = raw_harmonics(example)["rows"]
+raw_sha256 = hashlib.sha256(json.dumps(raw_rows, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
+if raw_sha256 != "e6a49362958bcc3ea9a4c0bda3b0076aec28ccaf93b54de8bba2781fb13c92a2":
+    print("FAIL: example.json changed the original San Felipe coefficient strings")
+    sys.exit(1)
+print("ok: all 900 original San Felipe string cells match the pinned source")
+
+doc = copy.deepcopy(example)
+extra_annotation = copy.deepcopy(raw_harmonics(doc)["annotations"][0])
+extra_annotation["row"] = 500
+raw_harmonics(doc)["annotations"].append(extra_annotation)
+if not any("annotation row must name an existing original row" in error for error in source_record_problems(doc)):
+    print("FAIL: the direct semantic checker ignored an out-of-bounds original-row annotation")
+    sys.exit(1)
+print("ok: direct source semantics reject an extra out-of-bounds original-row annotation")
+
+# Unknown country is explicit null; known alpha-3 strings retain their exact existing shape.
+must_pass("required country with unknown value null",
+          lambda d: d["stations"][0].__setitem__("country", None))
+must_fail("active station without required country",
+          lambda d: d["stations"][0].pop("country"))
+for invalid_country in ("", "us", "usa", "US", "USAA", "USA\n", 123, False):
+    must_fail(f"invalid country value {invalid_country!r}",
+              lambda d, value=invalid_country: d["stations"][0].__setitem__("country", value))
