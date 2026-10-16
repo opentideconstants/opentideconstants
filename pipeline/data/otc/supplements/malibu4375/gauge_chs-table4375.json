@@ -1,0 +1,81 @@
+{
+  "source": "chs-tide-current-tables",
+  "rows": [
+    {
+      "id": "4375",
+      "name": "Malibu Rapids (Princess Louisa Inlet)",
+      "lat": 50.166666666666664,
+      "lon": -123.85,
+      "country": "CAN",
+      "source_document": "Canadian Tide and Current Tables 2021 Volume 5",
+      "source_url": "https://publications.gc.ca/collections/collection_2021/mpo-dfo/Fs73-5-2021.pdf",
+      "source_edition_year": 2021,
+      "source_printed_page": 129,
+      "source_pdf_zero_based_page": 130,
+      "source_pdf_sha256": "b6e338f417c2b037b70b77b9274223ed27759993c6e14a0a4760c7b18d310fdb",
+      "retrieved_at_utc": "2026-10-16T01:07:02Z",
+      "original_identity": {
+        "index_number_as_printed": "4375",
+        "name": "Malibu Rapids",
+        "parent": "Princess Louisa Inlet",
+        "role": "Secondary current station",
+        "not_water_level_station_07860": true
+      },
+      "original_position": {
+        "latitude_as_printed": "50 10 N",
+        "longitude_as_printed": "123 51 W",
+        "resolution": "whole arcminutes",
+        "converted_latitude": 50.166666666666664,
+        "converted_longitude": -123.85
+      },
+      "rights_notice": {
+        "copyright_notice_printed_page": 121,
+        "copyright_notice_pdf_zero_based_page": 122,
+        "notice_fact": "Publication says written CHS permission must be obtained before reproducing any part.",
+        "copyright": "Fisheries and Oceans Canada 2021",
+        "permission_granted": false,
+        "ogl_grant_established": false,
+        "comparator_special_permission_established": false,
+        "qualification": "Factual notice only; no legal determination or permission inferred."
+      },
+      "limitations": [
+        "Historical 2021 edition; current applicability and numerical accuracy unestablished.",
+        "Whole-minute source position is approximate; decimals add no measured precision.",
+        "No harmonics, forecast timestamps, continuous speed curve, or IWLS/API current identity acquired.",
+        "Printed122 says a consistent speed-derivation method is not established for listed maximum-rate cases.",
+        "Do not conflate table current index4375 with Malibu Islet/Inner water-level records."
+      ],
+      "role": "secondary_current_station",
+      "prediction_capability": "none_implemented",
+      "upstream_harmonic_constants_acquired": false,
+      "slackwater_used_as_input": false,
+      "publication_tier": "fallback",
+      "quality_status": "unvalidated_historical_metadata",
+      "country_interpretation": {
+        "method": "Official BC geographical-name record identifies this rapids feature in British Columbia, Canada; assign ISO alpha-3 CAN. No coordinate substitution or water-level identity match.",
+        "resolved_country": "CAN",
+        "source_url": "https://apps.gov.bc.ca/pub/bcgnws/names/4664.html",
+        "source_response_sha256": "397d3853cae667d25f4cb188f1e1f2b41e2d19c6ffe944c457b75f92af813e23",
+        "retrieved_at_utc": "2026-10-16T01:13:45Z",
+        "coordinate_substitution": false
+      },
+      "payload_scope": "identity_and_provenance_only",
+      "unbundled_numeric_fields": [
+        "flood_direction_degrees_true",
+        "reference",
+        "reference_printed_pages",
+        "turn_to_flood_reference_event",
+        "turn_to_flood_lag_minutes",
+        "turn_to_ebb_reference_event",
+        "turn_to_ebb_lag_minutes",
+        "maximum_flood_knots",
+        "maximum_ebb_knots",
+        "maximum_rates_condition",
+        "maximum_flood_time_difference",
+        "maximum_ebb_time_difference",
+        "time_basis"
+      ],
+      "numeric_payload_status": "Private primary evidence only; no CHS table timing, direction or speed values bundled pending owner scope clarification."
+    }
+  ]
+}

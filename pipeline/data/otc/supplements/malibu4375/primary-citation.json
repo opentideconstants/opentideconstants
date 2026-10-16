@@ -1,0 +1,54 @@
+{
+  "document": "Canadian Tide and Current Tables 2021 Volume 5",
+  "publisher": "Canadian Hydrographic Service, Fisheries and Oceans Canada",
+  "url": "https://publications.gc.ca/collections/collection_2021/mpo-dfo/Fs73-5-2021.pdf",
+  "retrieved_at_utc": "2026-10-16T01:07:02Z",
+  "pdf_sha256": "b6e338f417c2b037b70b77b9274223ed27759993c6e14a0a4760c7b18d310fdb",
+  "edition": 2021,
+  "table": 4,
+  "printed_page": 129,
+  "pdf_zero_based_page": 130,
+  "visually_inspected": true,
+  "identity": {
+    "index_number_as_printed": "4375",
+    "name": "Malibu Rapids",
+    "parent": "Princess Louisa Inlet",
+    "role": "Secondary current station",
+    "not_water_level_station_07860": true
+  },
+  "position": {
+    "latitude_as_printed": "50 10 N",
+    "longitude_as_printed": "123 51 W",
+    "resolution": "whole arcminutes",
+    "converted_latitude": 50.166666666666664,
+    "converted_longitude": -123.85
+  },
+  "limitations": [
+    "Historical 2021 edition; current applicability and numerical accuracy unestablished.",
+    "Whole-minute source position is approximate; decimals add no measured precision.",
+    "No harmonics, forecast timestamps, continuous speed curve, or IWLS/API current identity acquired.",
+    "Printed122 says a consistent speed-derivation method is not established for listed maximum-rate cases.",
+    "Do not conflate table current index4375 with Malibu Islet/Inner water-level records."
+  ],
+  "rights": {
+    "copyright_notice_printed_page": 121,
+    "copyright_notice_pdf_zero_based_page": 122,
+    "notice_fact": "Publication says written CHS permission must be obtained before reproducing any part.",
+    "copyright": "Fisheries and Oceans Canada 2021",
+    "permission_granted": false,
+    "ogl_grant_established": false,
+    "comparator_special_permission_established": false,
+    "qualification": "Factual notice only; no legal determination or permission inferred."
+  },
+  "input_basis": "Independent official PDF only; no Slackwater input values.",
+  "country_evidence": {
+    "url": "https://apps.gov.bc.ca/pub/bcgnws/names/4664.html",
+    "status": "200",
+    "retrieved_at_utc": "2026-10-16T01:13:45Z",
+    "sha256": "397d3853cae667d25f4cb188f1e1f2b41e2d19c6ffe944c457b75f92af813e23",
+    "bytes": 9669,
+    "method": "Official BC geographical-name record identifies this rapids feature in British Columbia, Canada; assign ISO alpha-3 CAN. No coordinate substitution or water-level identity match.",
+    "resolved_country": "CAN"
+  },
+  "payload_scope": "Identity, position, source provenance and known rights notice only; numeric table facts remain private."
+}
