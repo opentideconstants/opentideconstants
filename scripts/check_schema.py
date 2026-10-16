@@ -1852,6 +1852,23 @@ datum_must_pass("a short own-month reduction (under 12 months, short_record)",
                                flags=["no_qualified_control", "short_record"])])
 datum_must_pass("datum.zero vertical_datum", lambda d: first_set(d)["datum"].__setitem__("zero", "vertical_datum"))
 
+DATUM_FALLBACK = {"reason": "datum_gate_failed", "basis": "Frozen harmonic extrema with tuning uncertainty",
+                  "otc_finding": "The complete datum gate has not passed; accuracy is not validated."}
+datum_must_pass("a computed datum with its own gate-failure fallback",
+                edit(noaa_on_first, "otc_lat", lambda b: b.__setitem__("fallback", copy.deepcopy(DATUM_FALLBACK))))
+datum_must_fail("a published datum with a computed fallback",
+                edit(noaa_on_first, "lat", lambda b: b.__setitem__("fallback", copy.deepcopy(DATUM_FALLBACK))),
+                basis_rule(r"dependentSchemas/fallback/"))
+datum_must_fail("an observed datum with a computed fallback",
+                edit(observed_on_a, "msl", lambda b: b.__setitem__("fallback", copy.deepcopy(DATUM_FALLBACK))),
+                basis_rule(r"dependentSchemas/fallback/"))
+datum_must_fail("a computed datum fallback with another reason",
+                edit(noaa_on_first, "otc_lat", lambda b: b.__setitem__("fallback", dict(DATUM_FALLBACK, reason="time_base_unresolved"))),
+                basis_rule(r"properties/fallback/"))
+datum_must_fail("a computed datum fallback without its finding",
+                edit(noaa_on_first, "otc_lat", lambda b: b.__setitem__("fallback", {k: v for k, v in DATUM_FALLBACK.items() if k != "otc_finding"})),
+                basis_rule(r"properties/fallback/"))
+
 # Must fail: each one change from a block that passes.
 datum_must_fail("named without basis (the shape of the earlier 1.0 schema: zero, chart_datum and named only)",
                 put(first_set, {"zero": "chart_datum", "chart_datum": "mllw", "named": {"mllw": 0.0, "msl": 1.554}}))

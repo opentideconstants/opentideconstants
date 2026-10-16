@@ -1881,8 +1881,16 @@
       "required": ["kind", "method"],
       "additionalProperties": false,
       "dependentRequired": { "uncertainty_m": ["uncertainty_basis"], "uncertainty_basis": ["uncertainty_m"] },
+      "dependentSchemas": { "fallback": { "properties": { "kind": { "const": "computed" } } } },
       "properties": {
         "kind": { "enum": ["published", "computed", "observed"] },
+        "fallback": {
+          "description": "A finding on this computed level only; the constant set and its published levels keep their own status.",
+          "allOf": [
+            { "$ref": "#/$defs/fallback" },
+            { "properties": { "reason": { "const": "datum_gate_failed" } } }
+          ]
+        },
         "method": {
           "description": "source: as published. harmonic_extremes: the lowest or highest height of the set's harmonic prediction over epoch. subordinate_offsets: the lowest or highest of the reference station's predicted extremes over epoch with the subordinate station's offsets applied. first_reduction: means over data_span with no control. Without the flag no_qualified_control it is a 19-year determination over the OTC datum epoch 2002-01-01 to 2020-12-31: the schema checks at least 216 months and the epoch dates; the release build checks that data_span is inside the epoch and that every calendar month counts in at least 17 of the 19 years (build check 14). With no_qualified_control it is an average over the record's own months (at most 228 months, and never with a primary's coverage), and its epoch equals its data_span (build check 14). standard, modified_range_ratio, direct: comparison with the control station on common tidal days (NOAA CO-OPS methods).",
           "enum": ["source", "harmonic_extremes", "subordinate_offsets", "first_reduction", "standard", "modified_range_ratio", "direct"]
