@@ -94,6 +94,7 @@ def derive_chart_datums(release: dict) -> dict:
     Mutates only missing chart_datum pointers. Gate-failed/unknown-quality fallback bases
     remain intact. Receipt counts places separately from sets; withheld counts are sets.
     Unresolved geographic conditions are unknown, including GBR without UK source facts.
+    Conflicting original COUNTRY identities leave new designations unresolved.
     """
     from otc_pipeline.lat_hat import low_water_suppressed
 
@@ -111,12 +112,16 @@ def derive_chart_datums(release: dict) -> dict:
             continue
         receipt["lat_places"] += 1
         metadata = [r.get("original_metadata", {}) for r in station.get("source_records", [])]
+        source_countries = {str(m.get("COUNTRY", "")).strip().upper() for m in metadata}
+        # Native COUNTRY identities are alpha-3; blank/unknown text asserts no country.
+        country_conflict = any(country != station.get("country") for country in source_countries
+                               if len(country) == 3 and country.isascii() and country.isalpha())
         country_rows = [r for r in table["rows"] if r["country_code"] == station.get("country")]
-        convention = next((r for r in country_rows if r["match"] == "country" or (
+        convention = next((r for r in country_rows if not country_conflict and (r["match"] == "country" or (
             r["match"] == "source_metadata" and any(
                 m.get("COUNTRY") == station.get("country") and any(
                     str(m.get(field, "")).strip().casefold() in values
-                    for field, values in r["metadata_any"].items()) for m in metadata))), None)
+                    for field, values in r["metadata_any"].items()) for m in metadata)))), None)
         tally = None
         if convention:
             receipt["matched_places"] += 1

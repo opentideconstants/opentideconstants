@@ -166,6 +166,17 @@ def test_unconditional_cited_country_rows_are_not_limited_to_uk_witnesses(countr
     assert station["constant_sets"][0]["datum"]["chart_datum"] == "lat"
 
 
+@pytest.mark.parametrize("country", ["GBR", "AUS", "FRA", "IND", "NZL", "ESP"])
+def test_conflicting_source_country_withholds_without_changing_source_identity(country):
+    station = chart_candidate(country)
+    station["source_records"].append({"source": "gesla", "original_metadata": {"COUNTRY": "KIR"}})
+    before = copy.deepcopy(station)
+    receipt = derive({"stations": [station]})
+    assert receipt["changed_places"] == 0
+    assert receipt["withheld"]["unknown_convention_or_area"] == 1
+    assert station == before
+
+
 @pytest.mark.parametrize("country", ["USA", "CAN", "BRA", "CHL", "ITA", "KOR", "SWE", "XXX",
                                      "NOR", "DEU", "NLD", "PNG", "SLB", "GBR"])
 def test_non_lat_or_unresolved_area_has_no_country_default(country):
