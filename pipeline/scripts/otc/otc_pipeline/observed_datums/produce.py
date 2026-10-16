@@ -698,38 +698,75 @@ def _reduction_worker(item: dict) -> tuple[dict, dict]:
     return reduce_profile(profile, primaries, cache)
 
 
-def reduction_results(index: list[dict], cache: Path, primaries: list[dict], workers: int):
-    """Bound both pending and completed results, yielding only original target order."""
+def reduction_results(index: list[dict], cache: Path, primaries: list[dict], workers: int, *, spool_parent: Path):
+    """Refill on completion; spool out-of-order payloads rather than block workers."""
+    from tempfile import TemporaryDirectory
+
     if workers == 1:
         for item in index:
             profile = read_checkpoint(cache, item["key"], item["job_sha256"], require_complete=True)
             yield reduce_profile(profile, primaries, cache)
         return
     prior_children = {child.pid for child in multiprocessing.active_children()}
-    executor = ProcessPoolExecutor(max_workers=workers, mp_context=multiprocessing.get_context("spawn"),
-        initializer=_initialize_reduction_worker, initargs=(cache, primaries))
-    pending = []
-    try:
-        for item in index:
-            pending.append(executor.submit(_reduction_worker, item))
-            if len(pending) >= workers:
-                yield pending.pop(0).result()
-        while pending:
-            yield pending.pop(0).result()
-    except BaseException:
-        for future in pending:
-            future.cancel()
-        children = [child for child in multiprocessing.active_children() if child.pid not in prior_children]
-        for child in children:
-            child.terminate()
-        for child in children:
-            child.join(timeout=5)
-            if child.is_alive():
-                child.kill()
-                child.join()
-        raise
-    finally:
-        executor.shutdown(wait=True, cancel_futures=True)
+    # Every attempt gets a fresh namespace: interrupted/foreign spools are never hits.
+    with TemporaryDirectory(prefix=".reduction-", dir=spool_parent) as directory:
+        spool = Path(directory)
+        executor = ProcessPoolExecutor(max_workers=workers, mp_context=multiprocessing.get_context("spawn"),
+            initializer=_initialize_reduction_worker, initargs=(cache, primaries))
+        pending, completed = {}, {}
+        jobs = iter(enumerate(index))
+
+        def submit_one():
+            try:
+                position, item = next(jobs)
+            except StopIteration:
+                return
+            pending[executor.submit(_reduction_worker, item)] = position
+
+        try:
+            for _ in range(workers):
+                submit_one()
+            emitted = 0
+            while pending or completed:
+                if pending:
+                    done, _ = wait(pending, timeout=0 if emitted in completed else None,
+                                   return_when=FIRST_COMPLETED)
+                    while done:
+                        future = done.pop()
+                        position = pending.pop(future)
+                        row, detail = future.result()
+                        path = spool / f"{position}.json"
+                        write_json(path, {"position": position, "job_sha256": index[position]["job_sha256"],
+                                          "row": row, "detail": detail})
+                        completed[position] = sha256(path)
+                        del row, detail, future
+                        submit_one()
+                if emitted in completed:
+                    path = spool / f"{emitted}.json"
+                    if sha256(path) != completed.pop(emitted):
+                        raise ValueError(f"reduction spool artifact changed: {emitted}")
+                    payload = json.loads(path.read_text())
+                    if (payload["position"] != emitted or payload["job_sha256"] != index[emitted]["job_sha256"] or
+                            payload["row"]["set_id"] != index[emitted]["set_id"]):
+                        raise ValueError(f"reduction spool source identity mismatch: {emitted}")
+                    path.unlink()
+                    yield payload["row"], payload["detail"]
+                    del payload
+                    emitted += 1
+        except BaseException:
+            for future in pending:
+                future.cancel()
+            children = [child for child in multiprocessing.active_children() if child.pid not in prior_children]
+            for child in children:
+                child.terminate()
+            for child in children:
+                child.join(timeout=5)
+                if child.is_alive():
+                    child.kill()
+                    child.join()
+            raise
+        finally:
+            executor.shutdown(wait=True, cancel_futures=True)
 
 
 def produce(release_path: Path, gesla_root: Path, fit_run: Path, tcd: Path, out: Path, *, resume: bool = False,
@@ -861,7 +898,7 @@ def _produce(release_path: Path, gesla_root: Path, fit_run: Path, tcd: Path, out
     with draft_temp.open("w") as drafts, report_temp.open("w") as records:
         prefix = json.dumps(report, sort_keys=True, allow_nan=False)
         records.write(prefix[:-1] + ', "records": [')
-        for position, (row, detail) in enumerate(reduction_results(index, cache, primaries, workers)):
+        for position, (row, detail) in enumerate(reduction_results(index, cache, primaries, workers, spool_parent=out)):
             drafts.write(json.dumps(row, sort_keys=True, allow_nan=False) + "\n")
             if position:
                 records.write(",\n")

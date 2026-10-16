@@ -249,13 +249,19 @@ def test_actual_measured_input_authentication_and_negative_controls(tmp_path, mo
     print("real frozen authentication PASS; changed source/code/dependency, corrupt/missing/partial checkpoints REFUSED")
 
 
-def test_actual_cached_serial_and_four_reductions_are_exact(cached_control_profiles, monkeypatch):
+def test_actual_cached_serial_and_four_reductions_are_exact(cached_control_profiles, monkeypatch, tmp_path):
     p = producer()
     cache, targets, primaries, run = cached_control_profiles
     selected = {target["cs"]["set_id"] for target in targets.values()}
     index = [item for item in run["targets"] if item["set_id"] in selected]
-    serial = list(p.reduction_results(index, cache, primaries, 1))
-    parallel = list(p.reduction_results(index, cache, primaries, 4))
+    serial = list(p.reduction_results(index, cache, primaries, 1, spool_parent=tmp_path))
+    stale = tmp_path / ".reduction-stale"
+    stale.mkdir()
+    (stale / "0.json").write_text("foreign result")
+    (stale / "1.json.part").write_text("partial result")
+    parallel = list(p.reduction_results(index, cache, primaries, 4, spool_parent=tmp_path))
+    assert list(tmp_path.iterdir()) == [stale]
+    assert (stale / "0.json").read_text() == "foreign result"
     assert len(serial) == len(parallel) == 4
     assert json.dumps(serial, sort_keys=True, allow_nan=False) == json.dumps(parallel, sort_keys=True, allow_nan=False)
     assert [row["set_id"] for row, _ in parallel] == [item["set_id"] for item in index]
