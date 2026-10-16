@@ -245,8 +245,13 @@ def test_engine_input_flood_sign(fetched):
 
 
 def _has_engine() -> bool:
+    if "OTC_ENGINE_WORKTREE" in os.environ:
+        return True  # An explicit profile must run: invalid configuration is a failure, not a skip.
+    engine_worktree = current_proof.WEBCALTIDES.resolve()
+    if not all((engine_worktree / path).is_file() for path in
+               ("Gemfile", "lib/harmonics_engine.rb", "clients/harmonics.rb")):
+        return False
     try:
-        engine_worktree = Path(os.environ.get("OTC_ENGINE_WORKTREE", current_proof.WEBCALTIDES)).resolve()
         return subprocess.run(["bundle", "exec", "ruby", "-e", "require 'tcd'"], cwd=engine_worktree,
                               env={**os.environ, "BUNDLE_GEMFILE": str(engine_worktree / "Gemfile")},
                               capture_output=True).returncode == 0
@@ -267,7 +272,7 @@ def test_engine_rejects_invalid_explicit_checkout(tmp_path, monkeypatch):
         current_proof.run_engine({}, tmp_path)
 
 
-@pytest.mark.skipif(not _has_engine(), reason="needs the webcaltides Ruby bundle (tcd gem)")
+@pytest.mark.skipif(not _has_engine(), reason="needs the external WebCalTides engine profile")
 @pytest.mark.parametrize("station,bin_,drop,ok", [
     ("ACT1616", 1, None, True), ("ACT1616", 1, "mean", False),
     ("BOS1101", 1, None, True), ("BOS1101", 1, "bins", False),
