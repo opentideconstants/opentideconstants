@@ -1,0 +1,1108 @@
+"""Tests for the OTC release writer and validator (format 1.0).
+
+The example document is the site repo's src/schema/example.json, copied at the
+pinned commit by sync_schema.sh.
+"""
+import copy
+import csv
+import gzip
+import hashlib
+import io
+import json
+import os
+import stat
+import time
+from datetime import date
+from pathlib import Path
+
+import pyarrow.parquet as pq
+import pytest
+from jsonschema import Draft202012Validator
+
+import otc_pipeline.release_writer as rw
+from otc_pipeline.astro_tables import load_congen_run
+from otc_pipeline.release_writer import (
+    CSV_COLUMNS,
+    check_release_dir,
+    main,
+    next_datestamp,
+    validate_release,
+    write_release,
+)
+
+HERE = Path(__file__).resolve().parent
+SCHEMA = HERE.parent / "schema" / "otc-1.0.schema.json"
+EXAMPLE = HERE / "fixtures" / "example-1.0.json"
+D = "20991231"
+
+
+@pytest.fixture
+def release():
+    return json.loads(EXAMPLE.read_text())
+
+
+def first_set(doc):
+    return doc["stations"][0]["constant_sets"][0]
+
+
+def write(release, out_dir, datestamp=D, **kw):
+    kw.setdefault("app_export", None)
+    kw.setdefault("congen_run", None)   # the schema example and fixtures: not a release build's tables
+    return write_release(release, out_dir, datestamp=datestamp, **kw)
+
+
+# --- validate_release -------------------------------------------------------
+
+def test_example_is_valid(release):
+    assert validate_release(release) == []
+
+
+@pytest.mark.parametrize("real_env,sid,set_id,policy_id", [
+    ("OTC_FALLBACK_REAL_RELEASE", "OTC-000cb5d3",
+     "OTC-000cb5d3/ticon-4/funafuti-67440-tuv-bom", None),
+    ("OTC_FB_LIC_REAL_RELEASE", "OTC-666303b1",
+     "OTC-666303b1/ticon-4/aberdeen-abe-gbr-cmems", "ticon-4-bodc-restricted"),
+], ids=["labelled-fallback", "restricted-ticon"])
+def test_fallback_real_release_roundtrip(tmp_path, real_env, sid, set_id, policy_id):
+    real_path = os.environ.get(real_env)
+    report_path = os.environ.get("OTC_FALLBACK_BUILD_REPORT")
+    if not real_path or not report_path:
+        pytest.skip("requires the pinned actual build evidence")
+    doc = json.loads(Path(real_path).read_text())
+    report = json.loads(Path(report_path).read_text())
+    run = load_congen_run(
+        Path(report["provenance"]["congen_run"]["path"]),
+        tcd_sha256=report["provenance"]["otc_tcd"]["sha256"],
+    )
+    assert validate_release(doc) == []
+    paths = write_release(doc, tmp_path, datestamp=doc["release"]["datestamp"],
+                          congen_run=run, app_export=None, parquet=True, jsonl_gz=True)
+    stem = "OTC_" + doc["release"]["datestamp"]
+    expected_st = _station(doc, sid)
+    expected_cs = next(c for c in expected_st["constant_sets"] if c["set_id"] == set_id)
+    policy = next(row for row in doc["licences"] if row["licence_id"] == expected_cs["licence_id"])
+    if policy_id is not None:
+        assert policy["licence_id"] == policy_id
+        assert policy["spdx"] == "NOASSERTION"
+        assert policy["commercial_use"] is False
+        assert "prior consent from BODC" in policy["restriction"]
+        assert policy["terms_url"] == "https://www.bodc.ac.uk/data/documents/nodb/267795/"
+        assert "OTC does not conclude a combined licence" in policy["attribution"]
+        m2 = next(c for c in expected_cs["constituents"] if c["name"] == "M2")
+        assert m2["amplitude_m"] == 1.291621
+        assert m2["phase_deg"] == 24.543287
+    for suffix in (".json", ".json.gz", ".jsonl", ".jsonl.gz"):
+        raw = (tmp_path / (stem + suffix)).read_bytes()
+        if suffix.endswith(".gz"):
+            raw = gzip.decompress(raw)
+        if ".jsonl" in suffix:
+            stations = [json.loads(line) for line in raw.splitlines()]
+        else:
+            back = json.loads(raw)
+            assert back == doc
+            stations = back["stations"]
+        assert stations == doc["stations"]
+        st = next(s for s in stations if s["station_id"] == sid)
+        cs = next(c for c in st["constant_sets"] if c["set_id"] == set_id)
+        assert st.get("recommended_is_fallback") == expected_st.get("recommended_is_fallback")
+        assert cs == expected_cs
+    with (tmp_path / (stem + ".csv")).open(newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    parquet_rows = pq.read_table(tmp_path / (stem + ".parquet")).to_pylist()
+    for table_rows, missing in ((rows, ""), (parquet_rows, None)):
+        st = next(r for r in table_rows if r["record_type"] == "station" and r["station_id"] == sid)
+        cs = next(r for r in table_rows if r["record_type"] == "constant_set" and r["set_id"] == set_id)
+        assert st["recommended_is_fallback"] == ("true" if expected_st.get("recommended_is_fallback") else missing)
+        assert cs["commercial_use"] == ("true" if policy["commercial_use"] else "false")
+        assert json.loads(cs["fallback"]) == expected_cs["fallback"]
+        assert json.loads(cs["qc_flags"]) == expected_cs["qc_flags"]
+        assert cs["licence_id"] == expected_cs["licence_id"]
+        assert cs["source_record_id"] == expected_cs["source_record_id"]
+        assert json.loads(cs["time_base"]) == expected_cs["time_base"]
+        assert json.loads(cs["provenance"]) == expected_cs["provenance"]
+        for edge in ("start", "end"):
+            assert cs["record_span_" + edge] == expected_cs["record_span"][edge]
+        expected_m2 = next(c for c in expected_cs["constituents"] if c["name"] == "M2")
+        m2_row = next(r for r in table_rows if r["record_type"] == "constituent"
+                      and r["set_id"] == set_id and r["name"] == "M2")
+        for key in ("amplitude_m", "phase_deg", "speed_deg_per_hour"):
+            assert float(m2_row[key]) == expected_m2[key]
+    meta = json.loads((tmp_path / (stem + ".meta.json")).read_text())
+    assert meta == {k: v for k, v in doc.items() if k != "stations"}
+    assert check_release_dir(tmp_path) == []
+    assert any(p.suffix == ".parquet" for p in paths)
+
+
+def _fallback_station(release):
+    st = release["stations"][0]
+    cs = st["constant_sets"][0]
+    cs["fallback"] = {"reason": "refused_fit", "basis": "retained fitted values",
+                      "otc_finding": "illustrative quality refusal",
+                      "preferred_set_id": st["constant_sets"][1]["set_id"]}
+    cs["qc_status"] = "flagged"
+    cs.setdefault("qc_flags", []).append({"flag": "fallback:refused_fit", "reason": "quality refusal"})
+    st["recommended_set_id"] = cs["set_id"]
+    st["recommended_is_fallback"] = True
+    return st, cs
+
+
+@pytest.mark.parametrize("preferred", ["OTC-EXAMPLE-0003/gesla-fit", "OTC-X/absent", "self"])
+def test_fallback_preferred_set_must_be_same_station_and_non_fallback(release, preferred):
+    st, cs = _fallback_station(release)
+    cs["fallback"]["preferred_set_id"] = cs["set_id"] if preferred == "self" else preferred
+    errors = validate_release(release)
+    assert any("preferred_set_id" in e and "non-fallback set of this station" in e for e in errors), errors
+
+
+@pytest.mark.parametrize("marker", [None, False])
+def test_fallback_recommendation_requires_true_marker(release, marker):
+    st, _cs = _fallback_station(release)
+    if marker is None:
+        st.pop("recommended_is_fallback")
+    else:
+        st["recommended_is_fallback"] = marker
+    errors = validate_release(release)
+    assert any("recommended_is_fallback must be true" in e for e in errors), errors
+
+
+@pytest.mark.parametrize("marker", [True, False])
+def test_normal_recommendation_requires_absent_marker(release, marker):
+    release["stations"][0]["recommended_is_fallback"] = marker
+    errors = validate_release(release)
+    assert any("recommended_is_fallback must be omitted" in e for e in errors), errors
+
+
+def test_fallback_semantics_does_not_rerank_or_mutate(release):
+    _fallback_station(release)
+    original = copy.deepcopy(release)
+    assert validate_release(release) == []
+    assert release == original
+
+
+@pytest.fixture(scope="module")
+def real_source_records():
+    real_path = os.environ.get("OTC_SOURCE_RECORDS_REAL_RELEASE")
+    report_path = os.environ.get("OTC_FALLBACK_BUILD_REPORT")
+    csv_path = os.environ.get("OTC_SOURCE_RECORDS_TICON_CSV")
+    if not real_path or not report_path or not csv_path:
+        pytest.skip("requires the pinned real source-record release, build and CSV evidence")
+    doc = json.loads(Path(real_path).read_text())
+    report = json.loads(Path(report_path).read_text())
+    run = load_congen_run(Path(report["provenance"]["congen_run"]["path"]),
+                          tcd_sha256=report["provenance"]["otc_tcd"]["sha256"])
+    ids = {sr["source_record_id"] for st in doc["stations"] for sr in st.get("source_records", [])
+           if "original_harmonics" in sr}
+    assert len(ids) >= 3, "the local proof requires three actual original TICON records"
+    originals = {record_id: [] for record_id in ids}
+    with Path(csv_path).open(newline="") as handle:
+        reader = csv.DictReader(handle)
+        columns = reader.fieldnames
+        assert columns is not None
+        for row in reader:
+            if row["tide_gauge_name"] in originals:
+                originals[row["tide_gauge_name"]].append([row[key] for key in columns])
+    return doc, run, columns, originals
+
+
+def _assert_original_source_rows(stations, columns, originals):
+    checked = set()
+    for st in stations:
+        for sr in st.get("source_records", []):
+            raw = sr.get("original_harmonics")
+            if raw is None:
+                continue
+            record_id = sr["source_record_id"]
+            assert raw["columns"] == columns
+            assert len(raw["rows"]) == 50
+            assert raw["rows"] == originals[record_id]
+            assert all(len(row) == 18 and all(isinstance(cell, str) for cell in row) for row in raw["rows"])
+            checked.add(record_id)
+    assert checked == set(originals)
+
+
+def test_source_records_real_release_roundtrip(real_source_records, tmp_path):
+    doc, run, columns, originals = real_source_records
+    _assert_original_source_rows(doc["stations"], columns, originals)
+    assert validate_release(doc) == []
+    started = time.perf_counter()
+    paths = write_release(doc, tmp_path, datestamp=doc["release"]["datestamp"],
+                          congen_run=run, app_export=None, parquet=True, jsonl_gz=True)
+    stem = "OTC_" + doc["release"]["datestamp"]
+    for suffix in (".json", ".json.gz", ".jsonl", ".jsonl.gz"):
+        raw = (tmp_path / (stem + suffix)).read_bytes()
+        if suffix.endswith(".gz"):
+            raw = gzip.decompress(raw)
+        if ".jsonl" in suffix:
+            stations = [json.loads(line) for line in raw.splitlines()]
+        else:
+            back = json.loads(raw)
+            assert back == doc
+            stations = back["stations"]
+        assert stations == doc["stations"]
+        _assert_original_source_rows(stations, columns, originals)
+    expected = {st["station_id"]: st.get("source_records") for st in doc["stations"] if st["status"] == "active"}
+    with (tmp_path / (stem + ".csv")).open(newline="") as handle:
+        csv_stations = [row for row in csv.DictReader(handle) if row["record_type"] == "station"]
+    parquet_rows = pq.read_table(tmp_path / (stem + ".parquet"),
+                                 columns=["record_type", "station_id", "source_records"]).to_pylist()
+    parquet_stations = [row for row in parquet_rows if row["record_type"] == "station"]
+    for rows, omitted in ((csv_stations, ""), (parquet_stations, None)):
+        assert {row["station_id"] for row in rows} == set(expected)
+        reconstructed = []
+        for row in rows:
+            wanted = expected[row["station_id"]]
+            if wanted is None:
+                assert row["source_records"] == omitted
+            else:
+                restored = json.loads(row["source_records"])
+                assert restored == wanted
+                reconstructed.append({"source_records": restored})
+        _assert_original_source_rows(reconstructed, columns, originals)
+    csv_payloads = {row["station_id"]: row["source_records"] for row in csv_stations}
+    for row in parquet_stations:
+        if row["source_records"] is not None:
+            assert row["source_records"].encode("utf-8") == csv_payloads[row["station_id"]].encode("utf-8")
+    meta = json.loads((tmp_path / (stem + ".meta.json")).read_text())
+    assert meta == {key: value for key, value in doc.items() if key != "stations"}
+    for policy_id in ("ticon-4-bodc-restricted", "ticon-4-cmems-restricted"):
+        row = next(lic for lic in meta["licences"] if lic["licence_id"] == policy_id)
+        assert row["spdx"] == "NOASSERTION" and row["commercial_use"] is False
+    assert check_release_dir(tmp_path) == []
+    print(json.dumps({"write_and_roundtrip_seconds": time.perf_counter() - started,
+                      "raw_records": len(originals), "raw_rows": sum(map(len, originals.values())),
+                      "source_records_column": "source_records", "bytes": {p.name: p.stat().st_size for p in paths}}))
+
+
+def test_original_rows_cannot_be_changed_or_predictive(real_source_records):
+    doc, _run, columns, originals = real_source_records
+    actual = _station(doc, "OTC-e00b60ee")
+    record_id = actual["source_records"][0]["source_record_id"]
+    one_original = {record_id: originals[record_id]}
+    _assert_original_source_rows([actual], columns, one_original)
+    changed = copy.deepcopy(actual)
+    rows = changed["source_records"][0]["original_harmonics"]["rows"]
+    t3 = next(row for row in rows if row[2] == "T3")
+    assert t3[4] == "-16.80374"
+    t3[4] = str(float(t3[4]) % 360)
+    with pytest.raises(AssertionError):
+        _assert_original_source_rows([changed], columns, one_original)
+    for speed in (None, 1.0):
+        subset = dict(doc, stations=[copy.deepcopy(actual)])
+        invented = {"name": "3L2", "amplitude_m": 0.1, "phase_deg": 0.0}
+        if speed is not None:
+            invented["speed_deg_per_hour"] = speed
+        subset["stations"][0]["constant_sets"][0]["constituents"].append(invented)
+        errors = validate_release(subset)
+        assert any("3L2" in error and ("table" in error or "unsupported" in error) for error in errors), errors
+
+
+@pytest.mark.parametrize("change,needle", [
+    ("duplicate", "duplicate source tuple"),
+    ("unknown_licence", "licence_id does not resolve"),
+    ("unknown_set", "published_set_ids must resolve"),
+    ("wrong_source_set", "original source tuple"),
+    ("annotation_bound", "annotation index"),
+    ("annotation_duplicate", "annotate exactly"),
+    ("annotation_detail", "native refusal"),
+    ("wrong_original_id", "retain this source_record_id"),
+    ("unsupported_predictive", "unsupported original rows"),
+])
+def test_source_record_semantic_negative_controls(real_source_records, change, needle):
+    doc, _run, _columns, _originals = real_source_records
+    st = copy.deepcopy(_station(doc, "OTC-e00b60ee"))
+    subset = dict(doc, stations=[st])
+    sr = st["source_records"][0]
+    raw = sr["original_harmonics"]
+    if change == "duplicate":
+        st["source_records"].append(copy.deepcopy(sr))
+    elif change == "unknown_licence":
+        sr["licence_id"] = "not-known"
+    elif change == "unknown_set":
+        sr["published_set_ids"] = ["OTC-unknown/set"]
+    elif change == "wrong_source_set":
+        sr["published_set_ids"] = [st["constant_sets"][0]["set_id"]]
+    elif change == "annotation_bound":
+        raw["annotations"].append(dict(raw["annotations"][0], row=500))
+    elif change == "annotation_duplicate":
+        raw["annotations"].append(copy.deepcopy(raw["annotations"][0]))
+    elif change == "annotation_detail":
+        raw["annotations"][0]["detail"] = "an altered original refusal"
+    elif change == "wrong_original_id":
+        raw["rows"][0][13] = "a-different-upstream-id"
+    else:
+        st["constant_sets"][0]["constituents"][0]["source_name"] = "3L2"
+    errors = validate_release(subset)
+    assert any(needle in error for error in errors), errors
+
+
+def test_missing_convention_id_is_rejected(release):
+    first_set(release).pop("convention_id")
+    errors = validate_release(release)
+    assert any("convention_id" in e for e in errors), errors
+
+
+@pytest.mark.parametrize("label, mutate, needle", [
+    ("unknown convention_id",
+     lambda d: first_set(d).__setitem__("convention_id", "nope"), "convention_id 'nope'"),
+    ("unknown licence_id",
+     lambda d: first_set(d).__setitem__("licence_id", "nope"), "licence_id 'nope'"),
+    ("recommended_set_id not a set of the station",
+     lambda d: d["stations"][0].__setitem__("recommended_set_id", "OTC-X/none"), "recommended_set_id"),
+    ("null recommended_set_id on a reference station",
+     lambda d: d["stations"][0].__setitem__("recommended_set_id", None),
+     "is null but the station is not subordinate"),
+    ("subordinate offsets to an unknown station",
+     lambda d: d["stations"][0].__setitem__(
+         "subordinate_offsets", {"reference_station_id": "OTC-NOPE", "height_adjusted_type": "R"}),
+     "reference_station_id"),
+    ("subordinate offsets to a removed station",
+     lambda d: d["stations"][0].__setitem__(
+         "subordinate_offsets", {"reference_station_id": "OTC-EXAMPLE-0002", "height_adjusted_type": "R"}),
+     "reference_station_id"),
+    ("offset licence_id unknown",
+     lambda d: d["stations"][0].__setitem__(
+         "subordinate_offsets", {"reference_station_id": "OTC-EXAMPLE-0001",
+                                 "height_adjusted_type": "R", "licence_id": "nope"}),
+     "licence_id 'nope'"),
+    ("constituent not in the release table",
+     lambda d: first_set(d)["constituents"][0].__setitem__("name", "Q1"), "Q1"),
+    ("duplicate constituent in one set",
+     lambda d: first_set(d)["constituents"].append(copy.deepcopy(first_set(d)["constituents"][0])),
+     "duplicate constituent"),
+    ("validation for a set the station does not have",
+     lambda d: d["stations"][0]["validation"][0].__setitem__("set_id", "OTC-X/none"), "validation"),
+    ("duplicate station_id",
+     lambda d: d["stations"].append(copy.deepcopy(d["stations"][1])), "duplicate station_id"),
+    ("duplicate set_id",
+     lambda d: d["stations"][0]["constant_sets"][1].__setitem__("set_id", first_set(d)["set_id"]),
+     "duplicate set_id"),
+    ("duplicate convention definition",
+     lambda d: d["conventions"].append(copy.deepcopy(d["conventions"][0])), "duplicate convention_id"),
+    ("duplicate licence definition",
+     lambda d: d["licences"].append(copy.deepcopy(d["licences"][0])), "duplicate licence_id"),
+    ("duplicate constituent table row",
+     lambda d: d["constituents"].append(copy.deepcopy(d["constituents"][0])), "duplicate constituent table"),
+    ("constituent name of 16 characters",
+     lambda d: first_set(d)["constituents"][0].__setitem__("name", "M" * 16), "too long"),
+    ("constituent source_name of 32 characters",
+     lambda d: first_set(d)["constituents"][0].__setitem__("source_name", "x" * 32), "too long"),
+    ("bad created date-time",
+     lambda d: d["release"].__setitem__("created", "yesterday"), "date-time"),
+    ("local convention without utc_offset_hours",
+     lambda d: d["conventions"][1].pop("utc_offset_hours"), "utc_offset_hours"),
+])
+def test_negative_controls(release, label, mutate, needle):
+    mutate(release)
+    errors = validate_release(release)
+    assert any(needle in e for e in errors), f"{label}: {errors}"
+
+
+def test_alias_reused_by_another_station_is_rejected(release):
+    twin = copy.deepcopy(release["stations"][0])
+    twin["station_id"] = "OTC-EXAMPLE-0099"
+    for s in twin["constant_sets"]:
+        s["set_id"] = s["set_id"].replace("0001", "0003")
+    twin["recommended_set_id"] = twin["recommended_set_id"].replace("0001", "0003")
+    for v in twin["validation"]:
+        v["set_id"] = v["set_id"].replace("0001", "0003")
+    release["stations"].append(twin)
+    errors = validate_release(release)
+    assert "duplicate alias kartverket:EXA (OTC-EXAMPLE-0001, OTC-EXAMPLE-0099)" in errors
+    assert "duplicate alias gesla:example-file-id (OTC-EXAMPLE-0001, OTC-EXAMPLE-0099)" in errors
+
+
+def test_alias_in_two_systems_is_allowed(release):
+    release["stations"][0]["aliases"]["xtide"] = "EXA"
+    assert validate_release(release) == []
+
+
+def test_subordinate_station_with_null_recommended_set(release):
+    sub = {
+        "station_id": "OTC-TEST-0914", "status": "active", "name": "Sub", "country": "NOR",
+        "lat": 60.1, "lon": 5.1, "timezone": "Europe/Oslo", "type": "subordinate",
+        "recommended_set_id": None, "constant_sets": [],
+        "subordinate_offsets": {"reference_station_id": "OTC-EXAMPLE-0001", "height_adjusted_type": "R",
+                                "time_offset_high_min": 5, "height_offset_high": 1.1, "licence_id": "kartverket"},
+    }
+    release["stations"].append(sub)
+    assert validate_release(release) == []
+
+
+# --- next_datestamp ---------------------------------------------------------
+
+def test_next_datestamp_empty_dir(tmp_path):
+    assert next_datestamp(tmp_path, date(2026, 10, 8)) == "20261008"
+
+
+def test_next_datestamp_missing_dir(tmp_path):
+    assert next_datestamp(tmp_path / "nope", date(2026, 10, 8)) == "20261008"
+
+
+def test_next_datestamp_counts_up(tmp_path):
+    (tmp_path / "OTC_20261008.json").write_text("{}")
+    assert next_datestamp(tmp_path, date(2026, 10, 8)) == "20261008.2"
+    (tmp_path / "OTC_20261008.2.sha256").write_text("")
+    assert next_datestamp(tmp_path, date(2026, 10, 8)) == "20261008.3"
+    (tmp_path / "OTC_20261008.10.csv").write_text("")
+    assert next_datestamp(tmp_path, date(2026, 10, 8)) == "20261008.11"
+
+
+def test_next_datestamp_ignores_other_days_and_files(tmp_path):
+    (tmp_path / "OTC_20261007.json").write_text("{}")
+    (tmp_path / "OTC_latest.json").write_text("{}")
+    (tmp_path / "OTC_202610081.json").write_text("{}")
+    assert next_datestamp(tmp_path, date(2026, 10, 8)) == "20261008"
+
+
+def test_next_datestamp_any_file_of_the_stem_counts(tmp_path):
+    (tmp_path / "OTC_20261008.app.json").write_text("[]")
+    assert next_datestamp(tmp_path, date(2026, 10, 8)) == "20261008.2"
+
+
+# --- write_release ------------------------------------------------------------
+
+def test_write_refuses_invalid_release(release, tmp_path):
+    first_set(release).pop("convention_id")
+    with pytest.raises(ValueError, match="convention_id"):
+        write(release, tmp_path)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_write_refuses_datestamp_mismatch(release, tmp_path):
+    with pytest.raises(ValueError, match="datestamp"):
+        write(release, tmp_path, datestamp="20991230")
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_write_refuses_existing_stem(release, tmp_path):
+    (tmp_path / f"OTC_{D}.csv").write_text("x")
+    with pytest.raises(FileExistsError):
+        write(release, tmp_path)
+    assert sorted(p.name for p in tmp_path.iterdir()) == [f"OTC_{D}.csv"]
+    assert (tmp_path / f"OTC_{D}.csv").read_text() == "x"
+
+
+def test_write_files_and_order(release, tmp_path):
+    paths = write(release, tmp_path)
+    names = [p.name for p in paths]
+    assert names == [f"OTC_{D}.json", f"OTC_{D}.json.gz", f"OTC_{D}.jsonl", f"OTC_{D}.meta.json",
+                     f"OTC_{D}.csv", f"OTC_{D}.sha256"]
+    assert sorted(p.name for p in tmp_path.iterdir()) == sorted(names)
+
+
+def test_write_optional_files(release, tmp_path):
+    app = [{"id": "noaa:9414290", "source": "gesla", "constituents": []}]
+    paths = write(release, tmp_path, app_export=app, parquet=True, jsonl_gz=True)
+    names = [p.name for p in paths]
+    assert names == [f"OTC_{D}.json", f"OTC_{D}.json.gz", f"OTC_{D}.jsonl", f"OTC_{D}.jsonl.gz",
+                     f"OTC_{D}.meta.json", f"OTC_{D}.csv", f"OTC_{D}.parquet", f"OTC_{D}.app.json",
+                     f"OTC_{D}.sha256"]
+    assert json.loads((tmp_path / f"OTC_{D}.app.json").read_text()) == app
+
+
+def test_round_trip_json(release, tmp_path):
+    original = copy.deepcopy(release)
+    write(release, tmp_path)
+    assert release == original, "write_release must not mutate its input"
+    back = json.loads((tmp_path / f"OTC_{D}.json").read_text(encoding="utf-8"))
+    assert back == original
+    assert validate_release(back) == []
+    gz = json.loads(gzip.decompress((tmp_path / f"OTC_{D}.json.gz").read_bytes()))
+    assert gz == original
+
+
+def test_jsonl_and_meta(release, tmp_path):
+    write(release, tmp_path, jsonl_gz=True)
+    schema = json.loads(SCHEMA.read_text())
+
+    def sub(name):
+        return Draft202012Validator({"$schema": schema["$schema"], "$defs": schema["$defs"],
+                                     "$ref": f"#/$defs/{name}"})
+
+    raw = (tmp_path / f"OTC_{D}.jsonl").read_bytes()
+    assert raw.endswith(b"\n") and b"\r" not in raw
+    lines = raw.decode("utf-8").splitlines()
+    stations = [json.loads(line) for line in lines]
+    assert stations == release["stations"]
+    for s in stations:
+        assert sub("station").is_valid(s)
+    assert gzip.decompress((tmp_path / f"OTC_{D}.jsonl.gz").read_bytes()) == raw
+    meta = json.loads((tmp_path / f"OTC_{D}.meta.json").read_text())
+    assert meta == {k: v for k, v in release.items() if k != "stations"}
+    assert sub("meta").is_valid(meta)
+
+
+def read_csv(path):
+    raw = path.read_bytes()
+    assert b"\r" not in raw, "CSV line ends must be LF (and no field here holds a CR)"
+    return list(csv.DictReader(io.StringIO(raw.decode("utf-8"), newline="")))
+
+
+def _expected_types(doc):
+    """The documented row order, computed from the document independently of the writer."""
+    out = ["convention"] * len(doc["conventions"])
+    for st in doc["stations"]:
+        if st["status"] == "removed":
+            out.append("tombstone")
+            continue
+        out.append("station")
+        if "subordinate_offsets" in st:
+            out.append("offset")
+        out += ["current_offset"] * len(st.get("current_offsets", []))
+        for cs in st["constant_sets"]:
+            out.append("constant_set")
+            out += ["constituent"] * len(cs["constituents"])
+            for b in cs.get("current_bins", []):
+                out.append("current_bin")
+                out += ["current_constituent"] * len(b["constituents"])
+        out += ["validation"] * len(st.get("validation", []))
+    return out
+
+
+def test_csv_layout(release, tmp_path):
+    write(release, tmp_path)
+    path = tmp_path / f"OTC_{D}.csv"
+    header = path.read_text(encoding="utf-8").split("\n", 1)[0]
+    assert header.split(",") == CSV_COLUMNS
+    assert CSV_COLUMNS[0] == "record_type"
+    rows = read_csv(path)
+    types = [r["record_type"] for r in rows]
+    assert types == _expected_types(release)
+    nc = len(release["conventions"])          # one row per convention first (5 in the 23aedbe example)
+    assert types[:nc + 6] == ["convention"] * nc + \
+        ["station", "constant_set", "constituent", "constituent", "constituent", "constituent"]
+    station = rows[nc]
+    assert station["station_id"] == "OTC-EXAMPLE-0001"
+    assert station["name"] == "Example Harbour (illustrative values, not data)"
+    assert json.loads(station["aliases"]) == {"gesla": ["example-file-id"], "kartverket": "EXA"}
+    assert station["amplitude_m"] == ""
+    cset = rows[nc + 1]
+    gesla = first_set(release)
+    assert cset["set_id"] == "OTC-EXAMPLE-0001/gesla-fit" and cset["station_id"] == "OTC-EXAMPLE-0001"
+    assert json.loads(cset["provenance"]) == gesla["provenance"]
+    assert cset["record_span_start"] == "2002-01-01T00:00:00Z" and cset["good_samples"] == "210000"
+    assert cset["good_hours"] == "210000"
+    assert json.loads(cset["time_base"]) == gesla["time_base"]
+    assert json.loads(cset["datum_named"]) == gesla["datum"]["named"]
+    assert json.loads(cset["datum_basis"]) == gesla["datum"]["basis"]
+    assert cset["datum_zero"] == "gauge_zero" and cset["datum_msl_offset_m"] == "1.0"
+    m2 = rows[nc + 2]
+    assert (m2["set_id"], m2["name"], m2["amplitude_m"], m2["phase_deg"]) == \
+        ("OTC-EXAMPLE-0001/gesla-fit", "M2", "0.5", "100.0")
+    assert m2["station_id"] == "OTC-EXAMPLE-0001"
+    kv = rows[types.index("constant_set", nc + 2)]
+    assert kv["set_id"] == "OTC-EXAMPLE-0001/kartverket" and kv["datum_chart_datum"] == "cd"
+    tomb = rows[types.index("tombstone")]
+    assert (tomb["station_id"], tomb["status"], tomb["removed_in"]) == ("OTC-EXAMPLE-0002", "removed", D)
+    assert (tomb["removed_reason"], tomb["merged_into"]) == ("merged", "OTC-EXAMPLE-0001")
+    assert tomb["detail"].startswith("Example tombstone")
+    conv = rows[1]
+    assert (conv["convention_id"], conv["phase_reference"], conv["utc_offset_hours"], conv["astro_table_id"]) == \
+        ("kartverket-utc1-v1", "local", "1", "tcd-20251228")
+
+
+def subordinate(offsets):
+    return {
+        "station_id": "OTC-TEST-0914", "status": "active", "name": "Sub", "country": "NOR",
+        "lat": 60.1, "lon": 5.1, "timezone": "Europe/Oslo", "type": "subordinate",
+        "recommended_set_id": None, "constant_sets": [], "subordinate_offsets": offsets,
+    }
+
+
+def test_offset_to_a_subordinate_station_is_rejected(release):
+    release["stations"].append(subordinate({"reference_station_id": "OTC-EXAMPLE-0001",
+                                            "height_adjusted_type": "R"}))
+    release["stations"].append(subordinate({"reference_station_id": "OTC-TEST-0914",
+                                            "height_adjusted_type": "R"}))
+    release["stations"][-1]["station_id"] = "OTC-TEST-0915"
+    errors = validate_release(release)
+    assert any("'OTC-TEST-0914' is not a reference station" in e for e in errors), errors
+
+
+def test_offset_to_itself_is_rejected(release):
+    release["stations"].append(subordinate({"reference_station_id": "OTC-TEST-0914",
+                                            "height_adjusted_type": "R"}))
+    errors = validate_release(release)
+    assert any("is the station itself" in e for e in errors), errors
+
+
+def test_csv_offset_row(release, tmp_path):
+    release["stations"].insert(1, subordinate({
+        "reference_station_id": "OTC-EXAMPLE-0001", "height_adjusted_type": "A",
+        "time_offset_high_min": -12, "height_offset_low": 0.25}))
+    write(release, tmp_path)
+    rows = read_csv(tmp_path / f"OTC_{D}.csv")
+    types = [r["record_type"] for r in rows]
+    i = types.index("offset")
+    assert types[i - 1:i + 2] == ["station", "offset", "tombstone"]
+    r = rows[i]
+    assert (r["station_id"], r["reference_station_id"], r["height_adjusted_type"],
+            r["time_offset_high_min"], r["height_offset_low"], r["time_offset_low_min"]) == \
+        ("OTC-TEST-0914", "OTC-EXAMPLE-0001", "A", "-12", "0.25", "")
+    assert rows[i - 1]["recommended_set_id"] == ""
+
+
+def test_csv_rfc4180_quoting(release, tmp_path):
+    tricky = 'Port "Quoted", Fjord\nsecond line, æøå'
+    release["stations"][0]["name"] = tricky
+    write(release, tmp_path)
+    rows = read_csv(tmp_path / f"OTC_{D}.csv")
+    assert [r["name"] for r in rows if r["record_type"] == "station"][0] == tricky
+    text = (tmp_path / f"OTC_{D}.csv").read_text(encoding="utf-8")
+    assert '"Port ""Quoted"", Fjord\nsecond line, æøå"' in text
+
+
+def test_parquet_matches_csv(release, tmp_path):
+    write(release, tmp_path, parquet=True)
+    table = pq.read_table(tmp_path / f"OTC_{D}.parquet")
+    assert table.column_names == CSV_COLUMNS
+    rows = read_csv(tmp_path / f"OTC_{D}.csv")
+    assert table.num_rows == len(rows)
+    assert table.column("record_type").to_pylist() == [r["record_type"] for r in rows]
+    amps = table.column("amplitude_m").to_pylist()
+    nc = len(release["conventions"])
+    assert amps[nc + 2] == 0.5 and amps[nc] is None
+    assert str(table.schema.field("amplitude_m").type) == "double"
+    assert str(table.schema.field("good_samples").type) == "int64"
+
+
+def test_sha256_file(release, tmp_path):
+    paths = write(release, tmp_path, app_export=[{"a": 1}], jsonl_gz=True)
+    lines = (tmp_path / f"OTC_{D}.sha256").read_text().splitlines()
+    listed = {}
+    for line in lines:
+        digest, name = line.split("  ", 1)
+        listed[name] = digest
+    assert set(listed) == {p.name for p in paths if not p.name.endswith(".sha256")}
+    assert [line.split("  ", 1)[1] for line in lines] == sorted(listed)
+    for name, digest in listed.items():
+        assert hashlib.sha256((tmp_path / name).read_bytes()).hexdigest() == digest
+
+
+def test_byte_identical_for_identical_input(release, tmp_path):
+    a, b = tmp_path / "a", tmp_path / "b"
+    a.mkdir(), b.mkdir()
+    pa = write(copy.deepcopy(release), a, app_export=[{"x": 1.5}], parquet=True, jsonl_gz=True)
+    pb = write(copy.deepcopy(release), b, app_export=[{"x": 1.5}], parquet=True, jsonl_gz=True)
+    assert [p.name for p in pa] == [p.name for p in pb]
+    for x, y in zip(pa, pb, strict=True):
+        assert x.read_bytes() == y.read_bytes(), x.name
+
+
+def test_key_order_does_not_change_bytes(release, tmp_path):
+    a, b = tmp_path / "a", tmp_path / "b"
+    a.mkdir(), b.mkdir()
+    shuffled = json.loads(json.dumps(release), object_pairs_hook=lambda kv: dict(reversed(kv)))
+    pa = write(release, a)
+    pb = write(shuffled, b)
+    assert [p.name for p in pa] == [p.name for p in pb]
+    for x, y in zip(pa, pb, strict=True):
+        assert x.read_bytes() == y.read_bytes(), x.name
+
+
+def test_float_formatting_is_fixed(release, tmp_path):
+    first_set(release)["constituents"][0]["amplitude_m"] = 0.1 + 0.2
+    first_set(release)["constituents"][0]["phase_deg"] = 1e-7
+    write(release, tmp_path)
+    text = (tmp_path / f"OTC_{D}.json").read_text()
+    assert '"amplitude_m":0.30000000000000004' in text
+    assert '"phase_deg":1e-07' in text
+    rows = read_csv(tmp_path / f"OTC_{D}.csv")
+    m2 = [r for r in rows if r["record_type"] == "constituent"][0]
+    assert (m2["amplitude_m"], m2["phase_deg"]) == ("0.30000000000000004", "1e-07")
+
+
+def test_nan_is_refused(release, tmp_path):
+    first_set(release)["constituents"][0]["amplitude_m"] = float("nan")
+    with pytest.raises(ValueError):
+        write(release, tmp_path)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_second_write_same_day(release, tmp_path):
+    day = date(2099, 12, 31)
+    d1 = next_datestamp(tmp_path, day)
+    first = write(copy.deepcopy(release), tmp_path, datestamp=d1)
+    before = {p.name: p.read_bytes() for p in first}
+    d2 = next_datestamp(tmp_path, day)
+    assert d2 == "20991231.2"
+    second_doc = copy.deepcopy(release)
+    second_doc["release"]["datestamp"] = d2
+    second = write(second_doc, tmp_path, datestamp=d2)
+    assert [p.name for p in second] == [f"OTC_20991231.2.{ext}" for ext in
+                                        ("json", "json.gz", "jsonl", "meta.json", "csv", "sha256")]
+    for name, data in before.items():
+        assert (tmp_path / name).read_bytes() == data
+
+
+def test_write_refuses_stem_with_only_an_optional_file(release, tmp_path):
+    (tmp_path / f"OTC_{D}.parquet").write_bytes(b"old")
+    with pytest.raises(FileExistsError):
+        write(release, tmp_path)
+    assert sorted(p.name for p in tmp_path.iterdir()) == [f"OTC_{D}.parquet"]
+
+
+def test_gzip_has_no_time_stamp(release, tmp_path):
+    write(release, tmp_path, jsonl_gz=True)
+    for ext in ("json.gz", "jsonl.gz"):
+        head = (tmp_path / f"OTC_{D}.{ext}").read_bytes()[:10]
+        assert head[4:8] == b"\0\0\0\0", ext  # MTIME field
+        assert head[3] & 0x08 == 0, ext       # no FNAME
+
+
+@pytest.mark.parametrize("where", ["amplitude", "provenance"])
+@pytest.mark.parametrize("bad", [float("nan"), float("inf")])
+def test_validate_reports_non_finite_numbers(release, where, bad):
+    if where == "amplitude":
+        first_set(release)["constituents"][0]["amplitude_m"] = bad
+    else:
+        first_set(release)["provenance"]["score"] = bad
+    errors = validate_release(release)
+    assert any("is not a finite number" in e for e in errors), errors
+
+
+def test_failed_write_removes_its_files(release, tmp_path, monkeypatch):
+    real_link = rw.os.link
+
+    def link(src, dst):
+        if str(dst).endswith(".csv"):
+            raise OSError("disk full")
+        real_link(src, dst)
+
+    monkeypatch.setattr(rw.os, "link", link)
+    with pytest.raises(OSError, match="disk full"):
+        write(release, tmp_path)
+    assert list(tmp_path.iterdir()) == []
+
+
+# --- review fixes (F1 CR round 1) ---------------------------------------------
+
+def _set_path(doc, path, value):
+    node = doc
+    for key in path[:-1]:
+        node = node[key]
+    node[path[-1]] = value
+
+
+# Schema-invalid values whose type the cross-reference checks must not trust.
+_WRONG_TYPES = [
+    (("stations",), 5),
+    (("conventions",), 5),
+    (("licences",), 5),
+    (("constituents",), 5),
+    (("conventions", 0, "convention_id"), [1]),
+    (("conventions", 0, "constituent_table_version"), ["x"]),
+    (("licences", 0, "licence_id"), ["x"]),
+    (("constituents", 0, "name"), ["x"]),
+    (("constituents", 0, "constituent_table_version"), {"a": 1}),
+    (("stations", 0, "station_id"), ["x"]),
+    (("stations", 0, "recommended_set_id"), {"a": 1}),
+    (("stations", 0, "constant_sets"), 3),
+    (("stations", 0, "validation"), 5),
+    (("stations", 0, "validation", 0, "set_id"), ["x"]),
+    (("stations", 0, "aliases"), ["x"]),
+    (("stations", 0, "subordinate_offsets"), {"reference_station_id": {"a": 1}, "height_adjusted_type": "R"}),
+    (("stations", 0, "subordinate_offsets"), {"reference_station_id": "OTC-EXAMPLE-0001",
+                                              "height_adjusted_type": "R", "licence_id": ["x"]}),
+    (("stations", 0, "constant_sets", 0, "set_id"), ["x"]),
+    (("stations", 0, "constant_sets", 0, "convention_id"), ["x"]),
+    (("stations", 0, "constant_sets", 0, "licence_id"), {"a": 1}),
+    (("stations", 0, "constant_sets", 0, "constituents"), 5),
+    (("stations", 0, "constant_sets", 0, "dropped_constituents"), 5),
+    (("stations", 0, "constant_sets", 0, "constituents", 0, "name"), ["x"]),
+]
+
+
+@pytest.mark.parametrize("path, value", _WRONG_TYPES, ids=lambda x: str(x))
+def test_validate_returns_errors_for_wrong_types_and_never_raises(release, path, value):
+    _set_path(release, path, value)
+    errors = validate_release(release)
+    assert errors and all(isinstance(e, str) for e in errors), errors
+
+
+@pytest.mark.parametrize("path, value", [
+    (("release", "datestamp"), D + "\n"),
+    (("stations", 0, "country"), "NOR\n"),
+    (("conventions", 0, "tables_sha256"), "0" * 64 + "\n"),
+])
+def test_trailing_newline_does_not_pass_a_pattern(release, path, value):
+    _set_path(release, path, value)
+    errors = validate_release(release)
+    assert any("does not match" in e for e in errors), errors
+
+
+def test_write_refuses_datestamp_with_trailing_newline(release, tmp_path):
+    release["release"]["datestamp"] = D + "\n"
+    with pytest.raises(ValueError):
+        write(release, tmp_path, datestamp=D + "\n")
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_recommended_set_id_absent_string_is_checked(release):
+    release["stations"][0]["recommended_set_id"] = "absent"
+    errors = validate_release(release)
+    assert any("recommended_set_id 'absent' is not a set of this station" in e for e in errors), errors
+
+
+def test_subordinate_with_null_recommended_set_needs_offsets(release):
+    sub = subordinate({"reference_station_id": "OTC-EXAMPLE-0001", "height_adjusted_type": "R"})
+    del sub["subordinate_offsets"]
+    release["stations"].append(sub)
+    errors = validate_release(release)
+    assert any("recommended_set_id is null" in e and "subordinate_offsets" in e for e in errors), errors
+
+
+def test_fsync_failure_leaves_no_files(release, tmp_path, monkeypatch):
+    real_fsync = rw.os.fsync
+    calls = []
+
+    def fsync(fd):
+        calls.append(fd)
+        if len(calls) == 3:
+            raise OSError("EIO")
+        real_fsync(fd)
+
+    monkeypatch.setattr(rw.os, "fsync", fsync)
+    with pytest.raises(OSError, match="EIO"):
+        write(release, tmp_path)
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_temp_unlink_failure_after_link_rolls_back(release, tmp_path, monkeypatch):
+    real_unlink = Path.unlink
+    state = {"failed": False}
+
+    def unlink(self, missing_ok=False):
+        if ".tmp" in self.name and self.name.startswith(f".OTC_{D}.csv") and not state["failed"]:
+            state["failed"] = True
+            raise OSError("EACCES")
+        return real_unlink(self, missing_ok=missing_ok)
+
+    monkeypatch.setattr(rw.Path, "unlink", unlink)
+    with pytest.raises(OSError, match="EACCES"):
+        write(release, tmp_path)
+    assert state["failed"]
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_stale_temp_file_with_same_pid_does_not_block_a_write(release, tmp_path):
+    for name in (f"OTC_{D}.json", f"OTC_{D}.csv", f"OTC_{D}.sha256"):
+        (tmp_path / f".{name}.tmp-{os.getpid()}").write_bytes(b"stale")
+    paths = write(release, tmp_path)
+    assert [p.name for p in paths][-1] == f"OTC_{D}.sha256"
+
+
+def test_link_order_sha256_last_and_directory_fsynced(release, tmp_path, monkeypatch):
+    events = []
+    real_link, real_fsync = rw.os.link, rw.os.fsync
+
+    def link(src, dst):
+        events.append(("link", Path(dst).name))
+        real_link(src, dst)
+
+    def fsync(fd):
+        if stat.S_ISDIR(os.fstat(fd).st_mode):
+            events.append(("fsync-dir", None))
+        real_fsync(fd)
+
+    monkeypatch.setattr(rw.os, "link", link)
+    monkeypatch.setattr(rw.os, "fsync", fsync)
+    paths = write(release, tmp_path, app_export=[{"a": 1}], parquet=True, jsonl_gz=True)
+    links = [n for kind, n in events if kind == "link"]
+    assert links == [p.name for p in paths]
+    assert links[-1] == f"OTC_{D}.sha256" and len(links) == 9
+    sha_at = events.index(("link", f"OTC_{D}.sha256"))
+    # every other file is durable in the directory before the .sha256 entry appears, and the
+    # .sha256 entry itself is made durable before write_release returns
+    assert ("fsync-dir", None) in events[:sha_at]
+    assert events[sha_at - 1] == ("fsync-dir", None)
+    assert events[-1] == ("fsync-dir", None)
+
+
+def test_cli_validate_bad_json_and_missing_file(tmp_path, capsys):
+    bad = tmp_path / "bad.json"
+    bad.write_text("{bad")
+    assert main(["validate", str(bad)]) != 0
+    assert main(["validate", str(tmp_path / "missing.json")]) != 0
+    assert main(["validate", str(tmp_path)]) != 0
+    err = capsys.readouterr().err
+    assert "bad.json" in err and "missing.json" in err
+
+
+def test_cli_validate_reports_wrong_types(tmp_path, capsys):
+    doc = json.loads(EXAMPLE.read_text())
+    doc["stations"] = 5
+    p = tmp_path / "doc.json"
+    p.write_text(json.dumps(doc))
+    assert main(["validate", str(p)]) == 1
+    assert "errors" in capsys.readouterr().out
+
+
+def test_cli_validate_valid_example(capsys):
+    assert main(["validate", str(EXAMPLE)]) == 0
+    assert "valid" in capsys.readouterr().out
+
+
+# --- format 0.4 tidal-current sets ---------------------------------------------------
+
+def _station(release, sid):
+    return next(st for st in release["stations"] if st["station_id"] == sid)
+
+
+def test_current_set_validates(release):
+    cur = _station(release, "OTC-EXAMPLE-0003")
+    assert cur["constant_sets"][0]["quantity"] == "current"
+    assert cur["constant_sets"][0]["constituents"] == []
+    assert validate_release(release) == []
+
+
+def test_current_offsets_reference_bin_must_exist(release):
+    _station(release, "OTC-EXAMPLE-0004")["current_offsets"][0]["reference_bin"] = 7
+    errors = validate_release(release)
+    assert any("reference_bin 7 is not a bin of 'OTC-EXAMPLE-0003'" in e for e in errors), errors
+
+
+def test_current_offsets_reference_must_be_a_station(release):
+    _station(release, "OTC-EXAMPLE-0004")["current_offsets"][0]["reference_station_id"] = "OTC-NOPE"
+    errors = validate_release(release)
+    assert any("'OTC-NOPE' is not an active station" in e for e in errors), errors
+
+
+def test_default_current_bin_must_name_a_bin(release):
+    _station(release, "OTC-EXAMPLE-0003")["default_current_bin"] = 9
+    errors = validate_release(release)
+    assert any("default_current_bin 9 is not a bin of the recommended set" in e for e in errors), errors
+
+
+def test_current_constituent_name_must_be_in_table(release):
+    b = _station(release, "OTC-EXAMPLE-0003")["constant_sets"][0]["current_bins"][0]
+    b["constituents"][0]["name"] = "MK3"
+    errors = validate_release(release)
+    assert any("constituent name 'MK3' is not in the constituents table" in e for e in errors), errors
+
+
+def test_duplicate_current_bin_rejected(release):
+    cs = _station(release, "OTC-EXAMPLE-0003")["constant_sets"][0]
+    cs["current_bins"].append(dict(cs["current_bins"][0]))
+    errors = validate_release(release)
+    assert any("duplicate current bin 1" in e for e in errors), errors
+
+
+def test_csv_current_rows(release, tmp_path):
+    write(release, tmp_path)
+    rows = read_csv(tmp_path / f"OTC_{D}.csv")
+    b = next(r for r in rows if r["record_type"] == "current_bin")
+    assert (b["station_id"], b["set_id"], b["bin"], b["depth_m"], b["depth_type"], b["azimuth_deg"]) == \
+        ("OTC-EXAMPLE-0003", "OTC-EXAMPLE-0003/noaa", "1", "2.13", "below_surface", "37.0")
+    assert b["mean_major_ms"] == "0.0772"
+    c = next(r for r in rows if r["record_type"] == "current_constituent")
+    assert (c["bin"], c["name"], c["major_amplitude_ms"], c["major_phase_deg"]) == ("1", "M2", "0.9353", "322.3")
+    o = next(r for r in rows if r["record_type"] == "current_offset")
+    assert (o["station_id"], o["reference_station_id"], o["reference_bin"], o["time_adj_slack_before_flood_min"],
+            o["flood_amp_ratio"]) == ("OTC-EXAMPLE-0004", "OTC-EXAMPLE-0003", "1", "", "1.2")
+    st = next(r for r in rows if r["record_type"] == "station" and r["station_id"] == "OTC-EXAMPLE-0003")
+    assert st["default_current_bin"] == "1"
+
+
+def test_csv_commercial_use_follows_the_licence(release, tmp_path):
+    # L-NC: every row with a licence_id carries that licence's commercial_use (the CMEMS set is false)
+    release["stations"].insert(1, subordinate({
+        "reference_station_id": "OTC-EXAMPLE-0001", "height_adjusted_type": "A", "licence_id": "gesla-cmems-nc"}))
+    write(release, tmp_path)
+    assert CSV_COLUMNS.index("commercial_use") == CSV_COLUMNS.index("licence_id") + 1
+    rows = read_csv(tmp_path / f"OTC_{D}.csv")
+    commercial = {lic["licence_id"]: lic["commercial_use"] for lic in release["licences"]}
+    with_lic = [r for r in rows if r["licence_id"]]
+    assert {r["record_type"] for r in with_lic} == {"constant_set", "offset", "current_offset"}
+    for r in with_lic:
+        assert r["commercial_use"] == ("true" if commercial[r["licence_id"]] else "false"), r["set_id"]
+    assert all(r["commercial_use"] == "" for r in rows if not r["licence_id"])
+    sets = {r["set_id"]: r for r in rows if r["record_type"] == "constant_set"}
+    assert sets["OTC-EXAMPLE-0005/gesla-fit-b"]["commercial_use"] == "false"
+    assert sets["OTC-EXAMPLE-0005/gesla-fit-a"]["commercial_use"] == "true"
+    assert next(r for r in rows if r["record_type"] == "offset")["commercial_use"] == "false"
+
+
+@pytest.fixture(scope="module")
+def historical_real_release():
+    path = os.environ.get("OTC_NOAA_HISTORICAL_REAL_RELEASE")
+    report_path = os.environ.get("OTC_FALLBACK_BUILD_REPORT")
+    if not path or not report_path:
+        pytest.skip("requires the sealed actual NOAA historical projection and native build report")
+    doc = json.loads(Path(path).read_text())
+    report = json.loads(Path(report_path).read_text())
+    run = load_congen_run(Path(report["provenance"]["congen_run"]["path"]),
+                          tcd_sha256=report["provenance"]["otc_tcd"]["sha256"])
+    return doc, run
+
+
+def test_historical_real_release_lossless_formats(historical_real_release, tmp_path):
+    doc, run = historical_real_release
+    original = copy.deepcopy(doc)
+    assert validate_release(doc) == []
+    paths = write_release(doc, tmp_path, datestamp=doc["release"]["datestamp"],
+                          app_export=None, congen_run=run, parquet=True, jsonl_gz=True)
+    stem = "OTC_" + doc["release"]["datestamp"]
+    for suffix in (".json", ".json.gz", ".jsonl", ".jsonl.gz"):
+        raw = (tmp_path / (stem + suffix)).read_bytes()
+        if suffix.endswith(".gz"):
+            raw = gzip.decompress(raw)
+        if ".jsonl" in suffix:
+            assert [json.loads(line) for line in raw.splitlines()] == doc["stations"]
+        else:
+            assert json.loads(raw) == doc
+    rows = read_csv(tmp_path / (stem + ".csv"))
+    parquet = pq.read_table(tmp_path / (stem + ".parquet")).to_pylist()
+    expected = {st["station_id"]: st["subordinate_offsets"] for st in doc["stations"] if "subordinate_offsets" in st}
+    assert len(expected) == 2
+    assert str(pq.read_schema(tmp_path / (stem + ".parquet")).field("subordinate_offsets").type) == "string"
+    for table_rows, missing in ((rows, ""), (parquet, None)):
+        offsets = [row for row in table_rows if row["record_type"] == "offset"]
+        assert {row["station_id"] for row in offsets} == set(expected)
+        for row in offsets:
+            wanted = expected[row["station_id"]]
+            assert json.loads(row["subordinate_offsets"]) == wanted
+            for key in ("time_offset_high_min", "time_offset_low_min", "height_offset_high", "height_offset_low"):
+                assert float(row[key]) == wanted[key]
+            assert row["height_adjusted_type"] == wanted["height_adjusted_type"]
+            assert row["licence_id"] == "noaa-public-domain" and row["commercial_use"] == "true"
+        assert all(row["subordinate_offsets"] == missing for row in table_rows if row["record_type"] != "offset")
+        for st in doc["stations"]:
+            station_row = next(row for row in table_rows if row["record_type"] == "station" and row["station_id"] == st["station_id"])
+            assert json.loads(station_row["source_records"]) == st["source_records"]
+    csv_payloads = {row["station_id"]: row["subordinate_offsets"] for row in rows if row["record_type"] == "offset"}
+    assert all(row["subordinate_offsets"].encode("utf-8") == csv_payloads[row["station_id"]].encode("utf-8")
+               for row in parquet if row["record_type"] == "offset")
+    assert json.loads((tmp_path / (stem + ".meta.json")).read_text()) == {key: value for key, value in doc.items() if key != "stations"}
+    assert check_release_dir(tmp_path) == [] and len(paths) == 8
+    assert doc == original
+
+
+@pytest.mark.parametrize("change,needle", [
+    ("reference_alias", "reference binding"),
+    ("raw_clock", "raw_values_json"),
+    ("source_record", "original source"),
+])
+def test_historical_real_semantic_links(historical_real_release, change, needle):
+    doc = copy.deepcopy(historical_real_release[0])
+    st = _station(doc, "OTC-28c56e20")
+    off = st["subordinate_offsets"]
+    if change == "reference_alias":
+        _station(doc, off["reference_station_id"])["aliases"].pop("noaa")
+    elif change == "raw_clock":
+        raw = json.loads(off["provenance"]["raw_values_json"])
+        raw["daylight_saving_applied_in_book"] = True
+        value = json.dumps(raw, ensure_ascii=False, separators=(",", ":"))
+        off["provenance"]["raw_values_json"] = value
+        st["source_records"][0]["original_metadata"]["raw_values_json"] = value
+    else:
+        st.pop("source_records")
+    errors = validate_release(doc)
+    assert any(needle in error for error in errors), errors
+
+
+def test_csv_unknown_offset_key_still_refuses(release):
+    release["stations"].append(subordinate({"reference_station_id": "OTC-EXAMPLE-0001",
+                                           "height_adjusted_type": "R", "unexpected_offset": 1}))
+    with pytest.raises(ValueError, match="unexpected_offset"):
+        rw._csv_rows(release)

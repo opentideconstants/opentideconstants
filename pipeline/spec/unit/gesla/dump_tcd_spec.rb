@@ -1,0 +1,155 @@
+# frozen_string_literal: true
+
+require 'digest'
+require 'open3'
+require 'tmpdir'
+require 'rbconfig'
+require_relative '../../../scripts/gesla/dump_tcd'
+
+# The GESLA fit reads speed, V0+u and f from a dump of the TCD the engine reads.
+# The dump must hold the engine's own values, or the fitted phases would not be in
+# the engine's convention.
+RSpec.describe GeslaTcdDump do
+    let(:engine_worktree) { ENV.fetch('OTC_ENGINE_WORKTREE') }
+    let(:tcd_path) { File.join(engine_worktree, 'data/latest-xtide.tcd') }
+    let(:engine_factors) do
+        program = <<~'RUBY'
+            require 'logger'
+            require 'json'
+            require File.join(Dir.pwd, 'lib/harmonics_engine')
+            engine = Harmonics::Engine.new(Logger.new('/dev/null'))
+            puts JSON.generate([2000, 2026, 2027].to_h { |year| [year, engine.send(:calculate_tcd_nodal_factors, year, 0.0)] })
+        RUBY
+        output, error, status = Bundler.with_unbundled_env do
+            Open3.capture3({ 'BUNDLE_GEMFILE' => File.join(engine_worktree, 'Gemfile') },
+                           RbConfig.ruby, '-rbundler/setup', '-e', program, chdir: engine_worktree)
+        end
+        expect(status.success?).to be(true), output + error
+        JSON.parse(output)
+    end
+    let(:dump) { described_class.dump(tcd_path) }
+
+    before(:example, :external_engine) do
+        unless ENV.key?('OTC_ENGINE_WORKTREE')
+            skip 'The real TCD/engine comparison requires OTC_ENGINE_WORKTREE; see pipeline/README.md'
+        end
+    end
+
+    describe '.dump', :external_engine do
+        it 'covers the years 1900 to 2100 and records the TCD SHA-256' do
+            expect(dump['years']).to eq([1900, 2100])
+            expect(dump['tcd_sha256']).to eq(Digest::SHA256.file(tcd_path).hexdigest)
+            expect(dump['constituents']).to include('M2', 'S2', 'K1', 'O1', 'N2', 'SA', 'M1')
+        end
+
+        it "equals the engine's own V0+u and f for M2 S2 K1 O1 N2 in 2000, 2026 and 2027" do
+            [2000, 2026, 2027].each do |year|
+                factors = engine_factors.fetch(year.to_s)
+                %w[M2 S2 K1 O1 N2].each do |name|
+                    c = dump['constituents'].fetch(name)
+                    i = year - dump['years'].first
+                    expect(c['v0u'][i]).to be_within(1e-9).of(factors[name]['V0']), "#{name} #{year} V0+u"
+                    expect(c['f'][i]).to be_within(1e-9).of(factors[name]['f']), "#{name} #{year} f"
+                    expect(factors[name]['u']).to eq(0.0)
+                end
+            end
+        end
+
+        it 'keeps one value per year for every constituent' do
+            n = dump['years'].last - dump['years'].first + 1
+            dump['constituents'].each_value do |c|
+                expect(c['v0u'].size).to eq(n)
+                expect(c['f'].size).to eq(n)
+            end
+        end
+    end
+
+    describe '.check_gem_alignment' do
+        it 'accepts a constituent count that is a multiple of 8, as the TCD in use (176) is', :external_engine do
+            expect(dump['constituents'].size).to eq(176)
+            expect { described_class.check_gem_alignment(176, 'x.tcd') }.not_to raise_error
+        end
+
+        it 'refuses any other count, naming the tcd gem misalignment' do
+            [177, 175, 1].each do |n|
+                expect { described_class.check_gem_alignment(n, 'x.tcd') }
+                    .to raise_error(ArgumentError, /x\.tcd: #{n} constituents, not a multiple of 8: the tcd gem misreads/)
+            end
+        end
+
+        it 'stops .dump on a TCD with 177 constituents before reading any value' do
+            db = double('TCD', year_range: (1700..2100), constituents: Array.new(177) { double('c') })
+            allow(TCD).to receive(:open).with('g177.tcd').and_yield(db)
+            expect { described_class.dump('g177.tcd', years: (2020..2022)) }
+                .to raise_error(ArgumentError, /177 constituents, not a multiple of 8/)
+        end
+    end
+
+    describe '.tcd_constituent_name', :external_engine do
+        let(:tcd_names) { dump['constituents'].keys }
+
+        it 'maps the TICON spellings to the TCD names' do
+            expect(%w[MI2 NI2 LM2 EP2 MKS].map { |n| described_class.tcd_constituent_name(n, tcd_names) })
+                .to eq(%w[MU2 NU2 LDA2 EPS2 MKS2])
+            expect(described_class.tcd_constituent_name(' m2 ', tcd_names)).to eq('M2')
+        end
+
+        it 'fails on a name the TCD does not define' do
+            expect { described_class.tcd_constituent_name('XYZ9', tcd_names) }.to raise_error(ArgumentError, /XYZ9/)
+        end
+    end
+
+    describe 'the command', :external_engine do
+        let(:script) { File.expand_path('../../../scripts/gesla/dump_tcd.rb', __dir__) }
+
+        it 'writes the same bytes on every run' do
+            Dir.mktmpdir do |dir|
+                outs = %w[a.json b.json].map do |f|
+                    out = File.join(dir, f)
+                    _, err, status = Open3.capture3('ruby', script, '--tcd', tcd_path, '--out', out)
+                    expect(status).to be_success, err
+                    File.binread(out)
+                end
+                expect(outs[0]).to eq(outs[1])
+                expect(JSON.parse(outs[0])['constituents']).to eq(JSON.parse(JSON.generate(dump['constituents'])))
+            end
+        end
+
+        it 'dumps another span with --years, with the same values in the years both dumps hold' do
+            Dir.mktmpdir do |dir|
+                out = File.join(dir, 'full.json')
+                _, err, status = Open3.capture3('ruby', script, '--tcd', tcd_path, '--out', out, '--years', '1700-2100')
+                expect(status).to be_success, err
+                full = JSON.parse(File.binread(out))
+                expect(full['years']).to eq([1700, 2100])
+                expect(full['tcd_sha256']).to eq(dump['tcd_sha256'])
+                %w[M2 K1 SA].each do |name|
+                    c = full['constituents'].fetch(name)
+                    expect([c['v0u'].size, c['f'].size]).to eq([401, 401])
+                    expect(c['v0u'][200..]).to eq(dump['constituents'][name]['v0u'])
+                    expect(c['f'][200..]).to eq(dump['constituents'][name]['f'])
+                end
+            end
+        end
+
+        it 'stops with a non-zero exit on a --years value that is not FIRST-LAST' do
+            Dir.mktmpdir do |dir|
+                %w[2100-1700 1700 x-2100].each do |bad|
+                    _, err, status = Open3.capture3('ruby', script, '--tcd', tcd_path, '--out', File.join(dir, 'x.json'),
+                                                    '--years', bad)
+                    expect(status).not_to be_success, bad
+                    expect(err).to match(/--years/)
+                end
+            end
+        end
+
+        it 'stops with a non-zero exit on a required name the TCD does not define' do
+            Dir.mktmpdir do |dir|
+                _, err, status = Open3.capture3('ruby', script, '--tcd', tcd_path, '--out', File.join(dir, 'x.json'),
+                                                '--require', 'M2,XYZ9')
+                expect(status).not_to be_success
+                expect(err).to match(/XYZ9/)
+            end
+        end
+    end
+end

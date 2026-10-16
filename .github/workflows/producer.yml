@@ -1,0 +1,116 @@
+name: Producer
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'pipeline/**'
+      - '.github/workflows/producer.yml'
+  pull_request:
+    paths:
+      - 'pipeline/**'
+      - '.github/workflows/producer.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: pipeline/scripts/otc
+    env:
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          lfs: true
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Install locked producer dependencies
+        run: |
+          python -m pip install uv==0.10.7
+          uv sync --frozen
+      # Full pinned publication and scientific profiles run separately.
+      - name: Run producer regression tests
+        run: >-
+          uv run --frozen python -m pytest -q -ra
+          tests/test_release_writer.py
+          tests/test_ticon_sets.py
+          tests/test_chs_identities.py
+          tests/test_combine.py
+          tests/test_country_resolutions.py
+          tests/test_format_1_0.py
+          tests/test_gesla_build.py
+          tests/test_original_metadata.py
+          tests/test_source_inventory.py
+          tests/test_station_map.py
+          tests/test_station_map_r3.py
+
+  ruby:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: pipeline
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          lfs: true
+          persist-credentials: false
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@6aaa311d81eba98ae12eaffbcb63296ace0efcde # v1
+        with:
+          ruby-version: '3.2'
+          working-directory: pipeline
+          bundler-cache: true
+      - name: Run standalone producer Ruby tests
+        run: bundle exec rspec spec
+
+  dependencies:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - uses: ruby/setup-ruby@6aaa311d81eba98ae12eaffbcb63296ace0efcde # v1
+        with:
+          ruby-version: '3.2'
+      - name: Audit the standalone Ruby lock
+        run: |
+          gem install bundler-audit --version 0.9.3 --no-document
+          bundle-audit update
+          bundle-audit check pipeline
+      - name: Audit all registry packages in both Python locks
+        run: |
+          python -m pip install uv==0.10.7
+          ruby -e '
+              %w[gesla otc].each do |project|
+                  lock = File.read("pipeline/scripts/#{project}/uv.lock")
+                  sections = lock.split(/^\[\[package\]\]\n/).drop(1)
+                  pins = sections.select { |section| section.match?(/^source = \{ registry = /) }.map do |section|
+                      name = section.match(/^name = "([^"]+)"/)[1]
+                      version = section.match(/^version = "([^"]+)"/)[1]
+                      "#{name}==#{version}"
+                  end
+                  abort "No registry packages in #{project}" if pins.empty?
+                  File.write("#{ENV.fetch("RUNNER_TEMP")}/#{project}-requirements.txt", pins.join("\n") + "\n")
+              end
+          '
+          uvx --from pip-audit==2.10.0 pip-audit --no-deps --disable-pip --strict --timeout 10 --progress-spinner off --requirement "$RUNNER_TEMP/gesla-requirements.txt"
+          # GHSA-rgxp-2hwp-jwgg (CVE-2026-25087) affects Arrow C++
+          # RecordBatchFileReader::PreBufferMetadata, which is not exposed in
+          # Python bindings. This sole exception applies to the OTC Python lock.
+          # https://github.com/advisories/GHSA-rgxp-2hwp-jwgg
+          uvx --from pip-audit==2.10.0 pip-audit --no-deps --disable-pip --strict --timeout 10 --progress-spinner off --ignore-vuln GHSA-rgxp-2hwp-jwgg --requirement "$RUNNER_TEMP/otc-requirements.txt"

@@ -1,0 +1,105 @@
+"""TB-SIB disputed_reason eot20_whole_hour: a station whose only sets carry it is withheld (owner rule: no bad
+data ships); a station with a clean set publishes the clean one. Synthetic verdicts until TB-SIB lands."""
+import inspect
+
+import pytest
+
+from otc_pipeline import gesla_release as gr
+from otc_pipeline.gesla_release import disputed_reasons_of
+
+from test_build_integrity import dump, table  # noqa: F401 (fixtures)
+from test_station_map import two
+from test_station_map_r3 import _kw
+
+WH = "eot20_whole_hour"
+
+
+def test_disputed_reasons_is_a_required_input():
+    assert inspect.signature(gr.build_release).parameters["disputed_reasons"].default is inspect.Parameter.empty
+
+
+def test_a_station_whose_only_sets_have_a_whole_hour_eot20_lag_is_withheld(table):  # noqa: F811
+    docs = two(table)
+    other = {d["record_id"]: f"OTC-{i}" for i, d in enumerate(docs)}
+    release, report = gr.build_release(docs, **{**_kw(table, docs, other, {}), "disputed_reasons": {"r1-nor-test": WH}})
+    assert [s["station_id"] for s in release["stations"]] == ["OTC-0"]
+    # TB-SIB writes the reasons space-separated, the code's own first
+    both = {"r1-nor-test": "comparators_disagree eot20_whole_hour"}
+    release, report = gr.build_release(docs, **{**_kw(table, docs, other, {}), "disputed_reasons": both})
+    assert [s["station_id"] for s in release["stations"]] == ["OTC-0"]
+    (r,) = report.refused
+    assert r["reason"] == "eot20_whole_hour_unresolved" and r["record"] == "r1-nor-test" and "OTC-1" in r["message"]
+    assert report.published == ["r0-nor-test"]
+
+
+def test_a_clean_set_at_the_station_publishes_and_no_disputed_set_ships(table):  # noqa: F811
+    docs = two(table)
+    one = {d["record_id"]: "OTC-ONE" for d in docs}
+    release, report = gr.build_release(docs, **{**_kw(table, docs, one, {}), "disputed_reasons": {"r1-nor-test": WH}})
+    assert [c["source_record_id"] for c in release["stations"][0]["constant_sets"]] == ["r0-nor-test"]
+    assert report.counts() == {"eot20_whole_hour_unresolved": 1}
+    with pytest.raises(ValueError, match="no record is publishable"):
+        gr.build_release(docs, **{**_kw(table, docs, one, {}), "disputed_reasons": {d["record_id"]: WH for d in docs}})
+    # any other disputed reason is not carried either (owner rule: disputed -> not carried)
+    release, report = gr.build_release(docs, **{**_kw(table, docs, one, {}),
+                                                "disputed_reasons": {"r1-nor-test": "comparators_disagree"}})
+    assert [c["source_record_id"] for c in release["stations"][0]["constant_sets"]] == ["r0-nor-test"]
+    (r,) = report.refused
+    assert r["reason"] == "time_base_disputed" and r["record"] == "r1-nor-test" and "comparators_disagree" in r["message"]
+    with pytest.raises(ValueError, match=r"'time_base_disputed': 2"):
+        gr.build_release(docs, **{**_kw(table, docs, one, {}),
+                                  "disputed_reasons": {d["record_id"]: "comparators_disagree" for d in docs}})
+
+
+def test_a_station_of_disputed_and_clock_offset_sets_is_withheld(table):  # noqa: F811
+    docs = two(table)
+    one = {d["record_id"]: "OTC-ONE" for d in docs}
+    clock = {"kind": "split_off", "verdict": "clock_offset_far", "clock_offset_h": -1.0, "distance_km": 1.5,
+             "against": ["x"], "decided_by": "size", "station_id": "OTC-ONE"}
+    with pytest.raises(ValueError, match=r"'clock_offset_unresolved': 1.*'time_base_disputed': 1|"
+                                         r"'time_base_disputed': 1.*'clock_offset_unresolved': 1"):
+        gr.build_release(docs, **{**_kw(table, docs, one, {"r0-nor-test": [clock]}),
+                                  "disputed_reasons": {"r1-nor-test": "weak_checks_disagree"}})
+
+
+def test_a_station_of_whole_hour_and_clock_offset_sets_is_withheld(table):  # noqa: F811
+    docs = two(table)
+    one = {d["record_id"]: "OTC-ONE" for d in docs}
+    clock = {"kind": "split_off", "verdict": "clock_offset_far", "clock_offset_h": -1.0, "distance_km": 1.5,
+             "against": ["x"], "decided_by": "size", "station_id": "OTC-ONE"}
+    with pytest.raises(ValueError, match="no record is publishable"):
+        gr.build_release(docs, **{**_kw(table, docs, one, {"r0-nor-test": [clock]}), "disputed_reasons": {"r1-nor-test": WH}})
+
+
+def test_disputed_reasons_from_the_audit():
+    rows = {"a": {"time_base_status": "disputed", "disputed_reason": WH, "time_base_code": "disputed:x"},
+            "b": {"time_base_status": "disputed", "time_base_code": "disputed:eot20_whole_hour"},
+            "c": {"time_base_status": "unverified", "disputed_reason": WH},
+            "d": {"time_base_status": "disputed", "time_base_code": "disputed"},
+            "e": {"time_base_status": "disputed", "disputed_reason": "comparators_disagree eot20_whole_hour"}}
+    assert disputed_reasons_of(rows) == {"a": WH, "b": WH, "e": "comparators_disagree eot20_whole_hour"}
+
+
+# --- release integration: SR-ACC short records publish now, and the whole-hour rule must see them ---------------
+
+def _short_and_long(table):  # noqa: F811
+    from test_format_1_0 import SHORT_HOURS, doc, fit_dict, short_calibration
+    f = fit_dict(rayleigh_hours=SHORT_HOURS)
+    short = doc(table, rid="r1-nor-test", fit=f, calibration=short_calibration(f, rid="r1-nor-test"))
+    return [doc(table, rid="r0-nor-test"), short]
+
+
+def test_a_short_record_with_a_whole_hour_eot20_lag_is_never_published(table):  # noqa: F811
+    docs = _short_and_long(table)
+    one = {d["record_id"]: "OTC-ONE" for d in docs}
+    release, report = gr.build_release(docs, **{**_kw(table, docs, one, {}), "disputed_reasons": {}})
+    assert sorted(report.published) == ["r0-nor-test", "r1-nor-test"]   # the short set publishes as an alternate
+    release, report = gr.build_release(docs, **{**_kw(table, docs, one, {}), "disputed_reasons": {"r1-nor-test": WH}})
+    assert [c["source_record_id"] for c in release["stations"][0]["constant_sets"]] == ["r0-nor-test"]
+    (r,) = report.refused
+    assert r["reason"] == "eot20_whole_hour_unresolved" and r["record"] == "r1-nor-test"
+    # its own station, the short set alone: the station is withheld, not published with an hours-wrong set
+    other = {"r0-nor-test": "OTC-0", "r1-nor-test": "OTC-1"}
+    release, report = gr.build_release(docs, **{**_kw(table, docs, other, {}), "disputed_reasons": {"r1-nor-test": WH}})
+    assert [s["station_id"] for s in release["stations"]] == ["OTC-0"]
+    assert report.counts() == {"eot20_whole_hour_unresolved": 1} and report.published == ["r0-nor-test"]
