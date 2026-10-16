@@ -166,7 +166,7 @@ FORMAT_VERSION = "1.0"
 SCHEMA_NAME = f"otc-{FORMAT_VERSION}.schema.json"
 # SHA-256 of the site's src/schema/otc-1.0.schema.json at the commit sync_schema.sh pins
 # (e2ae45a, approved source identities, original rows and restricted TICON policies). sync_schema.sh holds the same value; a test keeps the two equal.
-SCHEMA_SHA256 = "ece2e192505d66ae9295b10ff3a5993d9b233d6529851b4b15feea5d64518155"
+SCHEMA_SHA256 = "9e12738d3f3e54019ddf7863084273ec5526d16ff29c21ad3f40cf207d8013a8"
 _MISSING = object()  # "key not present"; never equal to a value read from JSON
 _UNSUPPORTED_TICON_NAMES = {"3L2", "3N2", "MSQM", "MTM", "R3", "T3"}
 

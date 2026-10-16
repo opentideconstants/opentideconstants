@@ -1881,11 +1881,11 @@
       "required": ["kind", "method"],
       "additionalProperties": false,
       "dependentRequired": { "uncertainty_m": ["uncertainty_basis"], "uncertainty_basis": ["uncertainty_m"] },
-      "dependentSchemas": { "fallback": { "properties": { "kind": { "const": "computed" } } } },
+      "dependentSchemas": { "fallback": { "properties": { "kind": { "enum": ["computed", "observed"] } } } },
       "properties": {
         "kind": { "enum": ["published", "computed", "observed"] },
         "fallback": {
-          "description": "A finding on this computed level only; the constant set and its published levels keep their own status.",
+          "description": "A finding on this computed or observed level only; the constant set and its published levels keep their own status. A labelled observed datum_gate_failed level may omit unknown total uncertainty and its basis together; tuning diagnostics are not a calibrated station uncertainty.",
           "allOf": [
             { "$ref": "#/$defs/fallback" },
             { "properties": { "reason": { "const": "datum_gate_failed" } } }
@@ -1959,7 +1959,12 @@
         {
           "if": { "properties": { "kind": { "const": "observed" } } },
           "then": {
-            "required": ["epoch", "data_span", "uncertainty_m"],
+            "required": ["epoch", "data_span"],
+            "if": {
+              "required": ["fallback"],
+              "properties": { "fallback": { "required": ["reason"], "properties": { "reason": { "const": "datum_gate_failed" } } } }
+            },
+            "else": { "required": ["uncertainty_m"] },
             "properties": {
               "method": { "enum": ["first_reduction", "standard", "modified_range_ratio", "direct"] },
               "uncertainty_basis": { "enum": ["calibrated", "propagated"] },
