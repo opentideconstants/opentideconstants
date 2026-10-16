@@ -8,7 +8,8 @@ require 'fileutils'
 # keeps these 2,706 ids and their identity fields; this spec pins the registry to the served file.
 RSpec.describe 'GESLA station registry' do
     root          = File.expand_path('../../..', __dir__)
-    ticon_path    = File.join(root, 'data', 'ticon.json')
+    ticon_path    = ENV.fetch('OTC_REGISTRY_TICON', File.join(root, 'data', 'ticon.json'))
+    tcd_path      = ENV.fetch('OTC_REGISTRY_TCD', File.join(root, 'data', 'latest-xtide.tcd'))
     registry_path = File.join(root, 'data', 'gesla', 'station_registry.json')
     pin_path      = File.join(root, 'data', 'gesla', 'inputs.lock.json')
     lock_key      = 'inputs/gesla/4.1/inputs.lock.json'
@@ -23,6 +24,14 @@ RSpec.describe 'GESLA station registry' do
     let(:registry)  { JSON.parse(File.read(registry_path)) }
     let(:pin)       { JSON.parse(File.read(pin_path)) }
     let(:lock_pin)  { pin.fetch('objects').fetch(lock_key) }
+
+    before(:example, :external_registry) do
+        profile = %w[OTC_REGISTRY_TICON OTC_REGISTRY_TCD]
+        if profile.none? { |name| ENV.key?(name) }
+            skip "The served-input comparison requires #{profile.join(', ')}; see pipeline/README.md"
+        end
+        profile.each { |name| File.realpath(ENV.fetch(name)) }
+    end
 
     # The full lock is data: it lives in the private work bucket, and $OTC_WORK is its local cache.
     # Fetch it when the cache lacks it and bucket credentials exist; otherwise skip (CI has no copy).
@@ -41,7 +50,7 @@ RSpec.describe 'GESLA station registry' do
         JSON.parse(File.read(lock_path))
     end
 
-    it 'is frozen from the served ticon.json (SHA-256 f58c960a...)' do
+    it 'is frozen from the served ticon.json (SHA-256 f58c960a...)', :external_registry do
         expect(ticon_sha).to start_with('f58c960a')
         expect(registry['source']['sha256']).to eq(ticon_sha)
     end
@@ -54,7 +63,7 @@ RSpec.describe 'GESLA station registry' do
         expect(registry['count']).to eq(2706)
     end
 
-    it 'has exactly the identity fields, equal to the served file for every id' do
+    it 'has exactly the identity fields, equal to the served file for every id', :external_registry do
         by_id = served.to_h { |s| [s['id'], s.slice(*identity)] }
         expect(registry['stations'].map { |s| s['id'] }).to match_array(by_id.keys)
 
@@ -72,8 +81,8 @@ RSpec.describe 'GESLA station registry' do
         expect(lock_pin['size']).to be_a(Integer).and be_positive
     end
 
-    it 'pins the served ticon.json and the engine TCD in the bucket lock' do
-        tcd = File.realpath(File.join(root, 'data', 'latest-xtide.tcd'))
+    it 'pins the served ticon.json and the engine TCD in the bucket lock', :external_registry do
+        tcd = File.realpath(tcd_path)
         expect(lock['ticon']['sha256']).to eq(ticon_sha)
         expect(lock['tcd']['file']).to eq(File.basename(tcd))
         expect(lock['tcd']['sha256']).to eq(Digest::SHA256.file(tcd).hexdigest)

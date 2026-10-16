@@ -3,17 +3,39 @@
 require 'digest'
 require 'open3'
 require 'tmpdir'
+require 'rbconfig'
 require_relative '../../../scripts/gesla/dump_tcd'
 
 # The GESLA fit reads speed, V0+u and f from a dump of the TCD the engine reads.
 # The dump must hold the engine's own values, or the fitted phases would not be in
 # the engine's convention.
 RSpec.describe GeslaTcdDump do
-    let(:tcd_path) { Harmonics::Engine::XTIDE_FILE }
-    let(:engine) { Harmonics::Engine.new(Logger.new('/dev/null')) }
+    let(:engine_worktree) { ENV.fetch('OTC_ENGINE_WORKTREE') }
+    let(:tcd_path) { File.join(engine_worktree, 'data/latest-xtide.tcd') }
+    let(:engine_factors) do
+        program = <<~'RUBY'
+            require 'logger'
+            require 'json'
+            require File.join(Dir.pwd, 'lib/harmonics_engine')
+            engine = Harmonics::Engine.new(Logger.new('/dev/null'))
+            puts JSON.generate([2000, 2026, 2027].to_h { |year| [year, engine.send(:calculate_tcd_nodal_factors, year, 0.0)] })
+        RUBY
+        output, error, status = Bundler.with_unbundled_env do
+            Open3.capture3({ 'BUNDLE_GEMFILE' => File.join(engine_worktree, 'Gemfile') },
+                           RbConfig.ruby, '-rbundler/setup', '-e', program, chdir: engine_worktree)
+        end
+        expect(status.success?).to be(true), output + error
+        JSON.parse(output)
+    end
     let(:dump) { described_class.dump(tcd_path) }
 
-    describe '.dump' do
+    before(:example, :external_engine) do
+        unless ENV.key?('OTC_ENGINE_WORKTREE')
+            skip 'The real TCD/engine comparison requires OTC_ENGINE_WORKTREE; see pipeline/README.md'
+        end
+    end
+
+    describe '.dump', :external_engine do
         it 'covers the years 1900 to 2100 and records the TCD SHA-256' do
             expect(dump['years']).to eq([1900, 2100])
             expect(dump['tcd_sha256']).to eq(Digest::SHA256.file(tcd_path).hexdigest)
@@ -22,7 +44,7 @@ RSpec.describe GeslaTcdDump do
 
         it "equals the engine's own V0+u and f for M2 S2 K1 O1 N2 in 2000, 2026 and 2027" do
             [2000, 2026, 2027].each do |year|
-                factors = engine.send(:calculate_tcd_nodal_factors, year, 0.0)
+                factors = engine_factors.fetch(year.to_s)
                 %w[M2 S2 K1 O1 N2].each do |name|
                     c = dump['constituents'].fetch(name)
                     i = year - dump['years'].first
@@ -43,7 +65,7 @@ RSpec.describe GeslaTcdDump do
     end
 
     describe '.check_gem_alignment' do
-        it 'accepts a constituent count that is a multiple of 8, as the TCD in use (176) is' do
+        it 'accepts a constituent count that is a multiple of 8, as the TCD in use (176) is', :external_engine do
             expect(dump['constituents'].size).to eq(176)
             expect { described_class.check_gem_alignment(176, 'x.tcd') }.not_to raise_error
         end
@@ -63,7 +85,7 @@ RSpec.describe GeslaTcdDump do
         end
     end
 
-    describe '.tcd_constituent_name' do
+    describe '.tcd_constituent_name', :external_engine do
         let(:tcd_names) { dump['constituents'].keys }
 
         it 'maps the TICON spellings to the TCD names' do
@@ -77,7 +99,7 @@ RSpec.describe GeslaTcdDump do
         end
     end
 
-    describe 'the command' do
+    describe 'the command', :external_engine do
         let(:script) { File.expand_path('../../../scripts/gesla/dump_tcd.rb', __dir__) }
 
         it 'writes the same bytes on every run' do
