@@ -205,9 +205,10 @@ module OTCTierB
         ].freeze
         PREFIX = 'OTC metric finding: '
 
-        def initialize(input:, comparison:, release:, provenance:, inventory:, out:, projection: false)
+        def initialize(input:, comparison:, release:, provenance:, inventory:, out:, projection: false, strict_source: nil)
             @paths = { input: input, comparison: comparison, provenance: provenance, inventory: inventory }
             @release_path, @out, @projection = release, out, projection
+            @strict_source = strict_source || OTCCaseOracle::Runner::STRICT_SOURCE
             @mappings, @labels, @violations = [], [], []
         end
 
@@ -245,8 +246,7 @@ module OTCTierB
             (@input.fetch('inputs') + @input.fetch('official_pins')).each do |item|
                 require_value(digest(item.fetch('path')) == item.fetch('sha256'), "original input bytes changed: #{item['path']}")
             end
-            strict = File.expand_path('../../../lib/harmonics_strict.rb', __dir__)
-            require_value(digest(strict) == @comparison.fetch('strict_source_sha256'), 'strict mathematics changed')
+            require_value(digest(@strict_source) == @comparison.fetch('strict_source_sha256'), 'strict mathematics changed')
             @xtide = JSON.parse(File.read(evidence('xtide-comparison/xtide-report.json').fetch('path')))
             require_value(digest(evidence('xtide-comparison/xtide-report.json').fetch('path')) == @comparison.fetch('xtide_report_sha256'),
                           'same-input XTide evidence changed')

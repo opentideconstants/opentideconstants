@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import os
 import shutil
 import subprocess
 from datetime import datetime, timedelta, timezone
@@ -245,10 +246,25 @@ def test_engine_input_flood_sign(fetched):
 
 def _has_engine() -> bool:
     try:
-        return subprocess.run(["bundle", "exec", "ruby", "-e", "require 'tcd'"], cwd=current_proof.WEBCALTIDES,
+        engine_worktree = Path(os.environ.get("OTC_ENGINE_WORKTREE", current_proof.WEBCALTIDES)).resolve()
+        return subprocess.run(["bundle", "exec", "ruby", "-e", "require 'tcd'"], cwd=engine_worktree,
+                              env={**os.environ, "BUNDLE_GEMFILE": str(engine_worktree / "Gemfile")},
                               capture_output=True).returncode == 0
     except FileNotFoundError:
         return False
+
+
+def test_engine_requires_explicit_external_checkout_after_relocation(tmp_path, monkeypatch):
+    monkeypatch.delenv("OTC_ENGINE_WORKTREE", raising=False)
+    monkeypatch.setattr(current_proof, "WEBCALTIDES", tmp_path)
+    with pytest.raises(ValueError, match="OTC_ENGINE_WORKTREE"):
+        current_proof.run_engine({}, tmp_path)
+
+
+def test_engine_rejects_invalid_explicit_checkout(tmp_path, monkeypatch):
+    monkeypatch.setenv("OTC_ENGINE_WORKTREE", str(tmp_path / "missing"))
+    with pytest.raises(ValueError, match="OTC_ENGINE_WORKTREE"):
+        current_proof.run_engine({}, tmp_path)
 
 
 @pytest.mark.skipif(not _has_engine(), reason="needs the webcaltides Ruby bundle (tcd gem)")

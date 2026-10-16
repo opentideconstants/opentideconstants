@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import subprocess
 import sys
 import tempfile
@@ -91,9 +92,15 @@ def engine_input(current_bin: dict, start: datetime, end: datetime) -> dict:
 
 
 def run_engine(inp: dict, workdir: Path) -> dict:
+    engine_worktree = Path(os.environ.get("OTC_ENGINE_WORKTREE", WEBCALTIDES)).resolve()
+    if not all((engine_worktree / path).is_file() for path in
+               ("Gemfile", "lib/harmonics_engine.rb", "clients/harmonics.rb")):
+        raise ValueError("set OTC_ENGINE_WORKTREE to the external WebCalTides engine checkout")
     i, o = workdir / "engine_in.json", workdir / "engine_out.json"
     i.write_text(json.dumps(inp))
-    subprocess.run(["bundle", "exec", "ruby", str(DRIVER), str(i), str(o)], cwd=WEBCALTIDES,
+    subprocess.run(["bundle", "exec", "ruby", str(DRIVER), str(i), str(o)], cwd=engine_worktree,
+                   env={**os.environ, "OTC_ENGINE_WORKTREE": str(engine_worktree),
+                        "BUNDLE_GEMFILE": str(engine_worktree / "Gemfile")},
                    check=True, capture_output=True, text=True)
     return json.loads(o.read_text())
 

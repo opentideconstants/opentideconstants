@@ -18,7 +18,9 @@ require 'json'
 require 'logger'
 require 'tmpdir'
 require 'active_support/all'
-root = File.expand_path('../../..', __dir__)
+root = File.expand_path(ENV.fetch('OTC_ENGINE_WORKTREE') { File.expand_path('../../..', __dir__) })
+abort 'set OTC_ENGINE_WORKTREE to the external WebCalTides engine checkout' unless
+    File.file?(File.join(root, 'lib/harmonics_engine.rb')) && File.file?(File.join(root, 'clients/harmonics.rb'))
 require File.join(root, 'lib/harmonics_engine')
 require File.join(root, 'clients/harmonics')
 
