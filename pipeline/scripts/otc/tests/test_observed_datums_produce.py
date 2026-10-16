@@ -180,7 +180,8 @@ def test_actual_cached_existing_valid_controls(cached_control_profiles):
     functions = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name in names]
     digest = hashlib.sha256(ast.dump(ast.Module(body=functions, type_ignores=[]), include_attributes=False).encode()).hexdigest()
     markers = [p.sha256(cache / f"{item['key']}.done.json") for item in run["targets"]]
-    excluded = {"choose_control", "reduce_profile", "produce", "_produce", "main", "authenticate_measured_inputs"}
+    excluded = {"choose_control", "reduce_profile", "produce", "_produce", "main", "authenticate_measured_inputs",
+                "_initialize_reduction_worker", "_reduction_worker", "reduction_results"}
     surface = ast.Module(body=[node for node in tree.body if not
                         (isinstance(node, ast.FunctionDef) and node.name in excluded)], type_ignores=[])
     surface_digest = hashlib.sha256(ast.dump(surface, include_attributes=False).encode()).hexdigest()
@@ -209,6 +210,10 @@ def test_actual_measured_input_authentication_and_negative_controls(tmp_path, mo
         p.authenticate_measured_inputs(source, run, changed)
     changed = copy.deepcopy(identity)
     changed["implementation"]["modules"]["gesla.qc"] = "0" * 64
+    with pytest.raises(ValueError, match="scientific dependency"):
+        p.authenticate_measured_inputs(source, run, changed)
+    changed = copy.deepcopy(identity)
+    changed["implementation"]["modules"]["otc_pipeline.observed_datums.monthly"] = "0" * 64
     with pytest.raises(ValueError, match="scientific dependency"):
         p.authenticate_measured_inputs(source, run, changed)
     changed_source = tmp_path / "changed-producer.py"
@@ -242,6 +247,29 @@ def test_actual_measured_input_authentication_and_negative_controls(tmp_path, mo
     with pytest.raises(ValueError, match="checkpoint missing"):
         p.read_checkpoint(tmp_path, key, job_sha, require_complete=True)
     print("real frozen authentication PASS; changed source/code/dependency, corrupt/missing/partial checkpoints REFUSED")
+
+
+def test_actual_cached_serial_and_four_reductions_are_exact(cached_control_profiles, monkeypatch):
+    p = producer()
+    cache, targets, primaries, run = cached_control_profiles
+    selected = {target["cs"]["set_id"] for target in targets.values()}
+    index = [item for item in run["targets"] if item["set_id"] in selected]
+    serial = list(p.reduction_results(index, cache, primaries, 1))
+    parallel = list(p.reduction_results(index, cache, primaries, 4))
+    assert len(serial) == len(parallel) == 4
+    assert json.dumps(serial, sort_keys=True, allow_nan=False) == json.dumps(parallel, sort_keys=True, allow_nan=False)
+    assert [row["set_id"] for row, _ in parallel] == [item["set_id"] for item in index]
+    # Execute the unchanged comparison once with the original monthly implementation.
+    original = p.datum_t1.compare_reduce
+    def uncached(ta, tb, accepted, supplied, method, *, common):
+        cached = original(ta, tb, accepted, supplied, method, common=common)
+        actual = original(ta, tb, accepted, monthly, method, common=common)
+        assert cached == actual
+        return cached
+    monkeypatch.setattr(p.datum_t1, "compare_reduce", uncached)
+    target = copy.deepcopy(targets["werkendambuitentg-wer-nld-cmems"])
+    p.reduce_profile(target, primaries, cache)
+    print("four actual records: serial/four ordered byte/value/control/method/month/binding equality; winning-pair adapter exact")
 
 
 def months(first, last):

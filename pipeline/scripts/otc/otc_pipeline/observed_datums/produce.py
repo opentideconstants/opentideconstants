@@ -352,7 +352,20 @@ def choose_control(profile: dict, profiles: list[dict], cache: Path) -> tuple[di
         values = {level: other["primary"][level] + float(np.mean([ma[k][level] - mb[k][level] for k in keys]))
                   for level in ("MHW", "MHHW")}
     else:
-        values = datum_t1.compare_reduce(ta, tb, other["primary"], monthly, method, common=True)
+        class ComparisonMonths:
+            MIN_COMMON_DAYS = monthly.MIN_COMMON_DAYS
+
+            @staticmethod
+            def monthly_means(tab, *, days, min_days):
+                if days != common or min_days != monthly.MIN_COMMON_DAYS:
+                    raise ValueError("winning-pair common-month arguments changed")
+                if tab is ta:
+                    return ma
+                if tab is tb:
+                    return mb
+                raise ValueError("unexpected winning-pair tabulation")
+
+        values = datum_t1.compare_reduce(ta, tb, other["primary"], ComparisonMonths, method, common=True)
         if values is None or not all(math.isfinite(v) for v in values.values()):
             return None, None, None
         values = monthly.derived(values)
@@ -655,11 +668,18 @@ def authenticate_measured_inputs(source: Path, previous: dict, identity: dict) -
         raise ValueError("measured-input original producer mismatch")
     if old["inputs"] != identity["inputs"] or old["roles_sha256"] != identity["roles_sha256"]:
         raise ValueError("measured-input current source identity mismatch")
-    for key in ("modules", "numpy_version"):
-        if old["implementation"][key] != identity["implementation"][key]:
-            raise ValueError("measured-input scientific dependency mismatch")
+    expected_modules = dict(old["implementation"]["modules"])
+    monthly_module = "otc_pipeline.observed_datums.monthly"
+    if expected_modules[monthly_module] != "af03e068fd4b7f7df23ead3f1f943e6d2e385702d3dff557a02ece27c821c426":
+        raise ValueError("measured-input original monthly dependency mismatch")
+    # One reviewed call-local index reuse; original measurements retain the old hash.
+    expected_modules[monthly_module] = "ed260f6d3c8b8b77c9d3931380ab7c55e28f56fee1dbf3f65ddccfe70623f0cc"
+    if (expected_modules != identity["implementation"]["modules"] or
+            old["implementation"]["numpy_version"] != identity["implementation"]["numpy_version"]):
+        raise ValueError("measured-input scientific dependency mismatch")
     tree = ast.parse(Path(__file__).read_text())
-    excluded = {"choose_control", "reduce_profile", "produce", "_produce", "main", "authenticate_measured_inputs"}
+    excluded = {"choose_control", "reduce_profile", "produce", "_produce", "main", "authenticate_measured_inputs",
+                "_initialize_reduction_worker", "_reduction_worker", "reduction_results"}
     surface = ast.Module(body=[node for node in tree.body if not
                         (isinstance(node, ast.FunctionDef) and node.name in excluded)], type_ignores=[])
     digest = hashlib.sha256(ast.dump(surface, include_attributes=False).encode()).hexdigest()
@@ -667,12 +687,57 @@ def authenticate_measured_inputs(source: Path, previous: dict, identity: dict) -
         raise ValueError("measured-input measurement implementation changed")
 
 
+def _initialize_reduction_worker(cache: Path, primaries: list[dict]) -> None:
+    global _WORKER_CONTEXT
+    _WORKER_CONTEXT = (cache, primaries)
+
+
+def _reduction_worker(item: dict) -> tuple[dict, dict]:
+    cache, primaries = _WORKER_CONTEXT
+    profile = read_checkpoint(cache, item["key"], item["job_sha256"], require_complete=True)
+    return reduce_profile(profile, primaries, cache)
+
+
+def reduction_results(index: list[dict], cache: Path, primaries: list[dict], workers: int):
+    """Bound both pending and completed results, yielding only original target order."""
+    if workers == 1:
+        for item in index:
+            profile = read_checkpoint(cache, item["key"], item["job_sha256"], require_complete=True)
+            yield reduce_profile(profile, primaries, cache)
+        return
+    prior_children = {child.pid for child in multiprocessing.active_children()}
+    executor = ProcessPoolExecutor(max_workers=workers, mp_context=multiprocessing.get_context("spawn"),
+        initializer=_initialize_reduction_worker, initargs=(cache, primaries))
+    pending = []
+    try:
+        for item in index:
+            pending.append(executor.submit(_reduction_worker, item))
+            if len(pending) >= workers:
+                yield pending.pop(0).result()
+        while pending:
+            yield pending.pop(0).result()
+    except BaseException:
+        for future in pending:
+            future.cancel()
+        children = [child for child in multiprocessing.active_children() if child.pid not in prior_children]
+        for child in children:
+            child.terminate()
+        for child in children:
+            child.join(timeout=5)
+            if child.is_alive():
+                child.kill()
+                child.join()
+        raise
+    finally:
+        executor.shutdown(wait=True, cancel_futures=True)
+
+
 def produce(release_path: Path, gesla_root: Path, fit_run: Path, tcd: Path, out: Path, *, resume: bool = False,
             workers: int = 1, measured_inputs: Path | None = None) -> dict:
     """Bounded independent measurements precede ordered full-cohort reductions."""
     if type(workers) is not int or not 1 <= workers <= 4:
         raise ValueError("workers must be an integer from 1 to 4")
-    if measured_inputs is not None and (resume or out.resolve() == measured_inputs.resolve()):
+    if measured_inputs is not None and out.resolve() == measured_inputs.resolve():
         raise ValueError("measured-input reduction requires a fresh separate output")
     out.mkdir(parents=True, exist_ok=True)
     with (out / ".lock").open("a+") as lock:
@@ -741,6 +806,8 @@ def _produce(release_path: Path, gesla_root: Path, fit_run: Path, tcd: Path, out
     run = {"format": "otc-observed-run-v1", "identity": identity, "targets": index}
     if previous is not None and (previous["targets"] != index or (measured_inputs is None and previous != run)):
         raise ValueError("resume full-cohort target manifest mismatch")
+    if resume and measured_inputs is not None and json.loads(run_path.read_text()) != run:
+        raise ValueError("resume current reduction source/implementation identity mismatch")
     if not resume:
         write_json(run_path, run)
     completion_path = out / "observed-completion.json"
@@ -794,18 +861,14 @@ def _produce(release_path: Path, gesla_root: Path, fit_run: Path, tcd: Path, out
     with draft_temp.open("w") as drafts, report_temp.open("w") as records:
         prefix = json.dumps(report, sort_keys=True, allow_nan=False)
         records.write(prefix[:-1] + ', "records": [')
-        for position, item in enumerate(index):
-            profile = read_checkpoint(cache, item["key"], item["job_sha256"], require_complete=True)
-            if profile is None:
-                raise ValueError(f"checkpoint disappeared after full-cohort barrier: {item['set_id']}")
-            row, detail = reduce_profile(profile, primaries, cache)
+        for position, (row, detail) in enumerate(reduction_results(index, cache, primaries, workers)):
             drafts.write(json.dumps(row, sort_keys=True, allow_nan=False) + "\n")
             if position:
                 records.write(",\n")
             records.write(json.dumps(detail, sort_keys=True, allow_nan=False))
             disposition = detail["disposition"]
             counts[disposition] = counts.get(disposition, 0) + 1
-            del row, detail, profile
+            del row, detail
         counts["target_sets"] = len(index)
         records.write('], "counts": ' + json.dumps(counts, sort_keys=True) + "}\n")
         for stream in (drafts, records):
@@ -824,7 +887,7 @@ def main() -> None:
     for name in ("release", "gesla-root", "fit-run", "tcd", "out"):
         parser.add_argument(f"--{name}", type=Path, required=True)
     parser.add_argument("--resume", action="store_true", help="resume only authenticated identical run inputs")
-    parser.add_argument("--workers", type=int, choices=range(1, 5), default=1, help="independent measurement processes (1–4)")
+    parser.add_argument("--workers", type=int, choices=range(1, 5), default=1, help="independent measurement/reduction processes (1–4)")
     parser.add_argument("--measured-inputs", type=Path, help="read-only frozen 1d0d487 measurements; no reconstruction")
     args = parser.parse_args()
     report = produce(args.release, args.gesla_root, args.fit_run, args.tcd, args.out, resume=args.resume,
