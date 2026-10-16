@@ -221,6 +221,86 @@ def write_actual_draft(row, path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+@pytest.fixture
+def native_chart_datum_input(tmp_path):
+    """Replay the three saved native drafts without recomputing their levels."""
+    root = os.environ.get("OTC_CHART_DATUM_PROOF")
+    if not root:
+        pytest.skip("requires the saved native chart-datum witnesses")
+    root = Path(root)
+    facts = json.loads((root / "native-cases.json").read_text())
+    fixture = Path(facts["fixture_path"])
+    assert hashlib.sha256(fixture.read_bytes()).hexdigest() == facts["fixture_sha256"]
+    original = json.loads(fixture.read_text())
+    release = copy.deepcopy(original)
+    ids = {row["set_id"] for row in facts["cases"]}
+    assert len(ids) == 3
+    drafts = Path(os.environ["OTC_CHART_DATUM_DRAFTS"])
+    assert hashlib.sha256(drafts.read_bytes()).hexdigest() == "77006af6f3274eae6437651abc93440c3d2a9d7d6452c9a6f7fa50a82b21fa99"
+    rows = [row for line in drafts.read_text().splitlines()
+            if (row := json.loads(line)).get("set_id") in ids]
+    assert len(rows) == 3
+    for station in release["stations"]:
+        for cs in station["constant_sets"]:
+            if cs["set_id"] in ids:
+                for level in ("lat", "hat"):
+                    assert cs["datum"]["basis"][level]["kind"] == "computed"
+                    del cs["datum"]["named"][level]
+                    del cs["datum"]["basis"][level]
+    path = tmp_path / "actual-chart-drafts.jsonl"
+    path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+    return root, original, release, ids, path, hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def test_native_chart_datum_designation_follows_labelled_level_attachment(native_chart_datum_input):
+    _, original, release, ids, path, sha = native_chart_datum_input
+    expected = copy.deepcopy(original)
+    for station in expected["stations"]:
+        for cs in station["constant_sets"]:
+            if cs["set_id"] in ids:
+                cs["datum"]["chart_datum"] = "lat"
+    receipt = build_otc.apply_official_datum_fallbacks(release, path, sha)
+    assert release == expected
+    assert receipt["computed_basis_fallback_count"] == 6
+    derivation = receipt["chart_datum_derivation"]
+    assert derivation["changed_places"] == derivation["changed_sets"] == 3
+    assert derivation["conventions_sha256"] == hashlib.sha256(
+        Path(build_otc.__file__).with_name("chart_datum_conventions.json").read_bytes()).hexdigest()
+    assert derivation["citations"]["iho-2021-uk"]["stated_convention"] == "approximate LAT"
+
+
+def test_native_staging_only_does_not_designate_chart_datum(native_chart_datum_input):
+    _, _, release, _, path, sha = native_chart_datum_input
+    before = copy.deepcopy(release)
+    receipt = build_otc.stage_official_datums(release, path, sha)
+    assert release == before
+    assert receipt["public_admission"] is False
+    assert "chart_datum_derivation" not in receipt
+
+
+@pytest.mark.parametrize("control", ["published_precedence", "uk_country_overseas_area_not_evidenced",
+                                     "southern_norway_not_unmargined_lat", "flatline", "truncated_lows"])
+def test_native_producer_chart_datum_controls(native_chart_datum_input, control, tmp_path):
+    root, original, _, _, _, _ = native_chart_datum_input
+    if control in ("flatline", "truncated_lows"):
+        station = copy.deepcopy(original["stations"][0])
+        for cs in station["constant_sets"]:
+            if control == "flatline":
+                cs.setdefault("record_issues", []).append({"issue": "flatline"})
+            else:
+                for basis in cs.get("datum", {}).get("basis", {}).values():
+                    basis.setdefault("flags", []).append("truncated_lows")
+    else:
+        station = json.loads((root / "native-controls.json").read_text())[control]
+    release = {"stations": [station]}
+    before = copy.deepcopy(release)
+    path = tmp_path / "no-drafts.jsonl"
+    path.write_text("")
+    receipt = build_otc.apply_official_datum_fallbacks(release, path, hashlib.sha256(path.read_bytes()).hexdigest())
+    assert release == before
+    assert receipt["chart_datum_derivation"]["changed_places"] == 0
+
+
 @pytest.mark.parametrize("actual_datum_case", range(3), indirect=True)
 def test_actual_tombstone_keeps_official_datum_producer_working(actual_datum_case):
     release, cs, row, path = actual_datum_case
@@ -375,6 +455,7 @@ def test_staging_rejects_invalid_or_changed_drafts(staged_input, defect):
 
 def test_missing_official_levels_use_unprefixed_keys_and_keep_set_ranking(staged_input):
     release, row, path = staged_input
+    release["stations"][0]["country"] = "FRA"
     cs = release["stations"][0]["constant_sets"][0]
     cs["datum"]["named"].clear()
     cs["datum"]["basis"].clear()
@@ -387,6 +468,8 @@ def test_missing_official_levels_use_unprefixed_keys_and_keep_set_ranking(staged
     assert set(cs["datum"]["named"]) == {"lat", "hat"}
     assert "fallback" not in cs
     assert cs["datum"]["basis"]["lat"]["fallback"]["reason"] == "datum_gate_failed"
+    assert cs["datum"]["chart_datum"] == "lat"
+    assert receipt["chart_datum_derivation"]["changed_places"] == 1
 
 
 @pytest.mark.skipif("OTC_DATUM_NATIVE_RELEASE" not in os.environ,
