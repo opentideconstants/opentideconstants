@@ -12,7 +12,9 @@ import hashlib
 import importlib
 import json
 import math
+import multiprocessing
 import os
+from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -538,18 +540,117 @@ def primary_summary(profile: dict) -> dict:
     return {"station": profile["station"], "cs": short_cs, "primary": profile["primary"], "cache": profile["cache"]}
 
 
-def produce(release_path: Path, gesla_root: Path, fit_run: Path, tcd: Path, out: Path, *, resume: bool = False) -> dict:
-    """One serial run; durable original measurements precede full-cohort reductions."""
+_WORKER_CONTEXT = None
+
+
+def _initialize_measurement_worker(gesla_root: Path, fit_run: Path, tcd: Path, roles_path: Path) -> None:
+    global _WORKER_CONTEXT
+    release = GeslaRelease(gesla_root)
+    dump = gesla_sets.load_tcd_dump(tcd)
+    manifest = json.loads((fit_run / "timebase_manifest.json").read_text())
+    audit = gesla_sets.load_audit(Path(manifest["inputs"]["timebase_csv"]["path"]).parent)
+    manifest, fit_rows = gesla_sets.check_fit_run(fit_run, dump, release, audit)
+    _WORKER_CONTEXT = (release, dump, fit_run, manifest, fit_rows, audit, load_contributor_roles(roles_path))
+
+
+def _measure_checkpoint(cache: Path, item: dict, context) -> str:
+    job = json.loads((cache / f"{item['key']}.job.json").read_text())
+    if canonical_hash(job) != item["job_sha256"]:
+        raise ValueError(f"measurement job changed: {item['set_id']}")
+    print(f"measure {item['set_id']} pid={os.getpid()}", flush=True)
+    profile, tab = measure_profile(job, *context)
+    write_checkpoint(cache, item["key"], item["job_sha256"], profile, tab)
+    print(f"checkpoint {item['set_id']} pid={os.getpid()}", flush=True)
+    return item["key"]
+
+
+def _measurement_worker(cache: Path, item: dict) -> str:
+    if _WORKER_CONTEXT is None:
+        raise RuntimeError("measurement worker was not initialized")
+    return _measure_checkpoint(cache, item, _WORKER_CONTEXT)
+
+
+def _complete_measurements(index: list[dict], cache: Path, context, worker_inputs: tuple,
+                           workers: int, require_complete: bool) -> tuple[int, int]:
+    """Bound pending jobs and arrays; no worker performs control selection."""
+    executor = None
+    pending = set()
+    prior_children = {child.pid for child in multiprocessing.active_children()}
+    measured = reused = 0
+    authenticated_members = set()
+    release = context[0]
+
+    def reap() -> None:
+        done, _ = wait(pending, return_when=FIRST_COMPLETED)
+        for future in done:
+            future.result()
+            pending.remove(future)
+
+    try:
+        for item in index:
+            key, job_sha = item["key"], item["job_sha256"]
+            job = json.loads((cache / f"{key}.job.json").read_text())
+            profile = read_checkpoint(cache, key, job_sha, require_complete=require_complete)
+            if profile is None:
+                if workers == 1:
+                    _measure_checkpoint(cache, item, context)
+                else:
+                    if executor is None:
+                        executor = ProcessPoolExecutor(max_workers=workers, mp_context=multiprocessing.get_context("spawn"),
+                            initializer=_initialize_measurement_worker, initargs=worker_inputs)
+                    if len(pending) >= workers:
+                        reap()
+                    pending.add(executor.submit(_measurement_worker, cache, item))
+                measured += 1
+            else:
+                # Reuse authenticates original bytes, never just an old caller context.
+                rid = job["cs"]["source_record_id"]
+                if rid in release.members and rid not in authenticated_members:
+                    release.read_member(rid)
+                    authenticated_members.add(rid)
+                if profile.get("binding") != job["binding"] or profile.get("cs") != job["cs"] or profile.get("station") != job["station"]:
+                    raise ValueError(f"checkpoint source context mismatch: {item['set_id']}")
+                reused += 1
+                print(f"reuse {item['set_id']}", flush=True)
+                print(f"checkpoint {item['set_id']}", flush=True)
+            del profile, job
+        while pending:
+            reap()
+    except BaseException:
+        for future in pending:
+            future.cancel()
+        # Python3.12 has no executor terminate_workers API. Use public Process
+        # lifecycle methods on only children created by this owned coordinator.
+        children = [child for child in multiprocessing.active_children() if child.pid not in prior_children]
+        for child in children:
+            child.terminate()
+        for child in children:
+            child.join(timeout=5)
+            if child.is_alive():
+                child.kill()
+                child.join()
+        raise
+    finally:
+        if executor is not None:
+            executor.shutdown(wait=True, cancel_futures=True)
+    return measured, reused
+
+
+def produce(release_path: Path, gesla_root: Path, fit_run: Path, tcd: Path, out: Path, *, resume: bool = False,
+            workers: int = 1) -> dict:
+    """Bounded independent measurements precede ordered full-cohort reductions."""
+    if type(workers) is not int or not 1 <= workers <= 4:
+        raise ValueError("workers must be an integer from 1 to 4")
     out.mkdir(parents=True, exist_ok=True)
     with (out / ".lock").open("a+") as lock:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as exc:
             raise ValueError(f"{out}: producer is already running") from exc
-        return _produce(release_path, gesla_root, fit_run, tcd, out, resume=resume)
+        return _produce(release_path, gesla_root, fit_run, tcd, out, resume=resume, workers=workers)
 
 
-def _produce(release_path: Path, gesla_root: Path, fit_run: Path, tcd: Path, out: Path, *, resume: bool) -> dict:
+def _produce(release_path: Path, gesla_root: Path, fit_run: Path, tcd: Path, out: Path, *, resume: bool, workers: int) -> dict:
     run_path = out / "observed-run.json"
     if not resume and any(path.name != ".lock" for path in out.iterdir()):
         raise ValueError(f"{out}: occupied; use --resume with the identical inputs")
@@ -604,33 +705,20 @@ def _produce(release_path: Path, gesla_root: Path, fit_run: Path, tcd: Path, out
     if not resume:
         write_json(run_path, run)
     completion_path = out / "observed-completion.json"
-    primaries, measured, reused, authenticated_members = [], 0, 0, set()
+    context = (release, dump, fit_run, manifest, fit_rows, audit, roles)
+    measured, reused = _complete_measurements(index, cache, context, (gesla_root, fit_run, tcd, roles_path),
+                                             workers, completion_path.exists())
+    primaries = []
     completed_profiles = []
     for item in index:
         key, job_sha = item["key"], item["job_sha256"]
-        job = json.loads((cache / f"{key}.job.json").read_text())
-        profile = read_checkpoint(cache, key, job_sha, require_complete=completion_path.exists())
+        profile = read_checkpoint(cache, key, job_sha, require_complete=True)
         if profile is None:
-            print(f"measure {item['set_id']}", flush=True)
-            profile, tab = measure_profile(job, release, dump, fit_run, manifest, fit_rows, audit, roles)
-            write_checkpoint(cache, key, job_sha, profile, tab)
-            del tab
-            measured += 1
-        else:
-            # Reuse never substitutes a caller's old context for authenticated original bytes.
-            rid = job["cs"]["source_record_id"]
-            if rid in release.members and rid not in authenticated_members:
-                release.read_member(rid)
-                authenticated_members.add(rid)
-            if profile.get("binding") != job["binding"] or profile.get("cs") != job["cs"] or profile.get("station") != job["station"]:
-                raise ValueError(f"checkpoint source context mismatch: {item['set_id']}")
-            reused += 1
-            print(f"reuse {item['set_id']}", flush=True)
+            raise ValueError(f"checkpoint missing after measurement barrier: {item['set_id']}")
         if profile.get("primary") and profile["report"].get("reason") is None:
             primaries.append(primary_summary(profile))
         completed_profiles.append(sha256(cache / f"{key}.done.json"))
-        print(f"checkpoint {item['set_id']}", flush=True)
-        del profile, job
+        del profile
     # Full-cohort barrier: every profile is complete before any control selection.
     reduction_identity = {"run_sha256": sha256(run_path), "profile_manifests_sha256": canonical_hash({"ordered": completed_profiles})}
     if completion_path.exists():
@@ -683,8 +771,9 @@ def main() -> None:
     for name in ("release", "gesla-root", "fit-run", "tcd", "out"):
         parser.add_argument(f"--{name}", type=Path, required=True)
     parser.add_argument("--resume", action="store_true", help="resume only authenticated identical run inputs")
+    parser.add_argument("--workers", type=int, choices=range(1, 5), default=1, help="independent measurement processes (1–4)")
     args = parser.parse_args()
-    report = produce(args.release, args.gesla_root, args.fit_run, args.tcd, args.out, resume=args.resume)
+    report = produce(args.release, args.gesla_root, args.fit_run, args.tcd, args.out, resume=args.resume, workers=args.workers)
     print(json.dumps(report["counts"], sort_keys=True))
 
 

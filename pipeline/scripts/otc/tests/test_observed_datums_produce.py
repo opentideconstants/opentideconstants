@@ -21,10 +21,20 @@ def test_producer_entry_point_exists():
     assert importlib.util.find_spec("otc_pipeline.observed_datums.produce") is not None
 
 
-def test_producer_has_explicit_resume_without_workers_or_selection():
+def test_producer_has_explicit_resume_and_bounded_workers_without_selection():
     parameters = inspect.signature(producer().produce).parameters
     assert parameters["resume"].default is False
-    assert "workers" not in parameters and "only" not in parameters
+    assert parameters["workers"].default == 1
+    assert "only" not in parameters
+
+
+@pytest.mark.parametrize("workers", (0, -1, 5, 1.5, True))
+def test_invalid_workers_fail_before_output_changes(tmp_path, workers):
+    absent = tmp_path / "missing-input"
+    out = tmp_path / "output"
+    with pytest.raises(ValueError, match="workers"):
+        producer().produce(absent, absent, absent, absent, out, workers=workers)
+    assert not out.exists()
 
 
 @pytest.mark.parametrize("disposition", ("failed", "unavailable"))
