@@ -783,13 +783,15 @@ def source_set(doc: Mapping, *, licence_id: str, retain_source_values: bool = Fa
 
 
 # Datums spec §4.4 admits a record's explicitly stated chart zero, not a vertical conversion.
-# Admit only individually confirmed facts from DT5f/out/gesla_stated_chart_datum.csv and
-# gesla_refmar_vs_shom.json: Brest has not_confirmed_by_shom_metadata=false; the cached
-# https://services.data.shom.fr/maregraphie/service/completetidegauge/3 states ZH.
+# The producer table pins the actual GESLA 4.1 member headers and DT5f admission facts.
+# REFMAR rows require DT5f's SHOM confirmation; its 19 unconfirmed rows stay unadmitted.
 # Key: release, record, contributor, site code, country, normalized header. Unknowns fail closed.
+_STATED_CHART_ZERO_SOURCE = json.loads((REPO / "data" / "otc" / "published_chart_datums.json").read_text())
 _CONFIRMED_STATED_CHART_ZEROS = {
-    ("4.1", "brest-3-fra-refmar", "REFMAR", "3", "FRA", "zero hydrographique"):
-        ("ZH", "Zero Hydrographique"),
+    (_STATED_CHART_ZERO_SOURCE["source_version"], row["record_id"], row["contributor"],
+     row["site_code"], row["country"], row["datum_information"].strip().casefold()):
+        (row["zero_name"], row["source_name"])
+    for row in _STATED_CHART_ZERO_SOURCE["records"]
 }
 
 
