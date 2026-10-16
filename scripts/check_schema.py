@@ -1859,9 +1859,56 @@ datum_must_pass("a computed datum with its own gate-failure fallback",
 datum_must_fail("a published datum with a computed fallback",
                 edit(noaa_on_first, "lat", lambda b: b.__setitem__("fallback", copy.deepcopy(DATUM_FALLBACK))),
                 basis_rule(r"dependentSchemas/fallback/"))
-datum_must_fail("an observed datum with a computed fallback",
-                edit(observed_on_a, "msl", lambda b: b.__setitem__("fallback", copy.deepcopy(DATUM_FALLBACK))),
-                basis_rule(r"dependentSchemas/fallback/"))
+OBSERVED_FALLBACK = {"reason": "datum_gate_failed", "basis": "Original gauge record, own-record reduction",
+                     "otc_finding": "Scientific T1 FAIL; normal acceptance false. High/low labels unverified; "
+                                    "station accuracy and levelling unknown; no calibrated total uncertainty."}
+
+
+def labelled_observed(base=observed_on_a, key="msl", *, unknown_uncertainty=False):
+    """A per-level observed finding retains the observed method and coverage requirements."""
+    def f(d):
+        datum = base(d)
+        basis = datum["basis"][key]
+        basis["fallback"] = copy.deepcopy(OBSERVED_FALLBACK)
+        if unknown_uncertainty:
+            basis.pop("uncertainty_m", None)
+            basis.pop("uncertainty_basis", None)
+        return datum
+    return f
+
+
+datum_must_pass("a labelled observed datum with supported total uncertainty", labelled_observed())
+datum_must_pass("a labelled observed datum with unknown total uncertainty omitted",
+                labelled_observed(unknown_uncertainty=True))
+datum_must_fail("a labelled observed datum with uncertainty_m alone",
+                edit(labelled_observed(), "msl", lambda b: b.pop("uncertainty_basis")), R_UNCERTAINTY_PAIR)
+datum_must_fail("a labelled observed datum with uncertainty_basis alone",
+                edit(labelled_observed(unknown_uncertainty=True), "msl",
+                     lambda b: b.__setitem__("uncertainty_basis", "propagated")), R_UNCERTAINTY_PAIR)
+datum_must_fail("a labelled observed datum without epoch",
+                edit(labelled_observed(), "msl", lambda b: b.pop("epoch")), R_OBSERVED)
+datum_must_fail("a labelled observed datum without data_span",
+                edit(labelled_observed(), "msl", lambda b: b.pop("data_span")), R_OBSERVED)
+datum_must_fail("a labelled observed datum without comparison control",
+                edit(labelled_observed(), "msl", lambda b: b.pop("control")), R_COMPARISON)
+datum_must_fail("a labelled observed datum with a source uncertainty basis",
+                edit(labelled_observed(), "msl", lambda b: b.__setitem__("uncertainty_basis", "source")), R_OBSERVED)
+datum_must_fail("a labelled observed datum with provisional status",
+                edit(labelled_observed(), "msl", set_flags("provisional")), R_OBSERVED)
+datum_must_fail("a labelled observed datum whose short_record flag contradicts its months",
+                edit(labelled_observed(), "msl", set_flags("short_record")), R_SHORT)
+datum_must_fail("a labelled observed msl beside a truncated high-water level",
+                edit(labelled_observed(trim(observed_on_a, ("msl", "mhw")), unknown_uncertainty=True),
+                     "mhw", lambda b: b.update(method="direct", flags=["truncated_lows"])), R_TRUNCATED_DATUM)
+datum_must_fail("a labelled observed datum with another fallback reason",
+                edit(labelled_observed(), "msl", lambda b: b["fallback"].__setitem__("reason", "time_base_unresolved")),
+                basis_rule(r"properties/fallback/"))
+datum_must_fail("a labelled observed datum without its finding",
+                edit(labelled_observed(), "msl", lambda b: b["fallback"].pop("otc_finding")),
+                basis_rule(r"properties/fallback/"))
+datum_must_fail("a computed datum fallback without total uncertainty",
+                edit(noaa_on_first, "otc_lat", lambda b: [b.__setitem__("fallback", copy.deepcopy(DATUM_FALLBACK)),
+                                                         b.pop("uncertainty_m"), b.pop("uncertainty_basis")]), R_COMPUTED)
 datum_must_fail("a computed datum fallback with another reason",
                 edit(noaa_on_first, "otc_lat", lambda b: b.__setitem__("fallback", dict(DATUM_FALLBACK, reason="time_base_unresolved"))),
                 basis_rule(r"properties/fallback/"))
