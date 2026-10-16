@@ -1,7 +1,7 @@
 pipeline/data/otc/station_ids.json filter=lfs diff=lfs merge=lfs -text
 pipeline/data/otc/station_review.json filter=lfs diff=lfs merge=lfs -text
 pipeline/data/otc/gesla_epoch_hours.csv filter=lfs diff=lfs merge=lfs -text
-pipeline/data/otc/published_chart_datums.json filter=lfs diff=lfs merge=lfs -text
+pipeline/scripts/otc/otc_pipeline/published_chart_datums.json filter=lfs diff=lfs merge=lfs -text
 pipeline/data/gesla/4.1/inventory.csv filter=lfs diff=lfs merge=lfs -text
 pipeline/data/gesla/4.1/station_map.csv filter=lfs diff=lfs merge=lfs -text
 pipeline/data/gesla/record_originators.csv filter=lfs diff=lfs merge=lfs -text

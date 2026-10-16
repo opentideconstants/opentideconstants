@@ -786,9 +786,7 @@ def source_set(doc: Mapping, *, licence_id: str, retain_source_values: bool = Fa
 # The producer table pins the actual GESLA 4.1 member headers and DT5f admission facts.
 # REFMAR rows require DT5f's SHOM confirmation; its 19 unconfirmed rows stay unadmitted.
 # Key: release, record, contributor, site code, country, normalized header. Unknowns fail closed.
-_STATED_CHART_ZERO_PATH = Path(__file__).resolve().parent / "data" / "published_chart_datums.json"
-if not _STATED_CHART_ZERO_PATH.is_file():
-    _STATED_CHART_ZERO_PATH = REPO / "data" / "otc" / "published_chart_datums.json"
+_STATED_CHART_ZERO_PATH = Path(__file__).resolve().with_name("published_chart_datums.json")
 _STATED_CHART_ZERO_SOURCE = json.loads(_STATED_CHART_ZERO_PATH.read_text())
 _CONFIRMED_STATED_CHART_ZEROS = {
     (_STATED_CHART_ZERO_SOURCE["source_version"], row["record_id"], row["contributor"],
