@@ -228,6 +228,10 @@ def _publish_official_datum_stage(release: dict, staged: dict) -> dict:
             "admission": "labelled computed datum fallback only"}
 
 
+class _ObservedCurrentInputMismatch(ValueError):
+    """The authenticated draft does not match this current native publication view."""
+
+
 def stage_observed_datums(release: dict, path: Path, sha256: str, *, source_release: Path,
                           source_release_sha256: str, gesla_root: Path, fit_run: Path, tcd: Path) -> dict:
     """Authenticate frozen reductions against original bytes and current native scientific inputs."""
@@ -307,7 +311,7 @@ def stage_observed_datums(release: dict, path: Path, sha256: str, *, source_rele
         if isinstance(build, dict) and "build_commit" in build and "build_commit" in old_build:
             build["build_commit"] = old_build["build_commit"]
         if produce.input_binding(station, current, member=member, fit_sha256=fit_sha, **common) != bound:
-            raise ValueError(f"observed current input binding mismatch: {sid}")
+            raise _ObservedCurrentInputMismatch(f"observed current input binding mismatch: {sid}")
         if member and rid not in verified_members:
             originals.read_member(rid)  # verifies actual original bytes, not only manifest identity
             verified_members.add(rid)
@@ -382,12 +386,48 @@ def _publish_observed_datum_stage(release: dict, staged: dict) -> dict:
             "admission": "labelled observed datum fallback only"}
 
 
+def _official_datum_view(release: dict, staged: dict) -> dict:
+    """Preview only authenticated computed additions and cited chart designation."""
+    native = {cs["set_id"]: cs for station in release["stations"] for cs in station.get("constant_sets", [])}
+    for entry in staged["drafts"]:
+        old = native[entry["set_id"]].get("datum", {})
+        draft = entry["datum"]
+        if ({k: v for k, v in old.items() if k not in ("named", "basis")} !=
+                {k: v for k, v in draft.items() if k not in ("named", "basis")}
+                or set(draft.get("named", {})) - set(old.get("named", {})) != set(entry["computed_keys"])
+                or set(draft.get("basis", {})) - set(old.get("basis", {})) != set(entry["computed_keys"])):
+            raise ValueError(f"official publication view requires only computed level additions: {entry['set_id']}")
+    # Copy the mutable datum containers only. Source, harmonic and station context
+    # remains identical; this preview never mutates the caller's release.
+    stations = []
+    for station in release["stations"]:
+        copied = dict(station)
+        if "constant_sets" in station:
+            copied["constant_sets"] = [
+                {**cs, "datum": copy.deepcopy(cs["datum"])} if "datum" in cs else dict(cs)
+                for cs in station["constant_sets"]]
+        stations.append(copied)
+    preview = {**release, "stations": stations}
+    _publish_official_datum_stage(preview, copy.deepcopy(staged))
+    return preview
+
+
 def apply_datum_drafts(release: dict, *, official: tuple | None = None, observed: tuple | None = None,
                        publish_official: bool = False, publish_observed: bool = False,
                        observed_inputs: dict | None = None) -> tuple[dict | None, dict | None]:
-    """Authenticate both draft groups against one unchanged baseline, then add disjoint levels."""
+    """Authenticate exact native or official-published views before merging disjoint additions."""
     official_stage = stage_official_datums(release, *official) if official is not None else None
-    observed_stage = stage_observed_datums(release, *observed, **(observed_inputs or {})) if observed is not None else None
+    observed_stage = None
+    if observed is not None:
+        try:
+            observed_stage = stage_observed_datums(release, *observed, **(observed_inputs or {}))
+        except _ObservedCurrentInputMismatch:
+            if not publish_official or official_stage is None:
+                raise
+            # Older accepted drafts bind the post-computed source release. Verify
+            # that exact view too; no binding field or historical hash is ignored.
+            preview = _official_datum_view(release, official_stage)
+            observed_stage = stage_observed_datums(preview, *observed, **(observed_inputs or {}))
     if publish_official and publish_observed and official_stage is not None and observed_stage is not None:
         observed_keys = {row["set_id"]: set(row["observed_keys"]) for row in observed_stage["drafts"]}
         # Reject overlaps before either group mutates the release, including an

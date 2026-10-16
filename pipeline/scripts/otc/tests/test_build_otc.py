@@ -380,6 +380,76 @@ def test_native_combined_refuses_tampered_inputs_before_mutation(native_combined
     assert release == before
 
 
+@pytest.fixture
+def native_postcomputed_source_inputs(native_combined_datum_inputs, tmp_path):
+    release, official_path, official_sha, _, _, inputs = native_combined_datum_inputs
+    root = Path(os.environ["OTC_OBSERVED_ATTACHMENT_PROOF"])
+    qualified = root / "reduction-zero-control/full-reduction-scheduled/observed-drafts.jsonl"
+    assert observed_produce.sha256(qualified) == "9900bca092508151fca9fe04d774b1492808b5d88defcdb9c9013c034a8a3132"
+    ids = {cs["set_id"] for station in release["stations"] for cs in station["constant_sets"]}
+    # Copy the exact accepted rows; their original source and native bindings are untouched.
+    with qualified.open() as stream:
+        lines = [line for line in stream if json.loads(line)["set_id"] in ids]
+    assert len(lines) == 5
+    path = tmp_path / "original-postcomputed-bound-rows.jsonl"
+    path.write_text("".join(lines))
+    inputs["source_release"] = Path("/Users/jpr5/.local/share/copilotkit/cr/otc-impl/derived-chart-datum/postfix-candidate/native-build/OTC_20261011.jsonl")
+    inputs["source_release_sha256"] = "14a12b36365f0e057633bb8cdf266a50cc24a3d0d417524f29e35547d299e111"
+    return release, official_path, official_sha, path, observed_produce.sha256(path), inputs
+
+
+def test_native_combined_preserves_original_postcomputed_source(native_postcomputed_source_inputs):
+    release, official_path, official_sha, observed_path, observed_sha, inputs = native_postcomputed_source_inputs
+    old_order = copy.deepcopy(release)
+    build_otc.apply_official_datum_fallbacks(old_order, official_path, official_sha)
+    old_observed = build_otc.apply_observed_datum_fallbacks(old_order, observed_path, observed_sha, **inputs)
+    assert old_observed["observed_basis_fallback_count"] == 33
+    print(f"ORIGINAL ACCEPTED SOURCE old official→observed GREEN: source={inputs['source_release_sha256']}; untouched rows={observed_sha}")
+    official, observed = build_otc.apply_datum_drafts(release, official=(official_path, official_sha),
+        observed=(observed_path, observed_sha), publish_official=True, publish_observed=True, observed_inputs=inputs)
+    assert release == old_order
+    assert official["computed_basis_fallback_count"] == 6 and observed["observed_basis_fallback_count"] == 33
+    for station in release["stations"]:
+        for cs in station["constant_sets"]:
+            if cs["source"] == "gesla-fit":
+                print(f"ORIGINAL SOURCE COMBINED GREEN {cs['set_id']}: {cs['datum']['named']}; exact old-order values/metadata/provenance retained")
+    output = observed_path.with_name("original-source-compatible-output.jsonl")
+    output.write_text("".join(json.dumps(station, sort_keys=True) + "\n" for station in release["stations"]))
+    print(f"ORIGINAL SOURCE COMPAT OUTPUT SHA256 {observed_produce.sha256(output)}")
+
+
+@pytest.mark.parametrize("defect", ["scientific_provenance", "historical_binding", "official_zero_injection", "official_value", "overlap", "unpublished_official"])
+def test_native_postcomputed_compatibility_still_refuses_tampering(native_postcomputed_source_inputs, defect, tmp_path):
+    release, official_path, official_sha, observed_path, observed_sha, inputs = native_postcomputed_source_inputs
+    publish_official = defect != "unpublished_official"
+    if defect == "scientific_provenance":
+        release["stations"][0]["constant_sets"][0]["provenance"]["tcd_sha256"] = "0" * 64
+    elif defect == "historical_binding":
+        rows = [json.loads(line) for line in observed_path.read_text().splitlines()]
+        rows[0]["input_binding"]["native_input_sha256"] = "0" * 64
+        observed_path = tmp_path / "stale-original-binding.jsonl"
+        observed_path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+        observed_sha = observed_produce.sha256(observed_path)
+    elif defect in ("official_zero_injection", "official_value", "overlap"):
+        rows = [json.loads(line) for line in official_path.read_text().splitlines()]
+        if defect == "official_zero_injection":
+            rows[0]["draft_datum"]["zero"] = "gauge_zero"
+        elif defect == "official_value":
+            rows[0]["draft_datum"]["named"]["lat"] += 0.001
+        else:
+            measured = next(row["draft_datum"] for row in map(json.loads, observed_path.read_text().splitlines()) if row["set_id"] == rows[0]["set_id"])
+            for field in ("named", "basis"):
+                rows[0]["draft_datum"][field]["mhw"] = copy.deepcopy(measured[field]["mhw"])
+        official_path = tmp_path / "invalid-original-official.jsonl"
+        official_path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+        official_sha = observed_produce.sha256(official_path)
+    before = copy.deepcopy(release)
+    with pytest.raises(ValueError):
+        build_otc.apply_datum_drafts(release, official=(official_path, official_sha), observed=(observed_path, observed_sha),
+            publish_official=publish_official, publish_observed=True, observed_inputs=inputs)
+    assert release == before
+
+
 @pytest.mark.skipif("OTC_GESLA_METADATA_PROOF" not in os.environ, reason="requires actual frozen GESLA metadata cases")
 @pytest.mark.parametrize("index", range(3))
 def test_native_gesla_sampling_class_is_not_timestamp_verification(index, tmp_path):
