@@ -210,6 +210,176 @@ def test_observed_cli_accepts_all_publication_arguments_before_build(monkeypatch
         build_otc.main(arguments)
 
 
+@pytest.fixture
+def native_combined_datum_inputs(native_observed_attachment, tmp_path):
+    release, observed_path, observed_sha, inputs = native_observed_attachment
+    metadata_path = Path("/Users/jpr5/.local/share/copilotkit/cr/otc-impl/derived-chart-datum/postfix-candidate/native-build/OTC_20261011.meta.json")
+    metadata = json.loads(metadata_path.read_text())
+    release.update({key: metadata[key] for key in ("conventions", "astro_tables")})
+    official_source = Path("/Users/jpr5/.local/share/copilotkit/cr/otc-impl/datum-lat-hat/missing-gesla/all-public-drafts.jsonl")
+    assert hashlib.sha256(official_source.read_bytes()).hexdigest() == "77006af6f3274eae6437651abc93440c3d2a9d7d6452c9a6f7fa50a82b21fa99"
+    ids = {cs["set_id"] for station in release["stations"] for cs in station["constant_sets"] if cs["source"] == "gesla-fit"}
+    rows = [row for line in official_source.read_text().splitlines() if (row := json.loads(line)).get("set_id") in ids]
+    assert len(rows) == 3
+    official_path = tmp_path / "official-three.jsonl"
+    official_path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+    official_sha = hashlib.sha256(official_path.read_bytes()).hexdigest()
+    # NEW test fixture: recover real pre-computed datum metadata; never alter old
+    # evidence or claim that its binding describes this newly serialized source.
+    reduction_root = Path(os.environ["OTC_OBSERVED_ATTACHMENT_PROOF"]) / "reduction"
+    assert observed_sha == "01ac08ab6ebb2a430323c2085636e485e7d9c085302b4f9454cfdde1d335b5ae"
+    accepted = {row["set_id"]: row for row in map(json.loads, observed_path.read_text().splitlines())}
+    report_path = reduction_root / "pilot/observed-reduction-report.json"
+    assert observed_produce.sha256(report_path) == "ba9f0c31c164cf44cd104765306de41d50c61d948e56b53f83cfe6f1bc71f746"
+    report = json.loads(report_path.read_text())
+    details = {row["set_id"]: row for row in report["records"]}
+    roster_path = official_source.with_name("roster.json")
+    roster = json.loads(roster_path.read_text())
+    payloads = {}
+    for entry in roster["rows"]:
+        if entry["set_id"] not in ids:
+            continue
+        payload_path = Path(entry["path"])
+        assert hashlib.sha256(payload_path.read_bytes()).hexdigest() == entry["input_sha256"]
+        payloads[entry["set_id"]] = json.loads(payload_path.read_text())
+    for station in release["stations"]:
+        for cs in station["constant_sets"]:
+            if cs["set_id"] not in payloads:
+                continue
+            original = payloads[cs["set_id"]]["constant_set"]
+            for key in ("constituents", "time_base", "record_span", "fit_segment", "record_issues", "source", "source_version"):
+                assert cs.get(key) == original.get(key)
+            provenances = [copy.deepcopy(item["provenance"]) for item in (cs, original)]
+            for provenance in provenances:
+                provenance.get("build", {}).pop("build_commit", None)
+            assert provenances[0] == provenances[1]
+            assert {k: v for k, v in cs["datum"].items() if k not in ("named", "basis", "chart_datum")} == original["datum"]
+            cs["datum"] = copy.deepcopy(original["datum"])
+    source_path = tmp_path / "new-pre-attachment-source.jsonl"
+    source_path.write_text("".join(json.dumps(station, sort_keys=True) + "\n" for station in release["stations"]))
+    inputs["source_release"] = source_path
+    inputs["source_release_sha256"] = observed_produce.sha256(source_path)
+    manifest = json.loads((inputs["gesla_root"] / "MANIFEST.json").read_text())
+    members = {row["name"]: row for row in manifest["members"]}
+    fresh = []
+    for station in release["stations"]:
+        for cs in station["constant_sets"]:
+            old = accepted[cs["set_id"]]
+            detail = details[cs["set_id"]]
+            old_binding = old["input_binding"]
+            common = {"release_sha256": inputs["source_release_sha256"],
+                      "fit_manifest_sha256": observed_produce.sha256(inputs["fit_run"] / "timebase_manifest.json"),
+                      "results_sha256": observed_produce.sha256(inputs["fit_run"] / "results.jsonl"),
+                      "tcd_sha256": observed_produce.sha256(inputs["tcd"]),
+                      "gesla_manifest_sha256": observed_produce.sha256(inputs["gesla_root"] / "MANIFEST.json"),
+                      "timebase_sha256": old_binding["timebase_sha256"]}
+            fit_path = inputs["fit_run"] / "fits" / f"{cs['source_record_id']}.json"
+            binding = observed_produce.input_binding(station, cs, member=members.get(cs["source_record_id"]),
+                fit_sha256=observed_produce.sha256(fit_path) if fit_path.is_file() else None, **common)
+            assert {k: v for k, v in binding.items() if k not in ("release_sha256", "native_input_sha256")} == {
+                k: v for k, v in old_binding.items() if k not in ("release_sha256", "native_input_sha256")}
+            draft = None
+            if old["draft_datum"]:
+                used = {tuple(map(int, key.split("-"))): value for key, value in detail["used_monthly_inputs"].items()}
+                values = {key.upper(): value for key, value in old["draft_datum"]["named"].items()}
+                primary = detail["method"] == "first_reduction" and "own_record_limitation" not in detail
+                draft, _ = observed_produce.draft_datum(cs, values, used, method=detail["method"],
+                    control=detail["control"], primary=primary, gaps=bool(detail["filled_gaps"] or detail["unfilled_gaps"]))
+                assert draft == old["draft_datum"]  # exact accepted measurements and scientific metadata
+            fresh.append({"station_id": station["station_id"], "set_id": cs["set_id"],
+                          "source_record_id": cs["source_record_id"], "input_binding": binding,
+                          "draft_datum": draft, "observed_keys": sorted(draft["named"]) if draft else []})
+    new_observed_path = tmp_path / "new-pre-attachment-observed.jsonl"
+    new_observed_path.write_text("".join(json.dumps(row, sort_keys=True) + "\n" for row in fresh))
+    return release, official_path, official_sha, new_observed_path, observed_produce.sha256(new_observed_path), inputs
+
+
+def test_native_combined_official_and_observed(native_combined_datum_inputs):
+    release, official_path, official_sha, observed_path, observed_sha, inputs = native_combined_datum_inputs
+    before = copy.deepcopy(release)
+    official_staged = build_otc.stage_official_datums(release, official_path, official_sha)
+    observed_staged = build_otc.stage_observed_datums(release, observed_path, observed_sha, **inputs)
+    assert release == before
+    assert official_staged["staged_level_count"] == 6 and observed_staged["staged_level_count"] == 33
+    print(f"NEW AUTHENTICATED REAL FIXTURE: official6 observed33; source={inputs['source_release_sha256']}; drafts={observed_sha}")
+    official_result, observed_result = build_otc.apply_datum_drafts(release,
+        official=(official_path, official_sha), observed=(observed_path, observed_sha),
+        publish_official=True, publish_observed=True, observed_inputs=inputs)
+    assert official_result["computed_basis_fallback_count"] == 6
+    assert observed_result["observed_basis_fallback_count"] == 33
+    for old_station, station in zip(before["stations"], release["stations"]):
+        assert {k: v for k, v in old_station.items() if k != "constant_sets"} == {k: v for k, v in station.items() if k != "constant_sets"}
+        for old_cs, cs in zip(old_station["constant_sets"], station["constant_sets"]):
+            assert {k: v for k, v in old_cs.items() if k != "datum"} == {k: v for k, v in cs.items() if k != "datum"}
+            if cs["source"] != "gesla-fit":
+                assert cs == old_cs
+                continue
+            official = next(row for row in official_staged["drafts"] if row["set_id"] == cs["set_id"])
+            observed = next(row for row in observed_staged["drafts"] if row["set_id"] == cs["set_id"])
+            for key, value in old_cs["datum"].items():
+                assert cs["datum"][key] == value
+            for stage in (official, observed):
+                for field in ("named", "basis"):
+                    for key, value in stage["datum"].get(field, {}).items():
+                        assert cs["datum"][field][key] == value
+            if cs["source_record_id"] == "penarth-pen-gbr-cco":
+                assert cs["datum"]["chart_datum"] == "lat"
+            print(f"REAL COMBINED GREEN {cs['set_id']}: computed={{{', '.join(str(cs['datum']['named'][key]) for key in ('lat', 'hat'))}}}; observed={{{', '.join(str(cs['datum']['named'][key]) for key in ('mllw', 'msl', 'mhhw'))}}}; prior scientific/data/provenance preserved")
+    output = inputs["source_release"].with_name("combined-green-stations.jsonl")
+    output.write_text("".join(json.dumps(station, sort_keys=True) + "\n" for station in release["stations"]))
+    print(f"COMBINED NATIVE OUTPUT SHA256 {observed_produce.sha256(output)}")
+
+
+@pytest.mark.parametrize("publish_official,publish_observed", [(False, False), (True, False), (False, True)])
+def test_native_combined_staging_and_independent_publication(native_combined_datum_inputs, publish_official, publish_observed):
+    release, official_path, official_sha, observed_path, observed_sha, inputs = native_combined_datum_inputs
+    before = copy.deepcopy(release)
+    official, observed = build_otc.apply_datum_drafts(release, official=(official_path, official_sha),
+        observed=(observed_path, observed_sha), publish_official=publish_official,
+        publish_observed=publish_observed, observed_inputs=inputs)
+    assert official["public_admission"] == publish_official
+    assert observed["public_admission"] == publish_observed
+    if not publish_official and not publish_observed:
+        assert release == before
+    for station in release["stations"]:
+        for cs in station["constant_sets"]:
+            if cs["source"] == "gesla-fit":
+                assert ("lat" in cs["datum"].get("named", {})) == publish_official
+                assert ("msl" in cs["datum"].get("named", {})) == publish_observed
+
+
+@pytest.mark.parametrize("defect", ["stale_harmonic", "stale_clock", "draft_hash", "missing_binding", "overlap"])
+def test_native_combined_refuses_tampered_inputs_before_mutation(native_combined_datum_inputs, defect, tmp_path):
+    release, official_path, official_sha, observed_path, observed_sha, inputs = native_combined_datum_inputs
+    if defect in ("stale_harmonic", "stale_clock"):
+        cs = next(cs for station in release["stations"] for cs in station["constant_sets"] if cs["source"] == "gesla-fit")
+        if defect == "stale_harmonic":
+            cs["constituents"][0]["amplitude_m"] += 0.001
+        else:
+            cs["time_base"]["decided_build_commit"] = "0" * 40
+    elif defect == "draft_hash":
+        observed_sha = "0" * 64
+    elif defect == "missing_binding":
+        rows = [json.loads(line) for line in observed_path.read_text().splitlines()]
+        del rows[0]["input_binding"]
+        observed_path = tmp_path / "missing-binding.jsonl"
+        observed_path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+        observed_sha = observed_produce.sha256(observed_path)
+    else:
+        rows = [json.loads(line) for line in official_path.read_text().splitlines()]
+        measured = next(row["draft_datum"] for row in map(json.loads, observed_path.read_text().splitlines()) if row["set_id"] == rows[0]["set_id"])
+        for field in ("named", "basis"):
+            rows[0]["draft_datum"][field]["mhw"] = copy.deepcopy(measured[field]["mhw"])
+        official_path = tmp_path / "overlapping-official.jsonl"
+        official_path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+        official_sha = observed_produce.sha256(official_path)
+    before = copy.deepcopy(release)
+    with pytest.raises(ValueError):
+        build_otc.apply_datum_drafts(release, official=(official_path, official_sha), observed=(observed_path, observed_sha),
+            publish_official=True, publish_observed=True, observed_inputs=inputs)
+    assert release == before
+
+
 @pytest.mark.skipif("OTC_GESLA_METADATA_PROOF" not in os.environ, reason="requires actual frozen GESLA metadata cases")
 @pytest.mark.parametrize("index", range(3))
 def test_native_gesla_sampling_class_is_not_timestamp_verification(index, tmp_path):

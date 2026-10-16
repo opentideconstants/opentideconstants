@@ -206,6 +206,10 @@ def stage_official_datums(release: dict, path: Path, sha256: str) -> dict:
 def apply_official_datum_fallbacks(release: dict, path: Path, sha256: str) -> dict:
     """Attach labelled computed levels while preserving every existing set and recommendation."""
     staged = stage_official_datums(release, path, sha256)
+    return _publish_official_datum_stage(release, staged)
+
+
+def _publish_official_datum_stage(release: dict, staged: dict) -> dict:
     from otc_pipeline.datums import derive_chart_datums
     from otc_pipeline.lat_hat import COMPUTED_FALLBACK
     by_id = {cs["set_id"]: cs for station in release["stations"] for cs in station.get("constant_sets", [])}
@@ -355,12 +359,47 @@ def stage_observed_datums(release: dict, path: Path, sha256: str, *, source_rele
 def apply_observed_datum_fallbacks(release: dict, path: Path, sha256: str, **inputs) -> dict:
     """Attach only authenticated new observed levels, retaining unrelated set and station fields."""
     staged = stage_observed_datums(release, path, sha256, **inputs)
+    return _publish_observed_datum_stage(release, staged)
+
+
+def _publish_observed_datum_stage(release: dict, staged: dict) -> dict:
+    from otc_pipeline.datums import observed_companions
+
     by_id = {cs["set_id"]: cs for station in release["stations"] for cs in station.get("constant_sets", [])}
+    pending = []
     for entry in staged["drafts"]:
-        by_id[entry["set_id"]]["datum"] = entry["datum"]
+        # Other authenticated stages may already have added disjoint computed
+        # levels and a chart pointer. Attach only this stage's new observed keys.
+        keys = entry["observed_keys"]
+        draft = {field: {key: entry["datum"][field][key] for key in keys} for field in ("named", "basis")}
+        datum = observed_companions(by_id[entry["set_id"]].get("datum", {}), draft, keys)
+        pending.append((entry, datum))
+    for entry, datum in pending:
+        by_id[entry["set_id"]]["datum"] = datum
+        entry["datum"] = datum
     return {**staged, "public_admission": True, "release_unchanged": not bool(staged["drafts"]),
             "observed_basis_fallback_count": staged["staged_level_count"],
             "admission": "labelled observed datum fallback only"}
+
+
+def apply_datum_drafts(release: dict, *, official: tuple | None = None, observed: tuple | None = None,
+                       publish_official: bool = False, publish_observed: bool = False,
+                       observed_inputs: dict | None = None) -> tuple[dict | None, dict | None]:
+    """Authenticate both draft groups against one unchanged baseline, then add disjoint levels."""
+    official_stage = stage_official_datums(release, *official) if official is not None else None
+    observed_stage = stage_observed_datums(release, *observed, **(observed_inputs or {})) if observed is not None else None
+    if publish_official and publish_observed and official_stage is not None and observed_stage is not None:
+        observed_keys = {row["set_id"]: set(row["observed_keys"]) for row in observed_stage["drafts"]}
+        # Reject overlaps before either group mutates the release, including an
+        # unexpected extra named key in a computed draft.
+        for row in official_stage["drafts"]:
+            if set(row["datum"].get("named", {})) & observed_keys.get(row["set_id"], set()):
+                raise ValueError(f"conflicting official and observed datum drafts: {row['set_id']}")
+    if publish_official and official_stage is not None:
+        official_stage = _publish_official_datum_stage(release, official_stage)
+    if publish_observed and observed_stage is not None:
+        observed_stage = _publish_observed_datum_stage(release, observed_stage)
+    return official_stage, observed_stage
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -507,18 +546,17 @@ def main(argv: list[str] | None = None) -> int:
         log("noaa historical augmentation: " + json.dumps(
             {key: value for key, value in historical_augmentation.items() if key not in {"members", "input_roles"}},
             sort_keys=True))
-    datum_stage = None
-    if a.official_datum_drafts is not None:
-        apply = apply_official_datum_fallbacks if a.publish_labelled_official_datums else stage_official_datums
-        datum_stage = apply(release, a.official_datum_drafts, a.official_datum_drafts_sha256)
+    datum_stage, observed_stage = apply_datum_drafts(release,
+        official=(a.official_datum_drafts, a.official_datum_drafts_sha256) if a.official_datum_drafts is not None else None,
+        observed=(a.observed_datum_drafts, a.observed_datum_drafts_sha256) if a.observed_datum_drafts is not None else None,
+        publish_official=a.publish_labelled_official_datums, publish_observed=a.publish_labelled_observed_datums,
+        observed_inputs={"source_release": a.observed_datum_source_release,
+                         "source_release_sha256": a.observed_datum_source_release_sha256,
+                         "gesla_root": gs.GeslaRelease().root, "fit_run": a.fit_run, "tcd": tcd}
+                        if a.observed_datum_drafts is not None else None)
+    if datum_stage is not None:
         log(f"official datums: {datum_stage['staged_set_count']} sets; public_admission={datum_stage['public_admission']}")
-    observed_stage = None
-    if a.observed_datum_drafts is not None:
-        apply = apply_observed_datum_fallbacks if a.publish_labelled_observed_datums else stage_observed_datums
-        observed_stage = apply(release, a.observed_datum_drafts, a.observed_datum_drafts_sha256,
-            source_release=a.observed_datum_source_release,
-            source_release_sha256=a.observed_datum_source_release_sha256,
-            gesla_root=gs.GeslaRelease().root, fit_run=a.fit_run, tcd=tcd)
+    if observed_stage is not None:
         log(f"observed datums: {observed_stage['staged_set_count']} sets; public_admission={observed_stage['public_admission']}")
     errs = validate_release(release)
     log(f"validate_release: {len(errs)} errors")
