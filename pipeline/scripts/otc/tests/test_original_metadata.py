@@ -72,3 +72,35 @@ def test_bom_unsigned_angle_does_not_claim_verified_physical_position(tmp_path):
     assert interpretation['physical_location_verified'] is False
     assert interpretation['original_longitude'] == 188.6833
     assert result['licence'] is None
+
+
+def test_malibu_current_4375_retains_independent_historical_facts_without_capability():
+    root = Path(__file__).resolve().parents[3] / 'data/otc/supplements/malibu4375'
+    path = root / 'gauge_chs-table4375.json'
+    raw = path.read_bytes()
+    captured = json.loads(raw)
+    source = captured['source']
+    inv = SourceInventory({'input_files': [{'path': str(path), 'size': len(raw),
+                                           'sha256': hashlib.sha256(raw).hexdigest()}],
+                           'identities': [{'source': source, 'version': '2021-volume5-table4',
+                                           'upstream_record_id': '4375', 'granularity': 'gauge_station',
+                                           'input_sha256': [hashlib.sha256(raw).hexdigest()]}]}, {})
+    results = load_original_metadata(inv, tcd_path=Path('unused'), datestamp='20261011')
+    assert set(results) == {(source, '4375')}
+    result = results[source, '4375']
+    row = json.loads(result['original_metadata']['captured_rows_json'])[0]
+    assert row == captured['rows'][0]
+    assert row['original_identity']['not_water_level_station_07860'] is True
+    assert row['payload_scope'] == 'identity_and_provenance_only'
+    assert 'original_table_facts' not in row
+    assert row['publication_tier'] == 'fallback'
+    assert row['quality_status'] == 'unvalidated_historical_metadata'
+    assert row['rights_notice']['permission_granted'] is False
+    assert row['rights_notice']['ogl_grant_established'] is False
+    assert row['prediction_capability'] == 'none_implemented'
+    assert row['upstream_harmonic_constants_acquired'] is False
+    assert row['slackwater_used_as_input'] is False
+    assert result['country'] == 'CAN'
+    assert row['country_interpretation']['coordinate_substitution'] is False
+    assert result['licence'] is None
+    assert 'original_constant_set_json' not in result

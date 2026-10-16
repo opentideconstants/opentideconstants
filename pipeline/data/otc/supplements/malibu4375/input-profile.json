@@ -1,0 +1,19 @@
+{
+  "source": "chs-tide-current-tables",
+  "version": "2021-volume5-table4",
+  "upstream_record_id": "4375",
+  "granularity": "gauge_station",
+  "capture": {
+    "path": "gauge_chs-table4375.json",
+    "sha256": "f0721b284ecb583a9112e50344248865c29d119238d968557b5d0ce87e140114"
+  },
+  "primary_document": {
+    "url": "https://publications.gc.ca/collections/collection_2021/mpo-dfo/Fs73-5-2021.pdf",
+    "sha256": "b6e338f417c2b037b70b77b9274223ed27759993c6e14a0a4760c7b18d310fdb",
+    "size": 9211327,
+    "bundled": false
+  },
+  "parent_source_inventory_sha256": "28c1d1391164a736add779dd92e61210fe2d0e633085a4e893d19fd379c9dcd1",
+  "parent_source_quality_findings_sha256": "01917ab0e584bf51870ca3807c209a583f2c19f896a2339faa1bc78493e52d24",
+  "qualification": "One metadata-only historical current identity. No forecast, harmonic constants, predictive admission, accuracy claim or permission grant. Existing source inventory is extended, never replaced."
+}
