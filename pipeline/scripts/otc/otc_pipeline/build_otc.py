@@ -22,6 +22,7 @@ The tree must be committed (gesla_build.head_commit); OUT must be empty.
 from __future__ import annotations
 
 import argparse
+import copy
 import hashlib
 import json
 import os
@@ -136,6 +137,71 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def stage_official_datums(release: dict, path: Path, sha256: str) -> dict:
+    """Stage pinned, calibrated official drafts; never change or admit release values."""
+    from otc_pipeline.lat_hat import EPOCH, _finite
+
+    if _sha256(path) != sha256:
+        raise ValueError("official datum draft SHA-256 mismatch")
+    native = {cs["set_id"]: (station["station_id"], cs) for station in release["stations"]
+              for cs in station["constant_sets"]}
+    staged, seen, count = [], set(), 0
+    for line in path.read_text().splitlines():
+        row = json.loads(line)
+        if "set_id" not in row:
+            continue
+        sid = row["set_id"]
+        if sid in seen:
+            raise ValueError(f"duplicate official datum draft {sid}")
+        seen.add(sid)
+        station_id, cs = native[sid]
+        if cs["source"] not in ("noaa", "kartverket", "linz") or cs["source_type"] != "official":
+            raise ValueError("only official NOAA, Kartverket and LINZ drafts can be staged")
+        if row.get("calibration_status") != "available":
+            raise ValueError(f"official datum calibration unavailable: {sid}")
+        draft = row["draft_datum"]
+        for key, value in cs["datum"].items():
+            if key not in ("named", "basis") and draft.get(key) != value:
+                raise ValueError(f"official datum metadata changed: {sid}:{key}")
+        for key, value in cs["datum"].get("named", {}).items():
+            if draft["named"].get(key) != value or draft["basis"].get(key) != cs["datum"]["basis"][key]:
+                raise ValueError(f"existing official datum changed: {sid}:{key}")
+        for level in ("lat", "hat"):
+            key = f"otc_{level}" if cs["datum"].get("basis", {}).get(level, {}).get("kind") == "published" else level
+            basis = draft["basis"].get(key, {})
+            if (basis.get("kind"), basis.get("method"), basis.get("epoch")) != ("computed", "harmonic_extremes", EPOCH):
+                raise ValueError(f"invalid staged computed datum method: {sid}:{key}")
+            if draft["named"][key] != row["raw"][f"{level}_m"]:
+                raise ValueError(f"staged datum differs from frozen extrema: {sid}:{key}")
+            if _finite(basis.get("uncertainty_m"), "staged uncertainty") < 0 or basis.get("uncertainty_basis") not in ("calibrated", "propagated"):
+                raise ValueError(f"invalid staged uncertainty: {sid}:{key}")
+            count += 1
+        staged.append({"station_id": station_id, "set_id": sid, "source": cs["source"],
+                       "datum": copy.deepcopy(draft), "input_sha256": sha256})
+    return {"public_admission": False, "release_unchanged": True, "input_path": str(path),
+            "input_sha256": sha256, "staged_set_count": len(staged), "staged_level_count": count,
+            "finding": "Official tuning drafts only; full DT4a and GATE-DATUM acceptance is not established.",
+            "drafts": staged}
+
+
+def apply_official_datum_fallbacks(release: dict, path: Path, sha256: str) -> dict:
+    """Attach labelled computed levels while preserving every existing set and recommendation."""
+    staged = stage_official_datums(release, path, sha256)
+    from otc_pipeline.lat_hat import COMPUTED_FALLBACK
+    by_id = {cs["set_id"]: cs for station in release["stations"] for cs in station["constant_sets"]}
+    count = 0
+    for entry in staged["drafts"]:
+        datum = entry["datum"]
+        for basis in datum["basis"].values():
+            if basis["kind"] == "computed":
+                basis["fallback"] = dict(COMPUTED_FALLBACK)
+                count += 1
+        by_id[entry["set_id"]]["datum"] = datum
+    return {**staged, "public_admission": True, "release_unchanged": False,
+            "normal_datum_gate_accepted": False, "computed_basis_fallback_count": count,
+            "admission": "labelled computed datum fallback only"}
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="otc_pipeline.build_otc", description=(__doc__ or "").split("\n")[0],
                                  allow_abbrev=False)
@@ -160,9 +226,18 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--noaa-historical-inputs-sha256")
     ap.add_argument("--noaa-historical-comparison", type=Path)
     ap.add_argument("--noaa-historical-comparison-sha256")
+    ap.add_argument("--official-datum-drafts", type=Path,
+                    help="stage pinned official computed drafts in DATUM_STAGE.json; release values stay unchanged")
+    ap.add_argument("--official-datum-drafts-sha256")
+    ap.add_argument("--publish-labelled-official-datums", action="store_true",
+                    help="attach the staged official levels with per-level datum_gate_failed findings")
     gb.inventory_arguments(ap)
     argv = sys.argv[1:] if argv is None else list(argv)
     a = ap.parse_args(argv)
+    if (a.official_datum_drafts is None) != (a.official_datum_drafts_sha256 is None):
+        raise ValueError("--official-datum-drafts and --official-datum-drafts-sha256 must be supplied together")
+    if a.publish_labelled_official_datums and a.official_datum_drafts is None:
+        raise ValueError("labelled official datums require the pinned --official-datum-drafts input")
     inventory = gb.inventory_from_arguments(a)
     if (a.chs_identities is None) != (a.chs_identities_sha256 is None):
         raise ValueError("--chs-identities and --chs-identities-sha256 must be supplied together")
@@ -257,6 +332,11 @@ def main(argv: list[str] | None = None) -> int:
         log("noaa historical augmentation: " + json.dumps(
             {key: value for key, value in historical_augmentation.items() if key not in {"members", "input_roles"}},
             sort_keys=True))
+    datum_stage = None
+    if a.official_datum_drafts is not None:
+        apply = apply_official_datum_fallbacks if a.publish_labelled_official_datums else stage_official_datums
+        datum_stage = apply(release, a.official_datum_drafts, a.official_datum_drafts_sha256)
+        log(f"official datums: {datum_stage['staged_set_count']} sets; public_admission={datum_stage['public_admission']}")
     errs = validate_release(release)
     log(f"validate_release: {len(errs)} errors")
     for e in errs[:20]:
@@ -269,6 +349,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     a.out.mkdir(parents=True, exist_ok=True)
     files = write_release(release, a.out, datestamp=a.datestamp, app_export=None, congen_run=parts.congen_run)
+    if datum_stage is not None:
+        (a.out / "DATUM_STAGE.json").write_text(json.dumps(datum_stage, allow_nan=False, sort_keys=True) + "\n")
     provenance = {"command_line": [sys.executable, "-m", "otc_pipeline.build_otc", *argv], "cwd": os.getcwd(),
                   **parts.provenance,
                   "agency_cache": {s: {"path": str((a.agency_cache / s).resolve()),
@@ -280,7 +362,10 @@ def main(argv: list[str] | None = None) -> int:
                   "currents_canary_cache": str(a.currents_canary_cache.resolve())}
     gb.write_report(parts.report, provenance, a.out / "BUILD_REPORT.json", extra={"agency": arep.as_dict(),
                     "original_source_retention": original_retention, "source_quality_findings": quality_findings,
-                    "original_derived_inputs": derived_inputs, "country_resolutions": country_resolutions, "noaa_historical_augmentation": historical_augmentation},
+                    "original_derived_inputs": derived_inputs, "country_resolutions": country_resolutions,
+                    "noaa_historical_augmentation": historical_augmentation,
+                    **({"official_datum_stage": {key: value for key, value in datum_stage.items() if key != "drafts"}}
+                       if datum_stage is not None else {})},
                     release=release, inventory=inventory)
     log(f"wrote {[p.name for p in files]} + BUILD_REPORT.json to {a.out}")
     return 0
