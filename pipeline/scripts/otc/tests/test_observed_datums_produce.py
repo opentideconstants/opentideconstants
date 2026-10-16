@@ -5,7 +5,12 @@ import hashlib
 import importlib
 import inspect
 import json
+import multiprocessing
 import os
+import re
+import signal
+import subprocess
+import time
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -204,9 +209,8 @@ def test_actual_measured_input_authentication_and_negative_controls(tmp_path, mo
     run = json.loads((source / "observed-run.json").read_text())
     identity = copy.deepcopy(run["identity"])
     identity["implementation"] = p.implementation_identity()
-    # The frozen run includes misaligned hourly means; it must not be rebound.
-    with pytest.raises(ValueError, match="measurement implementation"):
-        p.authenticate_measured_inputs(source, run, identity)
+    # Intake authorizes only the pinned selective refresh, never stale mean reuse.
+    p.authenticate_measured_inputs(source, run, identity)
     changed = copy.deepcopy(identity)
     changed["inputs"]["release_sha256"] = "0" * 64
     with pytest.raises(ValueError, match="current source"):
@@ -249,7 +253,7 @@ def test_actual_measured_input_authentication_and_negative_controls(tmp_path, mo
     (tmp_path / f"{key}.profile.json.part").write_bytes(original)
     with pytest.raises(ValueError, match="checkpoint missing"):
         p.read_checkpoint(tmp_path, key, job_sha, require_complete=True)
-    print("legacy mean measurements REFUSED; changed source/code/dependency, corrupt/missing/partial checkpoints REFUSED")
+    print("pinned selective intake PASS; changed source/code/dependency, corrupt/missing/partial checkpoints REFUSED")
 
 
 def test_actual_cached_serial_and_four_reductions_are_exact(cached_control_profiles, monkeypatch, tmp_path):
@@ -634,3 +638,171 @@ def test_actual_hourly_mean_refresh_scope():
               "impacted": impacted}
     (proof / "authenticated-impact.json").write_text(json.dumps(result, sort_keys=True, indent=2) + "\n")
     print(json.dumps({key: value for key, value in result.items() if key != "impacted"}, sort_keys=True))
+
+
+@pytest.fixture(scope="module")
+def actual_mean_refresh_inputs():
+    if "OTC_MEAN_REFRESH_PROOF" not in os.environ:
+        pytest.skip("requires frozen mean-refresh inputs")
+    p = producer()
+    proof = Path(os.environ["OTC_MEAN_REFRESH_PROOF"])
+    inputs = json.loads((proof.parent / "inputs.json").read_text())
+    source = Path(inputs["original"])
+    previous = json.loads((source / "observed-run.json").read_text())
+    command = json.loads((proof / "red-command.json").read_text())["argv"]
+    fit_run = Path(inputs["fit_run"])
+    manifest = json.loads((fit_run / "timebase_manifest.json").read_text())
+    audit = p.gesla_sets.load_audit(Path(manifest["inputs"]["timebase_csv"]["path"]).parent)
+    roles = Path(__file__).resolve().parents[3] / "data/gesla/contributor_roles.csv"
+    identity = {"inputs": {"release_sha256": p.sha256(Path(command[command.index("--release") + 1])),
+        "fit_manifest_sha256": p.sha256(fit_run / "timebase_manifest.json"),
+        "results_sha256": p.sha256(fit_run / "results.jsonl"), "tcd_sha256": p.sha256(Path(inputs["tcd"])),
+        "gesla_manifest_sha256": p.sha256(Path(inputs["gesla_root"]) / "MANIFEST.json"), "timebase_sha256": audit.csv_sha256},
+        "roles_sha256": p.sha256(roles), "implementation": p.implementation_identity()}
+    tree = ast.parse(Path(p.__file__).read_text())
+    surface = ast.Module(body=[node for node in tree.body if not
+        (isinstance(node, ast.FunctionDef) and node.name == "authenticate_measured_inputs")], type_ignores=[])
+    digest = hashlib.sha256(ast.dump(surface, include_attributes=False).encode()).hexdigest()
+    (proof / "current-source-pin.json").write_text(json.dumps({"sha256": digest}) + "\n")
+    return proof, inputs, source, previous, identity
+
+
+def test_actual_pinned_mean_intake(actual_mean_refresh_inputs):
+    p = producer()
+    _, _, source, previous, identity = actual_mean_refresh_inputs
+    p.authenticate_measured_inputs(source, previous, identity)
+    print("actual frozen full source + current scientific/dependency identities accept the pinned selective mean transition")
+
+
+def _actual_mean_pool(cache, index, worker_inputs, log):
+    with Path(log).open("w") as stream:
+        os.dup2(stream.fileno(), 1)
+        os.dup2(stream.fileno(), 2)
+        p = producer()
+        p._initialize_measurement_worker(*worker_inputs)
+        p._complete_measurements(index, Path(cache), p._WORKER_CONTEXT, worker_inputs, 4, False)
+
+
+def test_actual_selective_refresh_resume_and_provenance(actual_mean_refresh_inputs):
+    p = producer()
+    proof, inputs, source, previous, identity = actual_mean_refresh_inputs
+    out = proof / "gate"
+    out.mkdir()
+    cache = out / "checkpoints"
+    cache.mkdir()
+    reference = out / "observed-measurement-reference.json"
+    refresh = p.prepare_mean_refresh(source, cache, previous["targets"], identity, reference)
+    assert len(refresh) == 141
+    selected_ids = {row["set_id"] for row in inputs["targets"]}
+    selected = [row for row in refresh if row["set_id"] in selected_ids]
+    assert len(selected) == 3
+    assert all(not (cache / f"{row['key']}.done.json").exists() for row in refresh)
+    worker_inputs = (Path(inputs["gesla_root"]), Path(inputs["fit_run"]), Path(inputs["tcd"]),
+                    Path(__file__).resolve().parents[3] / "data/gesla/contributor_roles.csv")
+    log = out / "interrupted.log"
+    child = multiprocessing.get_context("spawn").Process(target=_actual_mean_pool,
+        args=(str(cache), selected, worker_inputs, str(log)))
+    child.start()
+    deadline = time.monotonic() + 180
+    completed = 0
+    try:
+        while child.is_alive() and time.monotonic() < deadline:
+            completed = sum((cache / f"{row['key']}.done.json").exists() for row in selected)
+            if completed:
+                os.kill(child.pid, signal.SIGINT)
+                break
+            time.sleep(0.02)
+        child.join(30)
+        assert not child.is_alive()
+        assert child.exitcode != 0 and 0 < completed < 3
+    finally:
+        if child.is_alive():
+            child.terminate()
+            child.join(10)
+    workers = set(map(int, re.findall(r"measure .* pid=(\d+)", log.read_text())))
+    assert workers and len(workers) <= 4
+    for pid in workers:
+        assert subprocess.run(["ps", "-p", str(pid)], capture_output=True).returncode != 0
+    # Existing complete markers are current and atomic; partial payloads are not hits.
+    refresh_again = p.prepare_mean_refresh(source, cache, previous["targets"], identity, reference)
+    assert refresh_again == refresh
+    p._initialize_measurement_worker(*worker_inputs)
+    measured, reused = p._complete_measurements(selected, cache, p._WORKER_CONTEXT, worker_inputs, 4, False)
+    assert measured == 3 - completed and reused == completed
+    oracle = {row["set_id"]: row for row in json.loads((proof.parent / "frozen-green-values.json").read_text())}
+    values = []
+    for item in selected:
+        key = item["key"]
+        profile = p.read_checkpoint(cache, key, item["job_sha256"], require_complete=True)
+        marker = json.loads((cache / f"{key}.done.json").read_text())
+        assert marker["measurement_implementation"] == identity["implementation"]
+        tab = p.load_tab(cache / profile["cache"])
+        old = p.load_tab(source / "checkpoints" / profile["cache"])
+        np.testing.assert_array_equal(tab.msl_t + 1800, old.msl_t)
+        np.testing.assert_array_equal(tab.msl_h, old.msl_h)
+        witness = oracle[item["set_id"]]
+        ym = tuple(map(int, witness["month"].split("-")))
+        assert profile["mm"][ym] == pytest.approx(witness["interval_oracle"], abs=1e-10)
+        values.append({"set_id": item["set_id"], "month": witness["month"], "actual": profile["mm"][ym],
+                       "interval_oracle": witness["interval_oracle"], "marker_sha256": p.sha256(cache / f"{key}.done.json")})
+    unchanged = [row for row in previous["targets"] if row not in refresh and
+                 row["set_id"].endswith(("/hellevoetsluis-hel-nld-rws", "/werkendambuitentg-wer-nld-cmems", "/penarth-pen-gbr-cco"))]
+    assert len(unchanged) == 3
+    for item in unchanged:
+        old = p.read_checkpoint(source / "checkpoints", item["key"], item["job_sha256"], require_complete=True)
+        assert p.read_checkpoint(cache, item["key"], item["job_sha256"], require_complete=True) == old
+        marker = json.loads((cache / f"{item['key']}.done.json").read_text())
+        for name in [f"{item['key']}.job.json", f"{item['key']}.done.json", *marker["files"]]:
+            assert (cache / name).is_symlink()
+            assert p.sha256(cache / name) == p.sha256(source / "checkpoints" / name)
+    assert p._complete_measurements(selected, cache, p._WORKER_CONTEXT, worker_inputs, 4, True) == (0, 3)
+    (proof / "gate-values.json").write_text(json.dumps(values, sort_keys=True, indent=2) + "\n")
+    (proof / "gate-status.json").write_text(json.dumps({"interrupted": True, "completed_before_interrupt": completed,
+        "worker_pids_absent": sorted(workers), "resume_measured": measured, "resume_reused": reused,
+        "nonmean_controls_unchanged": [row["set_id"] for row in unchanged], "planned_refresh": 141, "planned_preserve": 10536}, sort_keys=True, indent=2) + "\n")
+    print("three full original mean measurements match interval oracle; three nonmean controls byte-exact; interrupted pool reaped; resume/no-op/provenance PASS")
+
+
+def test_actual_mean_refresh_rejects_stale_and_partial_inputs(actual_mean_refresh_inputs, tmp_path):
+    p = producer()
+    proof, inputs, source, previous, identity = actual_mean_refresh_inputs
+    cache = proof / "gate/checkpoints"
+    reference = proof / "gate/observed-measurement-reference.json"
+    item = inputs["targets"][0]
+    key = item["key"]
+    names = [f"{key}.{suffix}" for suffix in ("profile.json", "npz", "done.json")]
+    saved = {name: (cache / name).read_bytes() for name in names}
+    try:
+        # An actual legacy mean marker is never a corrected cache hit.
+        (cache / names[-1]).write_bytes((source / "checkpoints" / names[-1]).read_bytes())
+        with pytest.raises(ValueError, match="stale mean measurement implementation"):
+            p.prepare_mean_refresh(source, cache, previous["targets"], identity, reference)
+        # Even rewriting its claimed implementation cannot bless the original arrays.
+        for name in names:
+            (cache / name).write_bytes((source / "checkpoints" / name).read_bytes())
+        marker = json.loads((cache / names[-1]).read_text())
+        marker["measurement_implementation"] = identity["implementation"]
+        (cache / names[-1]).write_text(json.dumps(marker))
+        with pytest.raises(ValueError, match="stale mean measurement arrays"):
+            p.prepare_mean_refresh(source, cache, previous["targets"], identity, reference)
+    finally:
+        for name, payload in saved.items():
+            (cache / name).write_bytes(payload)
+    (cache / names[0]).unlink()
+    try:
+        with pytest.raises(ValueError, match="invalid checkpoint"):
+            p.prepare_mean_refresh(source, cache, previous["targets"], identity, reference)
+    finally:
+        (cache / names[0]).write_bytes(saved[names[0]])
+    partial = tmp_path / "partial-original"
+    (partial / "checkpoints").mkdir(parents=True)
+    (partial / "observed-run.json").write_bytes((source / "observed-run.json").read_bytes())
+    first = previous["targets"][0]
+    for suffix in ("job.json", "done.json"):
+        name = f"{first['key']}.{suffix}"
+        (partial / "checkpoints" / name).symlink_to(source / "checkpoints" / name)
+    target = tmp_path / "partial-intake"
+    target.mkdir()
+    with pytest.raises(ValueError, match="invalid checkpoint"):
+        p.prepare_mean_refresh(partial, target, previous["targets"], identity, tmp_path / "reference.json")
+    print("actual stale mean markers/arrays and partial corrected/original checkpoints REFUSED; no raw fallback")
