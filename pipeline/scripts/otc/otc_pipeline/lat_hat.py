@@ -77,18 +77,35 @@ def read_tuning_input(path: Path, *, tier: str = "T5", data_dir: Path | None = N
     return payload
 
 
+def _strict_request(payload: dict, start: str = START, end: str = END) -> dict:
+    cs = payload["constant_set"]
+    return {"astro_table": payload["astro_table"], "constituents": cs["constituents"],
+            "msl_offset_m": _finite(cs["datum"].get("msl_offset_m"), "msl_offset_m"),
+            "start": start, "end": end}
+
+
+def computation_input_sha256(payload: dict) -> str:
+    """Bind extrema and uncertainty to the consumed request and source context."""
+    cs = payload["constant_set"]
+    body = {"request": _strict_request(payload), "convention_id": cs.get("convention_id"),
+            "source_version": cs.get("source_version"), "time_base": cs.get("time_base"),
+            "record_issues": cs.get("record_issues", []),
+            "truncated_lows": sorted(k for k, b in cs["datum"].get("basis", {}).items()
+                                     if "truncated_lows" in b.get("flags", []))}
+    return hashlib.sha256(json.dumps(body, sort_keys=True, separators=(",", ":"),
+                                     allow_nan=False).encode()).hexdigest()
+
+
 def compute_raw(payload: dict, *, start: str = START, end: str = END,
                 ruby: str = "ruby") -> dict:
     """Find raw extrema, adding the set's stated Z0 exactly once in the engine."""
     cs = payload["constant_set"]
     if cs.get("quantity") != "water_level" or cs.get("qc_status") not in ("ok", "flagged"):
         raise ValueError("eligible water-level set required")
-    offset = _finite(cs.get("datum", {}).get("msl_offset_m"), "msl_offset_m")
+    request = _strict_request(payload, start, end)
     root = os.environ.get("OTC_ENGINE_WORKTREE")
     if not root or not (Path(root) / "lib/harmonics_strict.rb").is_file():
         raise ValueError("set OTC_ENGINE_WORKTREE to the external strict engine checkout")
-    request = {"astro_table": payload["astro_table"], "constituents": cs["constituents"],
-               "msl_offset_m": offset, "start": start, "end": end}
     started = time.perf_counter()
     completed = subprocess.run([ruby, str(Path(__file__).with_name("lat_hat_strict.rb"))],
                                input=json.dumps(request, allow_nan=False), text=True,
@@ -339,6 +356,7 @@ def main():
                        "input_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
                        "source_calibration_sha256": args.production_official_calibration_sha256,
                        "native_json_sha256": payload.get("native_json_sha256")}
+                row["computation_input_sha256"] = computation_input_sha256(payload)
                 row = calibrated_draft(cs, row, calibration)
                 for basis in row["draft_datum"]["basis"].values():
                     if basis["kind"] == "computed":
@@ -370,6 +388,7 @@ def main():
             for row in rows:
                 payload = json.loads(paths[row["set_id"]].read_text())
                 result = calibrated_draft(payload["constant_set"], row, calibration)
+                result["computation_input_sha256"] = computation_input_sha256(payload)
                 stream.write(json.dumps(result, allow_nan=False, sort_keys=True) + "\n")
             stream.write(json.dumps({"official_calibration": calibration, "accepted": False}, allow_nan=False, sort_keys=True) + "\n")
         return
@@ -392,6 +411,7 @@ def main():
                    "low_water_eligibility": ("unknown" if args.tier == "T5b" and "flatline" not in payload
                                               else "suppressed" if payload.get("flatline") else "eligible"),
                    "pending_gates": ["calibration", "full tuning T5", "T5b", "T6"]}
+            row["computation_input_sha256"] = computation_input_sha256(payload)
             z0 = cs["datum"]["msl_offset_m"] if args.tier != "T6" else 0.0
             published_msl = reference["datum"]["named"]["msl"] if args.tier != "T6" else 0.0
             origin = "msl" if args.tier != "T6" else "set_zero"

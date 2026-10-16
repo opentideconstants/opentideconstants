@@ -139,12 +139,14 @@ def _sha256(path: Path) -> str:
 
 def stage_official_datums(release: dict, path: Path, sha256: str) -> dict:
     """Stage pinned, calibrated official drafts; never change or admit release values."""
-    from otc_pipeline.lat_hat import EPOCH, _finite
+    from otc_pipeline.lat_hat import EPOCH, START, END, _finite, computation_input_sha256
 
     if _sha256(path) != sha256:
         raise ValueError("official datum draft SHA-256 mismatch")
     native = {cs["set_id"]: (station["station_id"], cs) for station in release["stations"]
-              for cs in station["constant_sets"]}
+              for cs in station.get("constant_sets", [])}
+    conventions = {c["convention_id"]: c for c in release.get("conventions", [])}
+    tables = {t["astro_table_id"]: t for t in release.get("astro_tables", [])}
     staged, seen, count = [], set(), 0
     for line in path.read_text().splitlines():
         row = json.loads(line)
@@ -155,6 +157,13 @@ def stage_official_datums(release: dict, path: Path, sha256: str) -> dict:
             raise ValueError(f"duplicate official datum draft {sid}")
         seen.add(sid)
         station_id, cs = native[sid]
+        convention = conventions.get(cs.get("convention_id"), {})
+        table = tables.get(convention.get("astro_table_id"))
+        if (table is None or not row.get("computation_input_sha256") or
+                row["computation_input_sha256"] != computation_input_sha256(
+                    {"constant_set": cs, "astro_table": table}) or
+                (row["raw"].get("start"), row["raw"].get("end")) != (START, END)):
+            raise ValueError(f"official datum computation input mismatch: {sid}")
         if cs["source"] not in ("noaa", "kartverket", "linz") or cs["source_type"] != "official":
             raise ValueError("only official NOAA, Kartverket and LINZ drafts can be staged")
         if row.get("calibration_status") != "available":
@@ -175,9 +184,11 @@ def stage_official_datums(release: dict, path: Path, sha256: str) -> dict:
                 raise ValueError(f"staged datum differs from frozen extrema: {sid}:{key}")
             if _finite(basis.get("uncertainty_m"), "staged uncertainty") < 0 or basis.get("uncertainty_basis") not in ("calibrated", "propagated"):
                 raise ValueError(f"invalid staged uncertainty: {sid}:{key}")
-            count += 1
+            count += key not in cs["datum"].get("basis", {})
         staged.append({"station_id": station_id, "set_id": sid, "source": cs["source"],
-                       "datum": copy.deepcopy(draft), "input_sha256": sha256})
+                       "datum": copy.deepcopy(draft), "input_sha256": sha256,
+                       "computed_keys": [k for k in draft["basis"] if k not in cs["datum"].get("basis", {})
+                                         and k in ("lat", "hat", "otc_lat", "otc_hat")]})
     return {"public_admission": False, "release_unchanged": True, "input_path": str(path),
             "input_sha256": sha256, "staged_set_count": len(staged), "staged_level_count": count,
             "finding": "Official tuning drafts only; full DT4a and GATE-DATUM acceptance is not established.",
@@ -188,14 +199,13 @@ def apply_official_datum_fallbacks(release: dict, path: Path, sha256: str) -> di
     """Attach labelled computed levels while preserving every existing set and recommendation."""
     staged = stage_official_datums(release, path, sha256)
     from otc_pipeline.lat_hat import COMPUTED_FALLBACK
-    by_id = {cs["set_id"]: cs for station in release["stations"] for cs in station["constant_sets"]}
+    by_id = {cs["set_id"]: cs for station in release["stations"] for cs in station.get("constant_sets", [])}
     count = 0
     for entry in staged["drafts"]:
         datum = entry["datum"]
-        for basis in datum["basis"].values():
-            if basis["kind"] == "computed":
-                basis["fallback"] = dict(COMPUTED_FALLBACK)
-                count += 1
+        for key in entry["computed_keys"]:
+            datum["basis"][key]["fallback"] = dict(COMPUTED_FALLBACK)
+            count += 1
         by_id[entry["set_id"]]["datum"] = datum
     return {**staged, "public_admission": True, "release_unchanged": False,
             "normal_datum_gate_accepted": False, "computed_basis_fallback_count": count,

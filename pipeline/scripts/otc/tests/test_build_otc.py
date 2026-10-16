@@ -9,7 +9,149 @@ import pytest
 from jsonschema import Draft202012Validator
 
 from otc_pipeline import build_otc
-from otc_pipeline.lat_hat import EPOCH
+from otc_pipeline.lat_hat import EPOCH, START, END, computation_input_sha256
+
+
+@pytest.fixture
+def actual_datum_case(tmp_path, request):
+    """Three cached production stations and their frozen, unrecomputed extrema."""
+    root = os.environ.get("OTC_DATUM_FIX_PROOF")
+    if not root:
+        pytest.skip("requires the actual cached datum fix proof")
+    root = Path(root)
+    contract = json.loads((root / "new-place-sdk-contract.json").read_bytes())
+    case = contract["cases"][request.param]
+    release = copy.deepcopy(contract["release_fixture"])
+    release["stations"] = [s for s in release["stations"] if s["station_id"] == case["station_id"]]
+    entry = next(e for e in json.loads((root / "missing-official/roster.json").read_text())["rows"]
+                 if e["set_id"] == case["set_id"])
+    payload = json.loads(Path(entry["path"]).read_text())
+    cs = next(c for c in release["stations"][0]["constant_sets"] if c["set_id"] == case["set_id"])
+    cs["datum"] = copy.deepcopy(payload["constant_set"]["datum"])
+    row = next(r for line in (root / "official-public-drafts.jsonl").read_text().splitlines()
+               if (r := json.loads(line)).get("set_id") == cs["set_id"])
+    # Independently bind the actual request, before any intentional stale-input mutation.
+    body = {"request": {"astro_table": payload["astro_table"], "constituents": cs["constituents"],
+                        "msl_offset_m": cs["datum"]["msl_offset_m"],
+                        "start": "2020-01-01T00:00:00Z", "end": "2039-01-01T00:00:00Z"},
+            "convention_id": cs.get("convention_id"), "source_version": cs.get("source_version"),
+            "time_base": cs.get("time_base"), "record_issues": cs.get("record_issues", []),
+            "truncated_lows": sorted(k for k, b in cs["datum"].get("basis", {}).items()
+                                     if "truncated_lows" in b.get("flags", []))}
+    row["computation_input_sha256"] = hashlib.sha256(json.dumps(
+        body, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
+    return release, cs, row, tmp_path / "actual-drafts.jsonl"
+
+
+def write_actual_draft(row, path):
+    path.write_text(json.dumps(row) + "\n")
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+@pytest.mark.parametrize("actual_datum_case", range(3), indirect=True)
+def test_actual_tombstone_keeps_official_datum_producer_working(actual_datum_case):
+    release, cs, row, path = actual_datum_case
+    examples = json.loads((Path(__file__).parent / "fixtures/example-1.0.json").read_text())
+    tombstone = copy.deepcopy(next(s for s in examples["stations"] if s["status"] == "removed"))
+    tombstone["merged_into"] = release["stations"][0]["station_id"]
+    release["stations"].append(tombstone)
+    schema = json.loads((Path(__file__).parents[1] / "schema/otc-1.0.schema.json").read_text())
+    Draft202012Validator(schema).validate(release)
+    receipt = build_otc.apply_official_datum_fallbacks(release, path, write_actual_draft(row, path))
+    assert release["stations"][-1] == tombstone
+    assert receipt["computed_basis_fallback_count"] == 2
+
+
+@pytest.mark.parametrize("actual_datum_case", range(3), indirect=True)
+@pytest.mark.parametrize("mutation", ["amplitude", "phase", "table", "time_base", "missing_binding"])
+def test_actual_stale_harmonics_rejected(actual_datum_case, mutation):
+    release, cs, row, path = actual_datum_case
+    if mutation == "amplitude":
+        cs["constituents"][0]["amplitude_m"] += 0.001
+    elif mutation == "phase":
+        cs["constituents"][0]["phase_deg"] = (cs["constituents"][0]["phase_deg"] + 1) % 360
+    elif mutation == "table":
+        release["astro_tables"][0]["constituents"]["M2"]["f"][0] *= 1.001
+    elif mutation == "time_base":
+        cs["time_base"] = {"status": "unverified"}
+    else:
+        del row["computation_input_sha256"]
+    with pytest.raises(ValueError, match="computation input"):
+        build_otc.apply_official_datum_fallbacks(release, path, write_actual_draft(row, path))
+
+
+@pytest.mark.parametrize("actual_datum_case", range(3), indirect=True)
+def test_actual_unrelated_computed_basis_preserved(actual_datum_case):
+    release, cs, row, path = actual_datum_case
+    prior = {"kind": "computed", "method": "harmonic_extremes", "epoch": EPOCH,
+             "uncertainty_m": 0.123, "uncertainty_basis": "propagated",
+             "fallback": {"reason": "datum_gate_failed", "basis": "Existing independent computation",
+                          "otc_finding": "Preserve this prior finding."}}
+    published = next(k for k, b in cs["datum"]["basis"].items() if b["kind"] == "published")
+    key = f"otc_{published}"
+    cs["datum"]["named"][key] = cs["datum"]["named"][published]
+    cs["datum"]["basis"][key] = copy.deepcopy(prior)
+    row["draft_datum"]["named"][key] = cs["datum"]["named"][key]
+    row["draft_datum"]["basis"][key] = copy.deepcopy(prior)
+    schema = json.loads((Path(__file__).parents[1] / "schema/otc-1.0.schema.json").read_text())
+    Draft202012Validator(schema).validate(release)
+    receipt = build_otc.apply_official_datum_fallbacks(release, path, write_actual_draft(row, path))
+    assert cs["datum"]["basis"][key] == prior
+    assert receipt["computed_basis_fallback_count"] == 2
+
+
+@pytest.mark.skipif("OTC_DATUM_FIX_PROOF" not in os.environ,
+                    reason="requires the actual frozen519 inputs and completed build")
+def test_actual519_binding_preserves_completed_build(tmp_path):
+    root = Path(os.environ["OTC_DATUM_FIX_PROOF"])
+    rows = {r["set_id"]: r for line in (root / "official-public-drafts.jsonl").read_text().splitlines()
+            if (r := json.loads(line)).get("set_id")}
+    paths = {}
+    for name in ("full-t5", "t6", "missing-official"):
+        for entry in json.loads((root / name / "roster.json").read_text())["rows"]:
+            assert entry["set_id"] not in paths
+            paths[entry["set_id"]] = entry
+    assert rows.keys() == paths.keys() and len(rows) == 519
+    bound = []
+    for sid, row in rows.items():
+        entry = paths[sid]
+        raw_input = Path(entry["path"]).read_bytes()
+        if entry.get("input_sha256"):
+            assert hashlib.sha256(raw_input).hexdigest() == entry["input_sha256"]
+        payload = json.loads(raw_input)
+        assert payload["constant_set"]["set_id"] == sid
+        updated = {**row, "computation_input_sha256": computation_input_sha256(payload)}
+        assert {k: v for k, v in updated.items() if k != "computation_input_sha256"} == row
+        bound.append(updated)
+    artifact = root / "official-public-drafts-bound.jsonl"
+    artifact.write_text("".join(json.dumps(r, sort_keys=True, allow_nan=False) + "\n" for r in bound))
+    sha = hashlib.sha256(artifact.read_bytes()).hexdigest()
+    baseline = root.parent / "datum-stated-batch/native-build"
+    release = json.loads((baseline / "OTC_20261011.meta.json").read_bytes())
+    release["stations"] = []
+    with (baseline / "OTC_20261011.jsonl").open() as stream:
+        for line in stream:
+            station = json.loads(line)
+            if any(cs["set_id"] in rows for cs in station.get("constant_sets", [])):
+                release["stations"].append(station)
+    receipt = build_otc.apply_official_datum_fallbacks(release, artifact, sha)
+    assert receipt["staged_set_count"] == 519
+    assert receipt["computed_basis_fallback_count"] == 1038
+    resulting = {cs["set_id"]: cs["datum"] for s in release["stations"]
+                 for cs in s.get("constant_sets", []) if cs["set_id"] in rows}
+    checked = 0
+    with (root / "native-build/OTC_20261011.jsonl").open() as stream:
+        for line in stream:
+            station = json.loads(line)
+            for cs in station.get("constant_sets", []):
+                if cs["set_id"] in resulting:
+                    assert cs["datum"] == resulting[cs["set_id"]]
+                    checked += 1
+    assert checked == 519
+    proof = {"bound_artifact": str(artifact), "sha256": sha, "sets": checked,
+             "computed_levels": 1038, "unchanged_existing_build_data": True,
+             "existing_build_commit": "d992aa3", "strict_predictions_rerun": 0}
+    (root / "source-fix519-binding-green.json").write_text(json.dumps(proof, indent=2) + "\n")
 
 
 @pytest.fixture
@@ -17,7 +159,9 @@ def staged_input(tmp_path):
     datum = {"zero": "station_datum", "msl_offset_m": 1.0,
              "named": {"lat": 0.5, "hat": 2.0},
              "basis": {key: {"kind": "published", "method": "source"} for key in ("lat", "hat")}}
-    cs = {"set_id": "OTC-test/noaa/9410660", "source": "noaa", "source_type": "official", "datum": datum}
+    cs = {"set_id": "OTC-test/noaa/9410660", "source": "noaa", "source_type": "official", "datum": datum,
+          "convention_id": "test", "constituents": [{"name": "M2", "amplitude_m": 1,
+                                                       "phase_deg": 0, "speed_deg_per_hour": 28.9841042}]}
     draft = copy.deepcopy(datum)
     for level, value in (("lat", 0.51), ("hat", 1.99)):
         draft["named"][f"otc_{level}"] = value
@@ -25,8 +169,12 @@ def staged_input(tmp_path):
                                            "epoch": EPOCH, "uncertainty_m": 0.02,
                                            "uncertainty_basis": "calibrated"}
     row = {"set_id": cs["set_id"], "draft_datum": draft, "calibration_status": "available",
-           "raw": {"lat_m": 0.51, "hat_m": 1.99}}
-    return {"stations": [{"station_id": "OTC-test", "constant_sets": [cs]}]}, row, tmp_path / "drafts.jsonl"
+           "raw": {"lat_m": 0.51, "hat_m": 1.99, "start": START, "end": END}}
+    table = {"astro_table_id": "test"}
+    row["computation_input_sha256"] = computation_input_sha256({"constant_set": cs, "astro_table": table})
+    return {"stations": [{"station_id": "OTC-test", "constant_sets": [cs]}],
+            "conventions": [{"convention_id": "test", "astro_table_id": "test"}],
+            "astro_tables": [table]}, row, tmp_path / "drafts.jsonl"
 
 
 @pytest.mark.parametrize("defect", ["sha", "published", "source", "method", "epoch", "uncertainty", "raw", "duplicate"])
