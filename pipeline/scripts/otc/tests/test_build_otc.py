@@ -16,6 +16,71 @@ from otc_pipeline.lat_hat import EPOCH, START, END, computation_input_sha256, da
 from otc_pipeline import lat_hat
 from otc_pipeline.observed_datums import produce as observed_produce
 from otc_pipeline.release_writer import pinned_schema
+from test_datums import native_observed_chart_cases as native_observed_chart_cases
+
+
+@pytest.fixture
+def native_observed_chart_stage(native_observed_chart_cases, tmp_path):
+    facts, stations = native_observed_chart_cases
+    release = {"stations": [copy.deepcopy(stations[row["station_id"]]) for row in facts["witnesses"]]}
+    expected = copy.deepcopy(release)
+    source = Path("/Users/jpr5/.local/share/copilotkit/cr/otc-impl/datum-observed-fallback/review/fix-mean-clock/refresh/full/observed-drafts.jsonl")
+    with source.open("rb") as stream:
+        assert hashlib.file_digest(stream, "sha256").hexdigest() == "cfb0299eaf9247cd9cb5bba1be294250c3bf439a5d0d1c8086b8a9534a093053"
+    ids = {row["set_id"] for row in facts["witnesses"]}
+    rows = {}
+    with source.open() as stream:
+        for line in stream:
+            row = json.loads(line)
+            if row["set_id"] in ids:
+                rows[row["set_id"]] = row
+            if len(rows) == 3:
+                break
+    assert set(rows) == ids
+    for station in release["stations"]:
+        for cs in station["constant_sets"]:
+            if cs["set_id"] not in rows:
+                continue
+            row = rows[cs["set_id"]]
+            for key in row["observed_keys"]:
+                for field in ("named", "basis"):
+                    assert cs["datum"][field].pop(key) == row["draft_datum"][field][key]
+    path = tmp_path / "three-native-observed-drafts.jsonl"
+    path.write_text("".join(json.dumps(row) + "\n" for row in rows.values()))
+    inputs = {
+        "gesla_root": Path("/Users/jpr5/.local/share/opentideconstants/work/inputs/gesla/4.1"),
+        "fit_run": Path("/Users/jpr5/.local/share/copilotkit/cr/otc-impl/FIX-CONST/fit/fit-fc1"),
+        "tcd": Path("/Users/jpr5/.local/share/copilotkit/cr/otc-impl/FIX-CONST/astro/otc-tcd-20251228-ma2mb2-r2/tcd-1900-2100.json"),
+        "source_release": Path("/Users/jpr5/.local/share/copilotkit/cr/otc-impl/derived-chart-datum/postfix-candidate/native-build/OTC_20261011.jsonl"),
+        "source_release_sha256": "14a12b36365f0e057633bb8cdf266a50cc24a3d0d417524f29e35547d299e111"}
+    return release, expected, path, hashlib.sha256(path.read_bytes()).hexdigest(), inputs, facts
+
+
+@pytest.mark.parametrize("combined", [False, True])
+def test_native_observed_chart_publication_follows_authenticated_attachment(native_observed_chart_stage, tmp_path, combined):
+    release, expected, path, digest, inputs, facts = native_observed_chart_stage
+    before = copy.deepcopy(release)
+    staged = build_otc.stage_observed_datums(release, path, digest, **inputs)
+    assert release == before
+    assert "chart_datum_derivation" not in staged
+    if combined:
+        empty = tmp_path / "no-new-official-drafts.jsonl"
+        empty.write_text("")
+        official, result = build_otc.apply_datum_drafts(release,
+            official=(empty, hashlib.sha256(empty.read_bytes()).hexdigest()), observed=(path, digest),
+            publish_official=True, publish_observed=True, observed_inputs=inputs)
+        assert official["computed_basis_fallback_count"] == 0
+    else:
+        result = build_otc.apply_observed_datum_fallbacks(release, path, digest, **inputs)
+    for row in facts["witnesses"]:
+        station = next(s for s in release["stations"] if s["station_id"] == row["station_id"])
+        cs = next(c for c in station["constant_sets"] if c["set_id"] == row["set_id"])
+        print(f"REAL PRODUCER {row['station_id']}: mllw={cs['datum']['named']['mllw']!r}; chart={cs['datum'].get('chart_datum')!r}; combined={combined}")
+        assert cs["datum"].get("chart_datum") == "mllw"
+        del cs["datum"]["chart_datum"]
+    assert release == expected
+    assert result["chart_datum_derivation"]["changed_places"] == 3
+    assert result["normal_datum_gate_accepted"] is False
 
 
 @pytest.fixture

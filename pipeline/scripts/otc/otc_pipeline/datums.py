@@ -3,7 +3,7 @@
 A published level is the publisher's number, converted to metres and re-expressed above the set's
 zero, with a `basis` of kind `published`, method `source`, the publisher's own name for it and,
 only where the publisher states one, its epoch and control station. Nothing here computes a level.
-An existing computed LAT can be designated as a labelled fallback chart datum without changing
+An existing computed LAT or US coastal observed MLLW can be designated as a labelled fallback without changing
 its value or basis, subject to the cited country/area convention and station-wide precedence.
 
 `datum_build_errors` runs the release build checks the schema cannot express that touch a single
@@ -115,7 +115,7 @@ def _chart_conventions() -> tuple[dict, str]:
 
 
 def derive_chart_datums(release: dict) -> dict:
-    """Designate existing computed LAT under a cited convention; never compute a level.
+    """Designate existing computed LAT or US coastal observed MLLW; never compute a level.
 
     Mutates only missing chart_datum pointers. Gate-failed/unknown-quality fallback bases
     remain intact. Receipt counts places separately from sets; withheld counts are sets.
@@ -131,19 +131,33 @@ def derive_chart_datums(release: dict) -> dict:
                "by_convention": {}, "citations": {}}
     for station in release.get("stations", []):
         sets = station.get("constant_sets", [])
-        candidates = [cs for cs in sets if "lat" in cs.get("datum", {}).get("named", {})]
+        candidates = [(cs, "mllw" if station.get("country") == "USA" and
+                       "mllw" in cs.get("datum", {}).get("named", {}) else "lat") for cs in sets
+                      if "lat" in cs.get("datum", {}).get("named", {}) or
+                      station.get("country") == "USA" and "mllw" in cs.get("datum", {}).get("named", {})]
         datums = [cs.get("datum", {}) for cs in sets]
         datums.append(station.get("subordinate_offsets", {}).get("datum", {}))
-        if not any("lat" in d.get("named", {}) for d in datums):
+        has_lat = any("lat" in d.get("named", {}) for d in datums)
+        if not has_lat and not candidates:
             continue
-        receipt["lat_places"] += 1
+        receipt["lat_places"] += int(has_lat)
         metadata = [r.get("original_metadata", {}) for r in station.get("source_records", [])]
         source_countries = {str(m.get("COUNTRY", "")).strip().upper() for m in metadata}
         # Native COUNTRY identities are alpha-3; blank/unknown text asserts no country.
         country_conflict = any(country != station.get("country") for country in source_countries
                                if len(country) == 3 and country.isascii() and country.isalpha())
+        coastal_sets = set()
+        for cs, key in candidates:
+            if key != "mllw" or cs.get("source") != "gesla-fit":
+                continue
+            own = [r.get("original_metadata", {}) for r in station.get("source_records", [])
+                   if r.get("source") == "gesla" and r.get("source_record_id") == cs.get("source_record_id")]
+            if own and all(m.get("COUNTRY") == "USA" and m.get("GAUGE TYPE") == "Coastal" for m in own):
+                coastal_sets.add(cs["set_id"])
         country_rows = [r for r in table["rows"] if r["country_code"] == station.get("country")]
-        convention = next((r for r in country_rows if not country_conflict and (r["match"] == "country" or (
+        convention = next((r for r in country_rows if not country_conflict and (
+            station.get("country") == "USA" and r["stated_convention"] == "MLLW" and coastal_sets or
+            r["match"] == "country" or (
             r["match"] == "source_metadata" and any(
                 m.get("COUNTRY") == station.get("country") and any(
                     str(m.get(field, "")).strip().casefold() in values
@@ -169,25 +183,28 @@ def derive_chart_datums(release: dict) -> dict:
         record_ids.update([aliases] if isinstance(aliases, str) else aliases)
         excluded = bool(record_ids & exclusions)
         changed = 0
-        for cs in candidates:
+        for cs, key in candidates:
             datum = cs["datum"]
             if datum.get("chart_datum") is not None:
                 continue
-            value = datum["named"]["lat"]
+            kind = "observed" if key == "mllw" else "computed"
+            value = datum["named"][key]
             if (isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value)
-                    or datum.get("basis", {}).get("lat", {}).get("kind") != "computed"):
-                reason = "not_finite_computed_lat"
+                    or datum.get("basis", {}).get(key, {}).get("kind") != kind):
+                reason = f"not_finite_{kind}_{key}"
             elif published_chart:
                 reason = "published_chart_datum"
             elif excluded:
                 reason = "baltic_or_bscd2000"
             elif low_water_suppressed(cs):
                 reason = "actual_low_water_cutoff"
-            elif not convention:
+            elif key == "mllw" and cs["set_id"] not in coastal_sets:
+                reason = "unknown_convention_or_area"
+            elif not convention or key == "lat" and convention["stated_convention"] == "MLLW":
                 reason = "non_lat_convention" if country_rows and all(
                     r["LAT_evidence_status"] == "not_LAT" for r in country_rows) else "unknown_convention_or_area"
             else:
-                datum["chart_datum"] = "lat"
+                datum["chart_datum"] = key
                 changed += 1
                 continue
             receipt["withheld"][reason] = receipt["withheld"].get(reason, 0) + 1

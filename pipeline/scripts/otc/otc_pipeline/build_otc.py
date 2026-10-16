@@ -367,7 +367,7 @@ def apply_observed_datum_fallbacks(release: dict, path: Path, sha256: str, **inp
 
 
 def _publish_observed_datum_stage(release: dict, staged: dict) -> dict:
-    from otc_pipeline.datums import observed_companions
+    from otc_pipeline.datums import derive_chart_datums, observed_companions
 
     by_id = {cs["set_id"]: cs for station in release["stations"] for cs in station.get("constant_sets", [])}
     pending = []
@@ -381,8 +381,11 @@ def _publish_observed_datum_stage(release: dict, staged: dict) -> dict:
     for entry, datum in pending:
         by_id[entry["set_id"]]["datum"] = datum
         entry["datum"] = datum
-    return {**staged, "public_admission": True, "release_unchanged": not bool(staged["drafts"]),
+    chart_datum_derivation = derive_chart_datums(release)
+    return {**staged, "public_admission": True,
+            "release_unchanged": not bool(staged["drafts"]) and not bool(chart_datum_derivation["changed_sets"]),
             "observed_basis_fallback_count": staged["staged_level_count"],
+            "chart_datum_derivation": chart_datum_derivation,
             "admission": "labelled observed datum fallback only"}
 
 

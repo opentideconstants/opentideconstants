@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import json
+import os
 from pathlib import Path
 
 import pytest
@@ -10,6 +12,136 @@ import pytest
 from otc_pipeline import datums
 from otc_pipeline.datums import datum_build_errors, period, published
 from otc_pipeline.gesla_sets import _published_stated_zero
+
+
+@pytest.fixture(scope="module")
+def native_observed_chart_cases():
+    root = os.environ.get("OTC_OBSERVED_CHART_PROOF")
+    assert root, "OTC_OBSERVED_CHART_PROOF must name the pinned native observed chart evidence"
+    facts_path = Path(root) / "selected-native-3-witnesses.json"
+    assert hashlib.sha256(facts_path.read_bytes()).hexdigest() == "00d24525a3095ac69c457091ac15b750ca4077a015532ff0d8b5643334275ea5"
+    facts = json.loads(facts_path.read_text())
+    source = Path(facts["source"])
+    with source.open("rb") as stream:
+        assert hashlib.file_digest(stream, "sha256").hexdigest() == facts["source_sha256"]
+    rows = facts["witnesses"] + [facts["exclusion_control"]]
+    wanted = {row["source_line"]: row for row in rows}
+    stations = {}
+    with source.open("rb") as stream:
+        for number, line in enumerate(stream, 1):
+            if number in wanted:
+                row = wanted[number]
+                assert hashlib.sha256(line).hexdigest() == row["source_line_sha256"]
+                station = json.loads(line)
+                assert station["station_id"] == row["station_id"]
+                stations[station["station_id"]] = station
+            if number == max(wanted):
+                break
+    assert len(stations) == 4
+    return facts, stations
+
+
+@pytest.mark.parametrize("index", range(3))
+def test_native_observed_chart_fallback(native_observed_chart_cases, index):
+    facts, stations = native_observed_chart_cases
+    row = facts["witnesses"][index]
+    station = copy.deepcopy(stations[row["station_id"]])
+    before = copy.deepcopy(station)
+    cs = next(cs for cs in station["constant_sets"] if cs["set_id"] == row["set_id"])
+    assert cs["datum"]["named"]["mllw"] == row["existing_value_m"]
+    assert cs["datum"]["basis"]["mllw"] == row["existing_basis"]
+    assert all("chart_datum" not in cs.get("datum", {}) for cs in station["constant_sets"])
+    receipt = datums.derive_chart_datums({"stations": [station]})
+    print(f"REAL CHART {row['station_id']} {row['set_id']}: mllw={row['existing_value_m']!r}; "
+          f"before=None; after={cs['datum'].get('chart_datum')!r}; T1=FAIL; total_sigma=None")
+    assert cs["datum"].get("chart_datum") == "mllw"
+    assert receipt["changed_places"] == receipt["changed_sets"] == 1
+    assert receipt["citations"]["iho-2021-usa"]["stated_convention"] == "MLLW"
+    assert receipt["citations"]["iho-2021-usa"]["pdf_page_1_based"] == 2
+    assert datums.derive_chart_datums({"stations": [station]})["changed_places"] == 0
+    del cs["datum"]["chart_datum"]
+    assert station == before
+
+
+def test_native_lake_observed_mllw_is_not_coastal_chart(native_observed_chart_cases):
+    facts, stations = native_observed_chart_cases
+    station = copy.deepcopy(stations[facts["exclusion_control"]["station_id"]])
+    before = copy.deepcopy(station)
+    assert datums.derive_chart_datums({"stations": [station]})["changed_places"] == 0
+    assert station == before
+
+
+def test_native_observed_chart_does_not_equate_lat_and_mllw(native_observed_chart_cases):
+    facts, stations = native_observed_chart_cases
+    row = facts["witnesses"][0]
+    station = copy.deepcopy(stations[row["station_id"]])
+    cs = next(cs for cs in station["constant_sets"] if cs["set_id"] == row["set_id"])
+    sibling = copy.deepcopy(cs)
+    sibling["set_id"] += "/lat-only"
+    del sibling["datum"]["named"]["mllw"], sibling["datum"]["basis"]["mllw"]
+    station["constant_sets"].append(sibling)
+    before = copy.deepcopy(sibling)
+    assert datums.derive_chart_datums({"stations": [station]})["changed_sets"] == 1
+    assert cs["datum"]["chart_datum"] == "mllw"
+    assert sibling == before
+    # Existing LAT coverage receipt semantics do not count an MLLW-only place as LAT.
+    station = copy.deepcopy(stations[row["station_id"]])
+    for item in station["constant_sets"]:
+        for field in ("named", "basis"):
+            item.get("datum", {}).get(field, {}).pop("lat", None)
+    receipt = datums.derive_chart_datums({"stations": [station]})
+    assert receipt["lat_places"] == 0 and receipt["changed_places"] == 1
+
+
+@pytest.mark.parametrize("defect", ["Lake", "River", "missing_domain", "foreign_record", "conflicting_domain",
+    "unknown_country", "conflicting_country", "published_other", "published_subordinate", "existing_pointer",
+    "flatline", "truncated_lows", "nonfinite", "boolean", "computed_mllw", "published_mllw", "observed_lat"])
+def test_native_observed_chart_negative_variants_preserve_payload(native_observed_chart_cases, defect):
+    facts, stations = native_observed_chart_cases
+    row = facts["witnesses"][0]
+    station = copy.deepcopy(stations[row["station_id"]])
+    cs = next(cs for cs in station["constant_sets"] if cs["set_id"] == row["set_id"])
+    own = next(r for r in station["source_records"] if r["source"] == "gesla" and r["source_record_id"] == cs["source_record_id"])
+    datum = cs["datum"]
+    if defect in ("Lake", "River", "missing_domain"):
+        own["original_metadata"]["GAUGE TYPE"] = "Unspecified" if defect == "missing_domain" else defect
+        # A different source's Coastal label cannot qualify this source record.
+        sibling = copy.deepcopy(own)
+        sibling["source_record_id"] = "different-source-record"
+        sibling["original_metadata"]["GAUGE TYPE"] = "Coastal"
+        station["source_records"].append(sibling)
+    elif defect == "foreign_record":
+        own["source_record_id"] = "different-source-record"
+    elif defect == "conflicting_domain":
+        other = copy.deepcopy(own)
+        other["original_metadata"]["GAUGE TYPE"] = "Lake"
+        station["source_records"].append(other)
+    elif defect == "unknown_country":
+        station["country"] = own["original_metadata"]["COUNTRY"] = "XXX"
+    elif defect == "conflicting_country":
+        own["original_metadata"]["COUNTRY"] = "CAN"
+    elif defect in ("published_other", "published_subordinate"):
+        agency = {"named": {"cd": 0.0}, "basis": {"cd": published("CD")}, "chart_datum": "cd"}
+        if defect == "published_other":
+            station["constant_sets"].append({"set_id": "agency", "datum": agency})
+        else:
+            station["subordinate_offsets"] = {"datum": agency}
+    elif defect == "existing_pointer":
+        datum["chart_datum"] = "lat"
+    elif defect == "flatline":
+        cs["record_issues"] = cs.get("record_issues", []) + [{"issue": "flatline"}]
+    elif defect == "truncated_lows":
+        datum["basis"]["mllw"].setdefault("flags", []).append("truncated_lows")
+    elif defect in ("nonfinite", "boolean"):
+        datum["named"]["mllw"] = float("inf") if defect == "nonfinite" else True
+    elif defect in ("computed_mllw", "published_mllw"):
+        datum["basis"]["mllw"]["kind"] = defect.split("_")[0]
+    else:
+        del datum["named"]["mllw"], datum["basis"]["mllw"]
+        datum["basis"]["lat"]["kind"] = "observed"
+    before = copy.deepcopy(station)
+    assert datums.derive_chart_datums({"stations": [station]})["changed_places"] == 0
+    assert station == before
 
 
 def test_observed_companion_preserves_published_level_and_chart_pointer():
