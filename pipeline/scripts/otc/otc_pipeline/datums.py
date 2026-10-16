@@ -115,10 +115,10 @@ def _chart_conventions() -> tuple[dict, str]:
 
 
 def derive_chart_datums(release: dict) -> dict:
-    """Designate existing computed LAT or US coastal observed MLLW; never compute a level.
+    """Designate existing levels, with explicit labels for approximate stand-ins.
 
-    Mutates only missing chart_datum pointers. Gate-failed/unknown-quality fallback bases
-    remain intact. Receipt counts places separately from sets; withheld counts are sets.
+    Adds missing chart_datum pointers and appends stand-in findings where applicable.
+    Receipt counts places separately from sets; withheld counts are sets.
     Unresolved geographic conditions are unknown, including GBR without UK source facts.
     Conflicting original COUNTRY identities leave new designations unresolved.
     """
@@ -128,13 +128,34 @@ def derive_chart_datums(release: dict) -> dict:
     exclusions = set(table["dt5f_exclusions"]["source_record_ids"])
     receipt = {"conventions_sha256": digest, "lat_places": 0, "matched_places": 0,
                "changed_places": 0, "changed_sets": 0, "withheld": {},
+               "approximate_changed_places": 0, "approximate_changed_sets": 0,
                "by_convention": {}, "citations": {}}
     for station in release.get("stations", []):
         sets = station.get("constant_sets", [])
+        approximate_keys = {}
+        for cs in sets:
+            if cs.get("source") != "gesla-fit":
+                continue
+            own = [r.get("original_metadata", {}) for r in station.get("source_records", [])
+                   if r.get("source") == "gesla" and r.get("source_record_id") == cs.get("source_record_id")]
+            if not own or not all(m.get("COUNTRY") == station.get("country") for m in own):
+                continue
+            domains = {m.get("GAUGE TYPE") for m in own}
+            key = ("mllw" if station.get("country") == "USA" and domains in ({"River"}, {"Lake"})
+                   else "msl" if cs.get("source_record_id") in exclusions else None)
+            basis = cs.get("datum", {}).get("basis", {}).get(key, {})
+            fallback = basis.get("fallback", {})
+            if (key and basis.get("kind") == "observed" and fallback.get("reason") == "datum_gate_failed"
+                    and isinstance(fallback.get("basis"), str) and isinstance(fallback.get("otc_finding"), str)
+                    and key in cs.get("datum", {}).get("named", {})):
+                approximate_keys[cs["set_id"]] = key
         candidates = [(cs, "mllw" if station.get("country") == "USA" and
                        "mllw" in cs.get("datum", {}).get("named", {}) else "lat") for cs in sets
                       if "lat" in cs.get("datum", {}).get("named", {}) or
                       station.get("country") == "USA" and "mllw" in cs.get("datum", {}).get("named", {})]
+        candidates = [(cs, approximate_keys.get(cs["set_id"], key)) for cs, key in candidates]
+        candidates.extend((cs, approximate_keys[cs["set_id"]]) for cs in sets
+                          if cs.get("set_id") in approximate_keys and not any(c is cs for c, _ in candidates))
         datums = [cs.get("datum", {}) for cs in sets]
         datums.append(station.get("subordinate_offsets", {}).get("datum", {}))
         has_lat = any("lat" in d.get("named", {}) for d in datums)
@@ -183,21 +204,37 @@ def derive_chart_datums(release: dict) -> dict:
         record_ids.update([aliases] if isinstance(aliases, str) else aliases)
         excluded = bool(record_ids & exclusions)
         changed = 0
+        approximate_changed = 0
         for cs, key in candidates:
             datum = cs["datum"]
             if datum.get("chart_datum") is not None:
                 continue
-            kind = "observed" if key == "mllw" else "computed"
+            approximate = cs["set_id"] in approximate_keys
+            kind = "observed" if key == "mllw" or approximate else "computed"
             value = datum["named"][key]
             if (isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value)
                     or datum.get("basis", {}).get(key, {}).get("kind") != kind):
                 reason = f"not_finite_{kind}_{key}"
             elif published_chart:
                 reason = "published_chart_datum"
-            elif excluded:
+            elif country_conflict:
+                reason = "unknown_convention_or_area"
+            elif excluded and not approximate:
                 reason = "baltic_or_bscd2000"
             elif low_water_suppressed(cs):
                 reason = "actual_low_water_cutoff"
+            elif approximate:
+                label = "approximate chart-reference stand-in"
+                fallback = datum["basis"][key]["fallback"]
+                if label not in fallback["basis"]:
+                    fallback["basis"] += f"; {label}: existing observed {key.upper()}"
+                if label not in fallback["otc_finding"]:
+                    fallback["otc_finding"] += (
+                        f"; {label}; agency chart-datum equivalence and vertical tie are not established")
+                datum["chart_datum"] = key
+                changed += 1
+                approximate_changed += 1
+                continue
             elif key == "mllw" and cs["set_id"] not in coastal_sets:
                 reason = "unknown_convention_or_area"
             elif not convention or key == "lat" and convention["stated_convention"] == "MLLW":
@@ -211,6 +248,10 @@ def derive_chart_datums(release: dict) -> dict:
         if changed:
             receipt["changed_places"] += 1
             receipt["changed_sets"] += changed
-            tally["changed_places"] += 1
-            tally["changed_sets"] += changed
+            if changed > approximate_changed:
+                tally["changed_places"] += 1
+                tally["changed_sets"] += changed - approximate_changed
+        if approximate_changed:
+            receipt["approximate_changed_places"] += 1
+            receipt["approximate_changed_sets"] += approximate_changed
     return receipt

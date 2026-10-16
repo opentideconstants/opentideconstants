@@ -15,6 +15,65 @@ from otc_pipeline.gesla_sets import _published_stated_zero
 
 
 @pytest.fixture(scope="module")
+def native_approximate_chart_cases():
+    root = os.environ.get("OTC_APPROXIMATE_CHART_PROOF")
+    assert root, "OTC_APPROXIMATE_CHART_PROOF must name the pinned approximate chart evidence"
+    path = Path(root) / "policy/selected-native-9-witnesses.json"
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == "4a772ac92cb717b96543605dfc80ea890e6dfbb8839412af1800deb943cfe4f4"
+    facts = json.loads(path.read_text())
+    source = Path(facts["source"])
+    with source.open("rb") as stream:
+        assert hashlib.file_digest(stream, "sha256").hexdigest() == facts["source_sha256"]
+    wanted = {row["source_line"]: row for row in facts["witnesses"]}
+    stations = {}
+    with source.open("rb") as stream:
+        for number, line in enumerate(stream, 1):
+            if number in wanted:
+                row = wanted[number]
+                assert hashlib.sha256(line).hexdigest() == row["source_line_sha256"]
+                station = json.loads(line)
+                assert station["station_id"] == row["station_id"]
+                stations[station["station_id"]] = station
+            if number == max(wanted):
+                break
+    assert len(stations) == 9
+    return facts, stations
+
+
+@pytest.mark.parametrize("index", range(9))
+def test_native_approximate_chart_fallback(native_approximate_chart_cases, index):
+    facts, stations = native_approximate_chart_cases
+    row = facts["witnesses"][index]
+    station = copy.deepcopy(stations[row["station_id"]])
+    before = copy.deepcopy(station)
+    cs = next(cs for cs in station["constant_sets"] if cs["set_id"] == row["set_id"])
+    key = row["key"]
+    assert cs["datum"]["named"][key] == row["existing_value_m"]
+    assert cs["datum"]["basis"][key] == row["existing_basis"]
+    assert all("chart_datum" not in c.get("datum", {}) for c in station["constant_sets"])
+    receipt = datums.derive_chart_datums({"stations": [station]})
+    print(f"REAL APPROXIMATE {row['group']} {row['station_id']} {row['set_id']}: "
+          f"{key}={row['existing_value_m']!r}; before=None; after={cs['datum'].get('chart_datum')!r}; "
+          "T1=FAIL; total_sigma=None")
+    assert cs["datum"].get("chart_datum") == key
+    fallback = cs["datum"]["basis"][key]["fallback"]
+    original = row["existing_basis"]["fallback"]
+    assert fallback["reason"] == "datum_gate_failed"
+    assert fallback["basis"] == original["basis"] + f"; approximate chart-reference stand-in: existing observed {key.upper()}"
+    assert fallback["otc_finding"] == original["otc_finding"] + (
+        "; approximate chart-reference stand-in; agency chart-datum equivalence and vertical tie are not established")
+    assert cs["datum"]["basis"][key]["kind"] == "observed"
+    assert "sigma_m" not in cs["datum"]["basis"][key]
+    assert receipt["changed_places"] == receipt["changed_sets"] == 1
+    assert receipt["approximate_changed_places"] == receipt["approximate_changed_sets"] == 1
+    assert receipt["by_convention"] == {} and receipt["citations"] == {}
+    assert datums.derive_chart_datums({"stations": [station]})["changed_places"] == 0
+    del cs["datum"]["chart_datum"]
+    fallback.update(original)
+    assert station == before
+
+
+@pytest.fixture(scope="module")
 def native_observed_chart_cases():
     root = os.environ.get("OTC_OBSERVED_CHART_PROOF")
     assert root, "OTC_OBSERVED_CHART_PROOF must name the pinned native observed chart evidence"
@@ -63,11 +122,15 @@ def test_native_observed_chart_fallback(native_observed_chart_cases, index):
     assert station == before
 
 
-def test_native_lake_observed_mllw_is_not_coastal_chart(native_observed_chart_cases):
+def test_native_lake_observed_mllw_is_explicit_approximate_chart(native_observed_chart_cases):
     facts, stations = native_observed_chart_cases
     station = copy.deepcopy(stations[facts["exclusion_control"]["station_id"]])
     before = copy.deepcopy(station)
-    assert datums.derive_chart_datums({"stations": [station]})["changed_places"] == 0
+    assert datums.derive_chart_datums({"stations": [station]})["approximate_changed_places"] == 1
+    for cs in station["constant_sets"]:
+        if cs.get("datum", {}).pop("chart_datum", None) is not None:
+            original = next(c for c in before["constant_sets"] if c["set_id"] == cs["set_id"])
+            cs["datum"]["basis"]["mllw"]["fallback"] = original["datum"]["basis"]["mllw"]["fallback"]
     assert station == before
 
 
@@ -93,7 +156,7 @@ def test_native_observed_chart_does_not_equate_lat_and_mllw(native_observed_char
     assert receipt["lat_places"] == 0 and receipt["changed_places"] == 1
 
 
-@pytest.mark.parametrize("defect", ["Lake", "River", "missing_domain", "foreign_record", "conflicting_domain",
+@pytest.mark.parametrize("defect", ["missing_domain", "foreign_record", "conflicting_domain",
     "unknown_country", "conflicting_country", "published_other", "published_subordinate", "existing_pointer",
     "flatline", "truncated_lows", "nonfinite", "boolean", "computed_mllw", "published_mllw", "observed_lat"])
 def test_native_observed_chart_negative_variants_preserve_payload(native_observed_chart_cases, defect):
@@ -141,6 +204,69 @@ def test_native_observed_chart_negative_variants_preserve_payload(native_observe
         datum["basis"]["lat"]["kind"] = "observed"
     before = copy.deepcopy(station)
     assert datums.derive_chart_datums({"stations": [station]})["changed_places"] == 0
+    assert station == before
+
+
+@pytest.mark.parametrize("group", ["River", "Lake", "Baltic"])
+@pytest.mark.parametrize("defect", ["published_other", "published_subordinate", "existing_pointer", "flatline",
+    "truncated_lows", "nonfinite", "boolean", "missing_own", "foreign_own", "country_conflict",
+    "wrong_basis", "missing_fallback", "wrong_fallback", "missing_fallback_text", "non_target"])
+def test_approximate_chart_controls_preserve_payload(native_approximate_chart_cases, group, defect):
+    facts, stations = native_approximate_chart_cases
+    row = next(r for r in facts["witnesses"] if r["group"] == group)
+    station = copy.deepcopy(stations[row["station_id"]])
+    cs = next(c for c in station["constant_sets"] if c["set_id"] == row["set_id"])
+    own = next(r for r in station["source_records"] if r["source"] == "gesla" and r["source_record_id"] == cs["source_record_id"])
+    datum, key = cs["datum"], row["key"]
+    if defect in ("published_other", "published_subordinate"):
+        agency = {"named": {"cd": 0.0}, "basis": {"cd": published("CD")}, "chart_datum": "cd"}
+        if defect == "published_other":
+            station["constant_sets"].append({"set_id": "agency", "datum": agency})
+        else:
+            station["subordinate_offsets"] = {"datum": agency}
+    elif defect == "existing_pointer":
+        datum["chart_datum"] = "hat"
+    elif defect == "flatline":
+        cs.setdefault("record_issues", []).append({"issue": "flatline"})
+    elif defect == "truncated_lows":
+        datum["basis"][key].setdefault("flags", []).append("truncated_lows")
+    elif defect in ("nonfinite", "boolean"):
+        datum["named"][key] = float("inf") if defect == "nonfinite" else True
+    elif defect == "missing_own":
+        station["source_records"].remove(own)
+    elif defect == "foreign_own":
+        own["source_record_id"] = "foreign-record"
+    elif defect == "country_conflict":
+        own["original_metadata"]["COUNTRY"] = "CAN"
+    elif defect == "wrong_basis":
+        datum["basis"][key]["kind"] = "computed"
+    elif defect == "missing_fallback":
+        del datum["basis"][key]["fallback"]
+    elif defect == "wrong_fallback":
+        datum["basis"][key]["fallback"]["reason"] = "record_unreliable"
+    elif defect == "missing_fallback_text":
+        del datum["basis"][key]["fallback"]["otc_finding"]
+    elif group == "Baltic":
+        cs["source_record_id"] = own["source_record_id"] = "not-a-dt5f-exclusion"
+    else:
+        station["country"] = own["original_metadata"]["COUNTRY"] = "CAN"
+    before = copy.deepcopy(station)
+    assert datums.derive_chart_datums({"stations": [station]})["changed_sets"] == 0
+    assert station == before
+
+
+@pytest.mark.parametrize("group", ["River", "Lake", "Baltic"])
+def test_approximate_chart_requires_consistent_own_metadata(native_approximate_chart_cases, group):
+    facts, stations = native_approximate_chart_cases
+    row = next(r for r in facts["witnesses"] if r["group"] == group)
+    station = copy.deepcopy(stations[row["station_id"]])
+    cs = next(c for c in station["constant_sets"] if c["set_id"] == row["set_id"])
+    own = next(r for r in station["source_records"] if r["source"] == "gesla" and r["source_record_id"] == cs["source_record_id"])
+    duplicate = copy.deepcopy(own)
+    duplicate["original_metadata"]["COUNTRY" if group == "Baltic" else "GAUGE TYPE"] = "CAN" if group == "Baltic" else "Coastal"
+    station["source_records"].append(duplicate)
+    before = copy.deepcopy(station)
+    assert datums.derive_chart_datums({"stations": [station]})["changed_sets"] == 0
     assert station == before
 
 
