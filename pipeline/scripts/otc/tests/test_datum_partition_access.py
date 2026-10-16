@@ -7,7 +7,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[3]
 # Paths (relative to the repo) allowed to name the sealed files. The sealed T1 harness (slot DT1) adds itself
 # here; this test file names them only as search patterns.
-ALLOWED = {"scripts/otc/otc_pipeline/datum_partition.py", "scripts/otc/tests/test_datum_partition_access.py"}
+ALLOWED = {"scripts/otc/otc_pipeline/datum_partition.py", "scripts/otc/otc_pipeline/datum_t1.py", "scripts/otc/tests/test_datum_partition_access.py"}
 SEALED_NAME = re.compile(r"partitions\.json|t1_stations\.json")
 SUFFIXES = {".py", ".rb", ".sh", ".zsh", ".bash", ".js", ".mjs", ".ts", ".ipynb", ".toml", ".cfg", ".ini", ".rake"}
 

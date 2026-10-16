@@ -45,6 +45,7 @@ DATA_DIR = Path(__file__).resolve().parents[3] / "data" / "datums"
 SEALED = {   # file name -> SHA-256 recorded in the slot report when the file was sealed
     "partitions.json": "7c3ab369bbf6884549e795c2e538f965eb886634dfb17e397755a926830659ee",
     "t1_stations.json": "6d71c4a2a894983e11a7bed20707c0371c2e28aa28c6288bf51f98855780b2f2",
+    "t1g_gap_patterns.json": "258a9d72f37619a03b8d5e5e3dc620856c8bf53288e954aa88fd195c75cafadb",
 }
 
 
