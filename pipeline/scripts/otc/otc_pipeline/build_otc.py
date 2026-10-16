@@ -138,8 +138,8 @@ def _sha256(path: Path) -> str:
 
 
 def stage_official_datums(release: dict, path: Path, sha256: str) -> dict:
-    """Stage pinned, calibrated official drafts; never change or admit release values."""
-    from otc_pipeline.lat_hat import EPOCH, START, END, _finite, computation_input_sha256
+    """Stage pinned official or diagnostic GESLA drafts without changing values."""
+    from otc_pipeline.lat_hat import EPOCH, START, END, _finite, computation_input_sha256, low_water_suppressed
 
     if _sha256(path) != sha256:
         raise ValueError("official datum draft SHA-256 mismatch")
@@ -164,9 +164,10 @@ def stage_official_datums(release: dict, path: Path, sha256: str) -> dict:
                     {"constant_set": cs, "astro_table": table}) or
                 (row["raw"].get("start"), row["raw"].get("end")) != (START, END)):
             raise ValueError(f"official datum computation input mismatch: {sid}")
-        if cs["source"] not in ("noaa", "kartverket", "linz") or cs["source_type"] != "official":
+        gesla = cs["source"] == "gesla-fit" and cs["source_type"] == "gauge"
+        if not gesla and (cs["source"] not in ("noaa", "kartverket", "linz") or cs["source_type"] != "official"):
             raise ValueError("only official NOAA, Kartverket and LINZ drafts can be staged")
-        if row.get("calibration_status") != "available":
+        if row.get("calibration_status") != ("diagnostic" if gesla else "available"):
             raise ValueError(f"official datum calibration unavailable: {sid}")
         draft = row["draft_datum"]
         for key, value in cs["datum"].items():
@@ -177,6 +178,10 @@ def stage_official_datums(release: dict, path: Path, sha256: str) -> dict:
                 raise ValueError(f"existing official datum changed: {sid}:{key}")
         for level in ("lat", "hat"):
             key = f"otc_{level}" if cs["datum"].get("basis", {}).get(level, {}).get("kind") == "published" else level
+            if gesla and level == "lat" and low_water_suppressed(cs):
+                if key in draft["basis"] and key not in cs["datum"].get("basis", {}):
+                    raise ValueError(f"computed LAT forbidden by known low-water cutoff: {sid}")
+                continue
             basis = draft["basis"].get(key, {})
             if (basis.get("kind"), basis.get("method"), basis.get("epoch")) != ("computed", "harmonic_extremes", EPOCH):
                 raise ValueError(f"invalid staged computed datum method: {sid}:{key}")
@@ -184,6 +189,9 @@ def stage_official_datums(release: dict, path: Path, sha256: str) -> dict:
                 raise ValueError(f"staged datum differs from frozen extrema: {sid}:{key}")
             if _finite(basis.get("uncertainty_m"), "staged uncertainty") < 0 or basis.get("uncertainty_basis") not in ("calibrated", "propagated"):
                 raise ValueError(f"invalid staged uncertainty: {sid}:{key}")
+            if gesla and (basis.get("fallback", {}).get("reason") != "datum_gate_failed"
+                          or not basis["fallback"].get("otc_finding")):
+                raise ValueError(f"GESLA diagnostic datum requires a gate-failed finding: {sid}:{key}")
             count += key not in cs["datum"].get("basis", {})
         staged.append({"station_id": station_id, "set_id": sid, "source": cs["source"],
                        "datum": copy.deepcopy(draft), "input_sha256": sha256,
@@ -204,7 +212,8 @@ def apply_official_datum_fallbacks(release: dict, path: Path, sha256: str) -> di
     for entry in staged["drafts"]:
         datum = entry["datum"]
         for key in entry["computed_keys"]:
-            datum["basis"][key]["fallback"] = dict(COMPUTED_FALLBACK)
+            if entry["source"] != "gesla-fit":
+                datum["basis"][key]["fallback"] = dict(COMPUTED_FALLBACK)
             count += 1
         by_id[entry["set_id"]]["datum"] = datum
     return {**staged, "public_admission": True, "release_unchanged": False,

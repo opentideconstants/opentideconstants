@@ -5,6 +5,7 @@ import json
 import math
 import os
 from pathlib import Path
+from statistics import mean, stdev
 import subprocess
 import sys
 
@@ -19,6 +20,231 @@ from otc_pipeline import lat_hat
 PARTITION_DATA = Path(__file__).resolve().parents[3] / "data/datums"
 EXTERNAL_ENGINE = pytest.mark.skipif("OTC_ENGINE_WORKTREE" not in os.environ,
                                      reason="strict reference integration requires OTC_ENGINE_WORKTREE")
+
+
+@pytest.mark.skipif("OTC_GESLA_METADATA_PROOF" not in os.environ, reason="requires actual frozen native metadata cases")
+@pytest.mark.parametrize("index", range(3))
+def test_native_gesla_computed_basis_copies_source_flags(index):
+    root = Path(os.environ["OTC_GESLA_METADATA_PROOF"])
+    directory = root / "missing-gesla"
+    entry = json.loads((directory / "roster.json").read_text())["rows"][index]
+    cs = json.loads(Path(entry["path"]).read_text())["constant_set"]
+    row = next(r for line in (directory / "pilot.jsonl").read_text().splitlines()
+               if (r := json.loads(line))["set_id"] == cs["set_id"])
+    calibration = json.loads((directory / "diagnostic-calibration.json").read_text())
+    original = copy.deepcopy((row, cs))
+    result = calibrated_draft(cs, row, calibration)
+    expected = {"time_base_unverified", "sampling_assumed"}
+    if index < 2:
+        assert any(f["flag"] == "short_record" for f in cs["qc_flags"])
+        assert cs["record_span"]["good_hours"] < 365.25 * 24
+        expected.add("short_record")
+    if index == 1:
+        assert sum(c["amplitude_m"] for c in cs["constituents"] if c["name"] in ("M2", "S2", "K1", "O1")) < 0.05
+        expected.add("microtidal")
+    for level in ("lat", "hat"):
+        assert set(result["draft_datum"]["basis"][level]["flags"]) == expected
+        assert result["draft_datum"]["named"][level] == row["raw"][f"{level}_m"]
+    assert (row, cs) == original
+    print(json.dumps({"set_id": cs["set_id"], "expected_flags": sorted(expected), "raw_values_unchanged": True}))
+
+
+@pytest.mark.skipif("OTC_GESLA_METADATA_PROOF" not in os.environ, reason="requires the two evidenced official microtidal sets")
+@pytest.mark.parametrize("sid", ("OTC-29ff8d2e/noaa/8773896", "OTC-a4de929f/noaa/8721843"))
+def test_native_official_microtidal_flag_keeps_values_and_uncertainty(sid):
+    root = Path(os.environ["OTC_GESLA_METADATA_PROOF"])
+    with (root / "native-build/OTC_20261011.jsonl").open() as stream:
+        cs = next(c for line in stream for c in json.loads(line).get("constant_sets", []) if c["set_id"] == sid)
+    row = next(r for line in (root / "official-public-drafts-bound.jsonl").read_text().splitlines()
+               if (r := json.loads(line))["set_id"] == sid)
+    calibration = json.loads((root / "missing-official/source-calibration.json").read_text())
+    # Reconstruct the same pre-attachment datum from the saved, bound official draft.
+    cs = copy.deepcopy(cs)
+    for level in ("otc_lat", "otc_hat"):
+        cs["datum"]["named"].pop(level)
+        cs["datum"]["basis"].pop(level)
+    original = copy.deepcopy((row, cs))
+    result = calibrated_draft(cs, row, calibration)
+    for level in ("lat", "hat"):
+        key = f"otc_{level}"
+        assert set(result["draft_datum"]["basis"][key]["flags"]) == {"sampling_assumed", "microtidal"}
+        assert result["draft_datum"]["basis"][key]["uncertainty_m"] == row["draft_datum"]["basis"][key]["uncertainty_m"]
+    assert result["draft_datum"]["named"] == row["draft_datum"]["named"]
+    assert result["uncertainty_components"] == row["uncertainty_components"]
+    assert (row, cs) == original
+
+
+@pytest.mark.skipif("OTC_GESLA_REDERIVE_METADATA" not in os.environ, reason="explicit complete frozen-batch metadata proof")
+def test_native_rederive_frozen_batch_metadata_without_predictions():
+    root = Path(os.environ["OTC_GESLA_METADATA_PROOF"])
+    directory = root / "missing-gesla"
+    entries = {e["set_id"]: e for e in json.loads((directory / "roster.json").read_text())["rows"]}
+    calibration = json.loads((directory / "diagnostic-calibration.json").read_text())
+    frozen = []
+    for path in [directory / "pilot.jsonl", *[directory / f"shard-{n}.jsonl" for n in range(4)]]:
+        frozen.extend(json.loads(line) for line in path.read_text().splitlines())
+    assert len(frozen) == len({r["set_id"] for r in frozen}) == len(entries) == 3096
+    corrected, sampling_changed = [], 0
+    for row in frozen:
+        entry = entries[row["set_id"]]
+        raw_input = Path(entry["path"]).read_bytes()
+        assert hashlib.sha256(raw_input).hexdigest() == entry["input_sha256"] == row["input_sha256"]
+        payload = json.loads(raw_input)
+        assert lat_hat.computation_input_sha256(payload) == row["computation_input_sha256"]
+        cs = payload["constant_set"]
+        fresh = calibrated_draft(cs, row, calibration)
+        assert {k: v for k, v in fresh.items() if k not in ("draft_datum", "uncertainty_components")} == {
+            k: v for k, v in row.items() if k not in ("draft_datum", "uncertainty_components")}
+        assert fresh["draft_datum"]["named"] == row["draft_datum"]["named"]
+        sampling = 0.011 * sum(c["amplitude_m"] for c in cs["constituents"] if c["name"] in ("M2", "S2"))
+        flags = {"sampling_assumed"}
+        if cs.get("time_base", {}).get("code") in ("unverified", "disputed"):
+            flags.add(f"time_base_{cs['time_base']['code']}")
+        if cs.get("record_span", {}).get("good_hours", 365.25 * 24) < 365.25 * 24 or any(
+                f["flag"] == "short_record" for f in cs.get("qc_flags", [])):
+            flags.add("short_record")
+        if sum(c["amplitude_m"] for c in cs["constituents"] if c["name"] in ("M2", "S2", "K1", "O1")) < 0.05:
+            flags.add("microtidal")
+        for level in ("lat", "hat"):
+            basis = fresh["draft_datum"]["basis"][level]
+            parts = fresh["uncertainty_components"][level]
+            assert parts["sampling_m"] == sampling and parts["sampling_verified"] is False
+            assert basis["uncertainty_m"] == parts["base_m"] + sampling
+            assert basis["uncertainty_basis"] == ("propagated" if sampling >= parts["base_m"] else "calibrated")
+            assert set(basis["flags"]) == flags
+            assert basis["fallback"]["reason"] == "datum_gate_failed"
+        sampling_changed += fresh["uncertainty_components"] != row["uncertainty_components"]
+        corrected.append(fresh)
+    raw_official = (root / "official-public-drafts-bound.jsonl").read_bytes()
+    assert hashlib.sha256(raw_official).hexdigest() == "970f7b280c9507585995aed40f8be7b679bad0adaf0fa79f98f98f3054f07a3f"
+    official = [json.loads(line) for line in raw_official.splitlines()]
+    changed_official = []
+    # Only the two already evidenced official metadata cells need a new flag.
+    affected = {"OTC-29ff8d2e/noaa/8773896", "OTC-a4de929f/noaa/8721843"}
+    with (root / "native-build/OTC_20261011.jsonl").open() as stream:
+        source_sets = {c["set_id"]: c for line in stream for c in json.loads(line).get("constant_sets", []) if c["set_id"] in affected}
+    for row in official:
+        original = copy.deepcopy(row)
+        if row["set_id"] in affected:
+            for key in ("otc_lat", "otc_hat"):
+                row["draft_datum"]["basis"][key]["flags"].append("microtidal")
+            changed_official.append(row["set_id"])
+        assert row["raw"] == original["raw"]
+        assert row["uncertainty_components"] == original["uncertainty_components"]
+        assert row["draft_datum"]["named"] == original["draft_datum"]["named"]
+        for key in row["draft_datum"]["basis"]:
+            assert {k: v for k, v in row["draft_datum"]["basis"][key].items() if k != "flags"} == {
+                k: v for k, v in original["draft_datum"]["basis"][key].items() if k != "flags"}
+    assert set(changed_official) == set(source_sets) == affected
+    assert len(official) == 519
+    assert not ({r["set_id"] for r in official} & set(entries))
+    for name, rows in (("raw-results-frozen.jsonl", frozen), ("all-results.jsonl", corrected),
+                       ("all-public-drafts.jsonl", official + corrected)):
+        (directory / name).write_text("".join(json.dumps(r, sort_keys=True, allow_nan=False) + "\n" for r in rows))
+    receipt = {"new_raw_sets": len(corrected), "official_sets_retained": len(official),
+               "new_sampling_components_corrected_sets": sampling_changed,
+               "official_numeric_uncertainty_changes": 0, "official_microtidal_flags_added": sorted(changed_official),
+               "raw_extrema_and_input_bindings_unchanged": True, "predictions_rerun": 0,
+               "sha256": {name: hashlib.sha256((directory / name).read_bytes()).hexdigest()
+                          for name in ("raw-results-frozen.jsonl", "all-results.jsonl", "all-public-drafts.jsonl")}}
+    (directory / "metadata-complete-green.json").write_text(json.dumps(receipt, indent=2) + "\n")
+    print(json.dumps(receipt))
+
+
+@pytest.mark.skipif("OTC_GESLA_PROOF" not in os.environ, reason="requires actual cached GESLA production inputs")
+@pytest.mark.parametrize("index", range(3))
+def test_native_missing_gesla_production_route(index):
+    root = Path(os.environ["OTC_GESLA_PROOF"])
+    entry = json.loads((root / "missing-gesla/roster.json").read_text())["rows"][index]
+    payload = lat_hat.read_production_input(Path(entry["path"]))
+    assert payload["constant_set"]["set_id"] == entry["set_id"]
+    assert not any(k in payload["constant_set"]["datum"].get("named", {}) for k in ("lat", "hat", "otc_lat", "otc_hat"))
+
+
+@pytest.mark.skipif("OTC_GESLA_PROOF" not in os.environ, reason="requires actual frozen T5b outputs")
+@pytest.mark.parametrize("index", range(3))
+def test_native_gesla_diagnostic_uncertainty(index):
+    root = Path(os.environ["OTC_GESLA_PROOF"])
+    entries = json.loads((root / "full-t5b/roster.json").read_text())["rows"]
+    rows = [r for line in (root / "full-t5b/all-results.jsonl").read_text().splitlines()
+            if (r := json.loads(line)).get("set_id")]
+    group = {"status": "diagnostic", "cohort_complete": True, "gate_passed": False}
+    for level in ("lat", "hat"):
+        values = [r[f"{level}_residual_m"] for r in rows]
+        group[level] = {"sample_sd_m": stdev(values), "signed_bias_m": mean(values), "n": len(values)}
+    payload = json.loads(Path(entries[index]["path"]).read_text())
+    cs = payload["constant_set"]
+    row = next(r for r in rows if r["set_id"] == cs["set_id"])
+    result = calibrated_draft(cs, row, {"gesla-fit": group})
+    assert result["calibration_status"] == "diagnostic"
+    assert result["accepted"] is False
+    sampling = 0.011 * sum(c["amplitude_m"] for c in cs["constituents"] if c["name"] in ("M2", "S2"))
+    for level in ("lat", "hat"):
+        basis = result["draft_datum"]["basis"][level]
+        assert basis["uncertainty_m"] == group[level]["sample_sd_m"] + sampling
+        assert basis["fallback"]["reason"] == "datum_gate_failed"
+        assert "unknown" in basis["fallback"]["otc_finding"]
+        assert "diagnostic" in basis["fallback"]["otc_finding"].lower()
+
+
+@pytest.mark.skipif("OTC_GESLA_PROOF" not in os.environ, reason="requires frozen360 tuning inputs and native release")
+def test_native_gesla_calibration_artifact():
+    root = Path(os.environ["OTC_GESLA_PROOF"])
+    result_bytes = (root / "full-t5b/all-results.jsonl").read_bytes()
+    assert hashlib.sha256(result_bytes).hexdigest() == "89662b6310d9ad65b30655afd6b3546267f2f50eb085cd80eec2810b14e435a8"
+    rows = [r for line in result_bytes.splitlines() if (r := json.loads(line)).get("set_id")]
+    entries = json.loads((root / "full-t5b/roster.json").read_text())["rows"]
+    fingerprints = {}
+    for entry in entries:
+        payload = read_tuning_input(Path(entry["path"]), tier="T5b")
+        fingerprints[entry["set_id"]] = lat_hat.computation_input_sha256(payload)
+    meta = json.loads((root / "native-build/OTC_20261011.meta.json").read_text())
+    tables = {t["astro_table_id"]: t for t in meta["astro_tables"]}
+    conventions = {c["convention_id"]: c for c in meta["conventions"]}
+    matched = set()
+    with (root / "native-build/OTC_20261011.jsonl").open() as stream:
+        for line in stream:
+            for cs in json.loads(line).get("constant_sets", []):
+                if cs["set_id"] not in fingerprints:
+                    continue
+                table = tables[conventions[cs["convention_id"]]["astro_table_id"]]
+                assert lat_hat.computation_input_sha256({"constant_set": cs, "astro_table": table}) == fingerprints[cs["set_id"]]
+                matched.add(cs["set_id"])
+    assert len(rows) == len(matched) == 360
+    calibration = lat_hat.gesla_calibration(rows, matched)
+    group = calibration["gesla-fit"]
+    assert group["status"] == "diagnostic" and group["gate_passed"] is False
+    assert group["station_gate"]["station_count"] == 310
+    for level in ("lat", "hat"):
+        assert group[level]["n"] == 360
+        assert group[level]["sample_sd_m"] == stdev(r[f"{level}_residual_m"] for r in rows)
+    path = root / "missing-gesla/diagnostic-calibration.json"
+    path.write_text(json.dumps(calibration, sort_keys=True, allow_nan=False) + "\n")
+    (root / "missing-gesla/calibration-receipt.json").write_text(json.dumps({
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(), "frozen_fit_inputs_matched": len(matched),
+        "raw_predictions_rerun": 0, "diagnostic_calibration": calibration}, indent=2) + "\n")
+
+
+@pytest.mark.skipif("OTC_GESLA_RUN_PILOT" not in os.environ, reason="explicit actual three-place strict pilot")
+def test_native_gesla_production_three_place_pilot():
+    root = Path(os.environ["OTC_GESLA_PROOF"])
+    entries = json.loads((root / "missing-gesla/roster.json").read_text())["rows"][:3]
+    calibration = root / "missing-gesla/diagnostic-calibration.json"
+    command = [sys.executable, "-m", "otc_pipeline.lat_hat", "--production-calibration", str(calibration),
+               "--production-official-calibration-sha256", hashlib.sha256(calibration.read_bytes()).hexdigest(),
+               "--out", str(root / "missing-gesla/pilot.jsonl"), "--ruby", os.environ["OTC_PILOT_RUBY"],
+               *[entry["path"] for entry in entries]]
+    subprocess.run(command, check=True)
+    rows = [json.loads(line) for line in (root / "missing-gesla/pilot.jsonl").read_text().splitlines()]
+    assert len(rows) == 3
+    for entry, row in zip(entries, rows, strict=True):
+        assert row["set_id"] == entry["set_id"]
+        assert row["calibration_status"] == "diagnostic"
+        assert row["normal_datum_gate_accepted"] is False
+        for level in ("lat", "hat"):
+            assert row["draft_datum"]["named"][level] == row["raw"][f"{level}_m"]
+            assert row["draft_datum"]["basis"][level]["fallback"]["reason"] == "datum_gate_failed"
+            assert row["uncertainty_components"][level]["n"] == 360
 
 
 def simple_input():
@@ -351,10 +577,8 @@ def test_official_calibrated_draft_adds_sampling_literally_and_does_not_mutate()
     assert result["uncertainty_components"]["lat"]["base_basis"] == "calibrated"
     assert (row, cs) == original
     cs["time_base"] = {"code": "verified", "published": "utc_instant"}
-    verified = calibrated_draft(cs, row, calibration)["draft_datum"]["basis"]["otc_lat"]
-    assert verified["uncertainty_basis"] == "calibrated"
-    assert verified["uncertainty_m"] == pytest.approx(math.sqrt(0.000002))
-    assert "flags" not in verified
+    timestamp_verified = calibrated_draft(cs, row, calibration)["draft_datum"]["basis"]["otc_lat"]
+    assert timestamp_verified == basis
 
 
 def test_missing_official_production_input_needs_no_published_comparator(tmp_path, monkeypatch):

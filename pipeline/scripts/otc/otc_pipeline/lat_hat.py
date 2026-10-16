@@ -117,19 +117,27 @@ def compute_raw(payload: dict, *, start: str = START, end: str = END,
 
 
 def read_production_input(path: Path) -> dict:
-    """Read only the missing-level official production cohort, with no validation truth."""
+    """Read missing-level official/GESLA constants without validation truths."""
     payload = json.loads(Path(path).read_text())
     cs = payload["constant_set"]
     if "comparison_set" in payload or "comparison_metadata" in payload:
         raise ValueError("production official inputs must not contain a comparator")
-    if cs.get("source") not in ("noaa", "linz") or cs.get("source_type") != "official":
-        raise ValueError("missing-level production cohort is official NOAA and LINZ only")
+    official = cs.get("source") in ("noaa", "linz") and cs.get("source_type") == "official"
+    gesla = cs.get("source") == "gesla-fit" and cs.get("source_type") == "gauge"
+    if not (official or gesla):
+        raise ValueError("missing-level production requires official NOAA/LINZ or GESLA gauge constants")
     if cs.get("quantity") != "water_level" or cs.get("qc_status") not in ("ok", "flagged") or not cs.get("constituents"):
-        raise ValueError("eligible official water-level constants required")
+        raise ValueError("eligible water-level constants required")
     _finite(cs.get("datum", {}).get("msl_offset_m"), "msl_offset_m")
     if any(key in cs["datum"].get("named", {}) for key in ("lat", "otc_lat", "hat", "otc_hat")):
         raise ValueError("production cohort must lack both LAT and HAT; reuse existing levels")
     return payload
+
+
+def low_water_suppressed(constant_set: dict, flatline: bool | None = None) -> bool:
+    return bool(flatline or any(issue.get("issue") == "flatline" for issue in constant_set.get("record_issues", []))
+                or any("truncated_lows" in b.get("flags", [])
+                       for b in constant_set.get("datum", {}).get("basis", {}).values()))
 
 
 def datum_draft(constant_set: dict, raw: dict, *, flatline: bool | None = None) -> dict:
@@ -138,8 +146,7 @@ def datum_draft(constant_set: dict, raw: dict, *, flatline: bool | None = None) 
         raise ValueError("only the pinned 19-year window receives the OTC epoch")
     datum = copy.deepcopy(constant_set["datum"])
     named, basis = datum.setdefault("named", {}), datum.setdefault("basis", {})
-    known_flatline = flatline or any(issue.get("issue") == "flatline" for issue in constant_set.get("record_issues", []))
-    suppress = known_flatline or any("truncated_lows" in b.get("flags", []) for b in basis.values())
+    suppress = low_water_suppressed(constant_set, flatline)
     unknown_fit_eligibility = flatline is None and constant_set.get("source_type") == "gauge" and not suppress
     if suppress:
         for key in ("lat", "otc_lat"):
@@ -152,6 +159,19 @@ def datum_draft(constant_set: dict, raw: dict, *, flatline: bool | None = None) 
         key = f"otc_{level}" if basis.get(level, {}).get("kind") == "published" else level
         named[key] = _finite(raw[f"{level}_m"], level)
         basis[key] = {"kind": "computed", "method": "harmonic_extremes", "epoch": dict(EPOCH)}
+        flags = []
+        time_base = constant_set.get("time_base", {}).get("code")
+        if time_base in ("unverified", "disputed"):
+            flags.append(f"time_base_{time_base}")
+        hours = constant_set.get("record_span", {}).get("good_hours")
+        if ((hours is not None and hours < 365.25 * 24)
+                or any(f.get("flag") == "short_record" for f in constant_set.get("qc_flags", []))):
+            flags.append("short_record")
+        if sum(c["amplitude_m"] for c in constant_set["constituents"]
+               if c["name"] in ("M2", "S2", "K1", "O1")) < 0.05:
+            flags.append("microtidal")
+        if flags:
+            basis[key]["flags"] = flags
         if unknown_fit_eligibility:
             basis[key]["fallback"] = {**COMPUTED_FALLBACK,
                                       "otc_finding": COMPUTED_FALLBACK["otc_finding"] +
@@ -273,21 +293,44 @@ def official_calibration(rows: list[dict], expected_ids: dict[str, set[str]]) ->
     return result
 
 
+def gesla_calibration(rows: list[dict], expected_ids: set[str]) -> dict:
+    """Diagnostic fit-residual spread; a failed T5b gate never becomes acceptance."""
+    ids = [r["set_id"] for r in rows]
+    if len(set(ids)) != len(ids) or any(s.split("/")[1] != "gesla-fit" for s in ids):
+        raise ValueError("GESLA diagnostic calibration requires unique fitted sets")
+    complete = set(ids) == expected_ids
+    summary = comparison_summary(rows, tier="T5b")
+    group = {"status": "diagnostic" if complete and len(rows) >= 2 else "unavailable",
+             "cohort_complete": complete, "gate_passed": summary["station_level_gate"] == "PASS",
+             "expected_count": len(expected_ids), "actual_count": len(rows),
+             "estimator": "sample SD of signed fit residuals; repeated fits retained, not independent station observations",
+             "station_gate": summary, "fit_set_ids": sorted(ids)}
+    for level in ("lat", "hat"):
+        values = [_finite(r[f"{level}_residual_m"], "diagnostic residual") for r in rows]
+        group[level] = {"n": len(values), "signed_bias_m": mean(values) if values else None,
+                        "sample_sd_m": stdev(values) if len(values) >= 2 else None}
+    return {"gesla-fit": group}
+
+
 def calibrated_draft(constant_set: dict, row: dict, calibration: dict) -> dict:
     """Add a valid empirical base plus the literal sampling term to a proof draft."""
     if row["set_id"] != constant_set["set_id"]:
         raise ValueError("calibration input set identity differs")
     source = constant_set["source"]
-    if source not in ("noaa", "kartverket", "linz"):
+    if source not in ("noaa", "kartverket", "linz", "gesla-fit"):
         raise ValueError("only official reference calibration is established")
     out = copy.deepcopy(row)
     out["draft_datum"] = datum_draft(constant_set, row["raw"])
     group = calibration.get(source, {})
     out["calibration_status"] = group.get("status", "unavailable")
-    if group.get("status") != "available":
+    diagnostic = source == "gesla-fit" and group.get("status") == "diagnostic"
+    if source == "gesla-fit" and not diagnostic:
+        raise ValueError("GESLA uncertainty is diagnostic fallback only")
+    if group.get("status") != "available" and not diagnostic:
         return out
-    time_base = constant_set.get("time_base", {})
-    verified = time_base.get("code") in ("verified", "corrected") and bool(time_base.get("published"))
+    # time_base verifies timestamp coordinates, not instantaneous/hourly-mean sampling.
+    # These native sets carry no sampling-class verification evidence.
+    verified = False
     amplitude = 0.0
     for c in constant_set["constituents"]:
         if c["name"] in ("M2", "S2"):
@@ -313,6 +356,10 @@ def calibrated_draft(constant_set: dict, row: dict, calibration: dict) -> dict:
             "base_m": base, "base_basis": "calibrated", "sampling_m": sampling,
             "sampling_basis": "propagated", "sampling_verified": verified,
             "signed_bias_m": group[level]["signed_bias_m"], "n": group[level]["n"], "source": source}
+        if diagnostic:
+            finding = basis.get("fallback", dict(COMPUTED_FALLBACK))
+            basis["fallback"] = {**finding, "otc_finding": finding["otc_finding"] +
+                                 f" Diagnostic GESLA {level.upper()} fit-residual sample SD {base:.9g} m, signed bias {group[level]['signed_bias_m']:.9g} m, n={group[level]['n']} fits (repeated fits retained); plus sampling {sampling:.9g} m. This is not validated accuracy or coverage confidence."}
     return out
 
 
@@ -324,10 +371,10 @@ def main():
     parser.add_argument("--tier", choices=("T5", "T5b", "T6"), default="T5")
     parser.add_argument("--partition-data-dir", type=Path,
                         help="directory of the existing sealed lists (needed outside a source checkout)")
-    parser.add_argument("--calibrate-official-rosters", nargs="+", type=Path,
-                        help="prepare official uncertainties from completed result JSONLs and their native rosters")
-    parser.add_argument("--production-official-calibration", type=Path,
-                        help="pinned existing source calibration for missing-level official production inputs")
+    parser.add_argument("--calibrate-official-rosters", "--calibrate-rosters", nargs="+", type=Path,
+                        help="prepare official or diagnostic GESLA uncertainties from frozen tuning results")
+    parser.add_argument("--production-official-calibration", "--production-calibration", type=Path,
+                        help="pinned source calibration for missing-level official/GESLA inputs")
     parser.add_argument("--production-official-calibration-sha256")
     parser.add_argument("--without-seasonal", action="store_true",
                         help="tuning sensitivity only; fixed method retains present Sa/Ssa")
@@ -344,7 +391,9 @@ def main():
         for path in args.inputs:
             payload = read_production_input(path)
             group = calibration[payload["constant_set"]["source"]]
-            if group.get("status") != "available" or not group.get("cohort_complete") or not group.get("gate_passed"):
+            diagnostic = (payload["constant_set"]["source"] == "gesla-fit" and group.get("status") == "diagnostic")
+            if not group.get("cohort_complete") or not (diagnostic or (
+                    group.get("status") == "available" and group.get("gate_passed"))):
                 raise ValueError("existing official source calibration is unavailable")
         with args.out.open("w") as stream:
             for path in args.inputs:
@@ -359,7 +408,7 @@ def main():
                 row["computation_input_sha256"] = computation_input_sha256(payload)
                 row = calibrated_draft(cs, row, calibration)
                 for basis in row["draft_datum"]["basis"].values():
-                    if basis["kind"] == "computed":
+                    if basis["kind"] == "computed" and cs["source"] != "gesla-fit":
                         basis["fallback"] = dict(COMPUTED_FALLBACK)
                 stream.write(json.dumps(row, allow_nan=False, sort_keys=True) + "\n")
                 stream.flush()
@@ -372,9 +421,9 @@ def main():
                 if sid in paths:
                     raise ValueError(f"duplicate native calibration input {sid}")
                 source = sid.split("/")[1]
-                if source not in ("noaa", "kartverket", "linz"):
+                if source not in ("noaa", "kartverket", "linz", "gesla-fit"):
                     raise ValueError("only official reference cohorts can be calibrated")
-                payload = read_tuning_input(Path(entry["path"]), tier="T5" if source == "noaa" else "T6",
+                payload = read_tuning_input(Path(entry["path"]), tier="T5b" if source == "gesla-fit" else "T5" if source == "noaa" else "T6",
                                             data_dir=args.partition_data_dir)
                 if payload["constant_set"]["set_id"] != sid:
                     raise ValueError("native roster/input identity differs")
@@ -387,7 +436,10 @@ def main():
         for row in rows:
             if row.get("computation_input_sha256") != fingerprints[row["set_id"]]:
                 raise ValueError(f"calibration computation input differs for {row['set_id']}; recompute extrema")
-        calibration = official_calibration(rows, expected)
+        official_rows = [r for r in rows if r["set_id"].split("/")[1] != "gesla-fit"]
+        calibration = official_calibration(official_rows, {s: ids for s, ids in expected.items() if s != "gesla-fit"})
+        if "gesla-fit" in expected:
+            calibration.update(gesla_calibration([r for r in rows if r["set_id"].split("/")[1] == "gesla-fit"], expected["gesla-fit"]))
         with args.out.open("w") as stream:
             for row in rows:
                 payload = json.loads(paths[row["set_id"]].read_text())
