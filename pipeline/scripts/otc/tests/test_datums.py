@@ -57,6 +57,37 @@ def test_unconfirmed_gesla_zero_is_unchanged(overrides):
     assert _published_stated_zero(brest_header(**overrides), original) == original
 
 
+@pytest.mark.parametrize("record_id,contributor,site_code,country,header,zero_name,source_name", [
+    ("abbot_point-59300-aus-bom", "BOM", "59300", "AUS", "Chart Datum / Lowest Astronomical Tide",
+     "CD / LAT", "CD / LAT"),
+    ("abbotts_harbour-382-can-meds", "MEDS", "382", "CAN", "Chart Datum (CD)", "CD", "Chart Datum (CD)"),
+    ("aberdeen-abe-gbr-bodc", "BODC", "ABE", "GBR", "Admiralty Chart Datum (ACD) ",
+     "ACD", "Admiralty Chart Datum (ACD)"),
+    ("aberdeen-abe-gbr-cmems", "CMEMS", "Abe", "GBR", "Admiralty Chart Datum", "ACD", "Admiralty Chart Datum"),
+    ("aiguillon_sur_mer-6257-fra-refmar", "REFMAR", "6257", "FRA", "Zero Hydrographique", "ZH", "Zero Hydrographique"),
+    ("aiguillonsurmertg_60minute-aig-fra-cmems", "CMEMS", "Aig", "FRA", "chart datum", "CD", "Chart Datum"),
+    ("antalya-ant-tur-eseas", "ESEAS", "ANT", "TUR", "Local Chart Datum", "Local CD", "Local Chart Datum"),
+    ("howth_water_level_1-how-irl-mi_c", "MI_C", "HOW", "IRL", "Lowest Astronomical Tide (LAT)",
+     "LAT", "Lowest Astronomical Tide (LAT)"),
+    ("northcormoranttg-nor-gbr-cmems", "CMEMS", "Nor", "GBR", "ACD", "ACD", "ACD"),
+])
+def test_cached_published_chart_zero_families(record_id, contributor, site_code, country, header, zero_name, source_name):
+    doc = brest_header(record_id=record_id, contributor=contributor, site_code=site_code,
+                       country=country, datum_information=header)
+    original = {"msl_offset_m": 1.25}
+    datum = _published_stated_zero(doc, original)
+    assert datum == {**original, "zero": "chart_datum", "zero_name": zero_name, "chart_datum": "cd",
+                     "named": {"cd": 0.0}, "basis": {"cd": published(source_name)}}
+    assert original == {"msl_offset_m": 1.25}
+    assert datum_build_errors(datum) == []
+
+
+def test_unconfirmed_refmar_header_is_not_a_published_chart_zero():
+    doc = brest_header(record_id="bourcefranc_le_chapus-155-fra-refmar", site_code="155")
+    original = {"msl_offset_m": 1.25}
+    assert _published_stated_zero(doc, original) == original
+
+
 GOOD = {"zero": "chart_datum", "chart_datum": "cd", "named": {"cd": 0.0, "msl": 1.0},
         "basis": {"cd": published("CD"), "msl": published("MSL", epoch=period("1996-01-01", "2014-12-31"))}}
 
