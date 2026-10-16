@@ -4,6 +4,7 @@ from __future__ import annotations
 import pytest
 
 from otc_pipeline.datums import datum_build_errors, period, published
+from otc_pipeline.gesla_sets import _published_stated_zero
 
 
 def test_period():
@@ -27,6 +28,33 @@ def test_published():
         published("x" * 32)
     with pytest.raises(ValueError):
         published("")
+
+
+def brest_header(**overrides):
+    return {"record_id": "brest-3-fra-refmar", "source_version": "4.1", "contributor": "REFMAR",
+            "site_code": "3", "country": "FRA", "datum_information": "Zero Hydrographique", **overrides}
+
+
+@pytest.mark.parametrize("header", ["Zero Hydrographique", "  zErO hYdRoGrApHiQuE  "])
+def test_confirmed_gesla_stated_chart_zero_is_published(header):
+    original = {"msl_offset_m": 4.20872}
+    datum = _published_stated_zero(brest_header(datum_information=header), original)
+    assert datum == {"msl_offset_m": 4.20872, "zero": "chart_datum", "zero_name": "ZH",
+                     "named": {"cd": 0.0}, "chart_datum": "cd",
+                     "basis": {"cd": published("Zero Hydrographique")}}
+    assert original == {"msl_offset_m": 4.20872}
+    assert datum_build_errors(datum) == []
+
+
+@pytest.mark.parametrize("overrides", [
+    {"record_id": "unconfirmed-3-fra-refmar"}, {"source_version": "future"},
+    {"contributor": "OTHER"}, {"site_code": "other"}, {"country": "SWE"},
+    {"datum_information": "unknown"}, {"datum_information": "BSCD2000"},
+    {"datum_information": None},
+])
+def test_unconfirmed_gesla_zero_is_unchanged(overrides):
+    original = {"msl_offset_m": 4.20872}
+    assert _published_stated_zero(brest_header(**overrides), original) == original
 
 
 GOOD = {"zero": "chart_datum", "chart_datum": "cd", "named": {"cd": 0.0, "msl": 1.0},
