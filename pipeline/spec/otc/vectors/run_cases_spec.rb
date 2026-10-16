@@ -18,6 +18,7 @@ RSpec.describe 'the native strict case oracle' do
     end
 
     def run_oracle(out, *extra)
+        extra += ['--strict-source', File.join(ENV.fetch('OTC_ENGINE_WORKTREE'), 'lib/harmonics_strict.rb')] if ENV.key?('OTC_ENGINE_WORKTREE')
         Open3.capture2e(RbConfig.ruby, script,
                        '--calls', File.join(sdk, 'conformance/tools/predict_calls.json'),
                        '--fixtures', File.join(sdk, 'conformance/fixtures'),

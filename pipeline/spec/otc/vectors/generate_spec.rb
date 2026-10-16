@@ -20,6 +20,7 @@ RSpec.describe 'the native prediction vectors' do
     end
 
     def generate(path, *extra)
+        extra += ['--strict-source', File.join(ENV.fetch('OTC_ENGINE_WORKTREE'), 'lib/harmonics_strict.rb')] if ENV.key?('OTC_ENGINE_WORKTREE')
         Open3.capture2e(RbConfig.ruby, script, '--release', release,
                        '--run-dir', File.join(inputs, 'congen'), '--output', path,
                        '--only', '8443970', *extra)

@@ -9,6 +9,12 @@ RSpec.describe 'the native Tier B official comparison' do
     script = File.join(root, 'scripts/otc/vectors/tier_b.rb')
     let(:input) { ENV.fetch('OTC_TIER_B_INPUT') }
 
+    def strict_source_args
+        return [] unless ENV.key?('OTC_ENGINE_WORKTREE')
+
+        ['--strict-source', File.join(ENV.fetch('OTC_ENGINE_WORKTREE'), 'lib/harmonics_strict.rb')]
+    end
+
     # The pinned real-data profile is external to ordinary repository CI.
     # A partially configured profile must still fail rather than hide missing inputs.
     before(:context) do
@@ -22,7 +28,7 @@ RSpec.describe 'the native Tier B official comparison' do
 
     it 'preserves all fixed bounds and six actual scientific failures' do
         Dir.mktmpdir('tier-b-green-') do |out|
-            log, status = Open3.capture2e(RbConfig.ruby, script, '--input', input, '--out', out,
+            log, status = Open3.capture2e(RbConfig.ruby, script, *strict_source_args, '--input', input, '--out', out,
                                         '--xtide-report', ENV.fetch('OTC_TIER_B_XTIDE_REPORT'))
             expect(status.exitstatus).to eq(1), log
             report = JSON.parse(File.read(File.join(out, 'comparison.json')))
@@ -42,6 +48,7 @@ RSpec.describe 'the native Tier B official comparison' do
                     '--provenance', ENV.fetch('OTC_TIER_B_PROVENANCE'),
                     '--inventory', ENV.fetch('OTC_TIER_B_INVENTORY')]
             args << '--projection' if ENV['OTC_TIER_B_PROJECTION'] == '1'
+            args += strict_source_args
             log, status = Open3.capture2e(*args)
             path = File.join(out, 'coverage.json')
             [log, status, File.file?(path) ? JSON.parse(File.read(path)) : nil]
@@ -284,7 +291,7 @@ RSpec.describe 'the native Tier B official comparison' do
 
     it 'detects the UTC+1 phase error on the same real Bergen comparison' do
         Dir.mktmpdir('tier-b-phase-red-') do |out|
-            log, status = Open3.capture2e(RbConfig.ruby, script, '--input', input, '--out', out,
+            log, status = Open3.capture2e(RbConfig.ruby, script, *strict_source_args, '--input', input, '--out', out,
                                         '--only', 'kartverket/BGO/heights', '--mutant', 'raw-kartverket-phase')
             expect(status.success?).to be(false), log
             expect(File.file?(File.join(out, 'comparison.json'))).to be(true), log
@@ -295,7 +302,7 @@ RSpec.describe 'the native Tier B official comparison' do
 
     it 'passes the same actual Bergen hours with the accepted phase conversion' do
         Dir.mktmpdir('tier-b-phase-green-') do |out|
-            log, status = Open3.capture2e(RbConfig.ruby, script, '--input', input, '--out', out,
+            log, status = Open3.capture2e(RbConfig.ruby, script, *strict_source_args, '--input', input, '--out', out,
                                         '--only', 'kartverket/BGO/heights')
             expect(status.success?).to be(true), log
             report = JSON.parse(File.read(File.join(out, 'comparison.json')))
@@ -305,7 +312,7 @@ RSpec.describe 'the native Tier B official comparison' do
 
     it 'refuses a missing used table row rather than comparing invented predictions' do
         Dir.mktmpdir('tier-b-table-red-') do |out|
-            log, status = Open3.capture2e(RbConfig.ruby, script, '--input', input, '--out', out,
+            log, status = Open3.capture2e(RbConfig.ruby, script, *strict_source_args, '--input', input, '--out', out,
                                         '--only', 'kartverket/BGO/heights', '--mutant', 'missing-used-row')
             expect(status.success?).to be(false), log
             expect(File.file?(File.join(out, 'comparison.json'))).to be(true), log
@@ -316,7 +323,7 @@ RSpec.describe 'the native Tier B official comparison' do
 
     it 'pairs the near-exact Puget event before an earlier event 86 minutes away' do
         Dir.mktmpdir('tier-b-pairing-') do |out|
-            log, status = Open3.capture2e(RbConfig.ruby, script, '--input', input, '--out', out,
+            log, status = Open3.capture2e(RbConfig.ruby, script, *strict_source_args, '--input', input, '--out', out,
                                         '--only', 'noaa-currents/PUG1501:1/events')
             expect(status.success?).to be(false), log  # Genuine missed/extra events remain failures.
             report = JSON.parse(File.read(File.join(out, 'comparison.json')))
