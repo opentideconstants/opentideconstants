@@ -1,0 +1,38 @@
+{
+ "expansion": "otc-t1g-expand-v1",
+ "gaps_sha256": "ede553c9a69ee6be42064634e545ffb1de2f1f1b6b7c0c86bbf961ce65f4acf6",
+ "pairs": [
+  {
+   "class": "mixed",
+   "control": "9412110",
+   "distance_km": 278.8,
+   "short": "9410660"
+  },
+  {
+   "class": "mixed",
+   "control": "9412110",
+   "distance_km": 7607.8,
+   "short": "1770000"
+  },
+  {
+   "class": "mixed",
+   "control": "9457804",
+   "distance_km": 401.6,
+   "short": "9463502"
+  },
+  {
+   "class": "diurnal",
+   "control": "8739803",
+   "distance_km": 9.1,
+   "short": "8738043"
+  },
+  {
+   "class": "diurnal",
+   "control": "8735180",
+   "distance_km": 2653.6,
+   "short": "9752695"
+  }
+ ],
+ "partition": "tuning",
+ "rule": "datum_t1.expand_pattern and datum_t1.t1g_pairs; gaps_sha256 is SHA-256 of the canonical JSON (sorted keys, no spaces) of every pattern|short|role|station gap list"
+}
