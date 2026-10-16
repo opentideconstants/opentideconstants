@@ -1,5 +1,7 @@
 """Original-record reduction orchestration and optional immutable native witnesses."""
+import ast
 import copy
+import hashlib
 import importlib
 import inspect
 import json
@@ -70,6 +72,176 @@ def test_completed_run_missing_checkpoint_must_refuse_instead_of_remeasure(tmp_p
 
 def producer():
     return importlib.import_module("otc_pipeline.observed_datums.produce")
+
+
+@pytest.fixture(scope="module")
+def cached_control_profiles():
+    if "OTC_ZERO_CONTROL_CACHE" not in os.environ:
+        pytest.skip("requires frozen actual full-cohort measurement checkpoints")
+    p = producer()
+    root = Path(os.environ["OTC_ZERO_CONTROL_CACHE"])
+    cache = root / "checkpoints"
+    run = json.loads((root / "observed-run.json").read_text())
+    rids = ("zwartsluistg-zwa-nld-cmems", "hellevoetsluis-hel-nld-rws",
+            "werkendambuitentg-wer-nld-cmems", "penarth-pen-gbr-cco")
+    targets = {}
+    for item in run["targets"]:
+        for rid in rids:
+            if item["set_id"].endswith("/gesla-fit/" + rid):
+                targets[rid] = p.read_checkpoint(cache, item["key"], item["job_sha256"], require_complete=True)
+    assert len(targets) == 4
+    primaries = []
+    for item in run["targets"]:
+        job = json.loads((cache / f"{item['key']}.job.json").read_text())
+        if not any(p.tide_class(job["cs"]) == p.tide_class(target["cs"]) and
+                   p.ticon_sets._km((job["station"]["lat"], job["station"]["lon"]),
+                                   (target["station"]["lat"], target["station"]["lon"])) <= 250
+                   for target in targets.values()):
+            continue
+        profile_path = cache / f"{item['key']}.profile.json"
+        profile = json.loads(profile_path.read_text())
+        if profile.get("primary") and profile["report"].get("reason") is None:
+            authenticated = p.read_checkpoint(cache, item["key"], item["job_sha256"], require_complete=True)
+            primaries.append(p.primary_summary(authenticated))
+    return cache, targets, primaries, run
+
+
+def test_actual_cached_control_has_defined_reduction(cached_control_profiles):
+    p = producer()
+    cache, targets, primaries, _ = cached_control_profiles
+    target = copy.deepcopy(targets["zwartsluistg-zwa-nld-cmems"])
+    try:
+        row, detail = p.reduce_profile(target, primaries, cache)
+    except ZeroDivisionError as error:
+        trace = error.__traceback__
+        finding = {}
+        while trace is not None:
+            local = trace.tb_frame.f_locals
+            if trace.tb_frame.f_code.co_name == "choose_control":
+                finding["selected_control"] = local["other"]["cs"]["set_id"]
+                finding["method"] = local["method"]
+            if trace.tb_frame.f_code.co_name == "mean_ratio":
+                level = local["lv"]
+                finding["denominator_level"] = level
+                finding["zero_months"] = [list(month) for month in local["months"] if local["mb"][month][level] == 0]
+                finding["first_values"] = {side: local[side][tuple(finding["zero_months"][0])] for side in ("ma", "mb")}
+            trace = trace.tb_next
+        print(json.dumps(finding, sort_keys=True))
+        raise
+    assert row["draft_datum"]["named"]
+    assert detail["disposition"] == "reduced"
+    rejected = detail["ineligible_controls"]
+    assert any(r["control_set_id"].endswith("/hundsmhlen-4960020-deu-wsv") and
+               r["month"] == "2014-08" and r["level"] == "DLQ" for r in rejected)
+    assert not detail["control"] or not detail["control"]["set_id"].endswith("/hundsmhlen-4960020-deu-wsv")
+    # Independently check three scalars against the actual selected common-month inputs.
+    values = row["draft_datum"]["named"]
+    if detail["control"]:
+        inputs = detail["comparison_inputs"]
+        ma, mb, acc = inputs["short"], inputs["control"], inputs["control_primary"]
+        mtl = acc["MTL"] + np.mean([ma[m]["MTL"] - mb[m]["MTL"] for m in ma])
+        mn = acc["MN"] * np.mean([ma[m]["MN"] / mb[m]["MN"] for m in ma])
+        expected = {"mtl": mtl, "mlw": mtl - mn / 2, "mhw": mtl + mn / 2}
+    else:
+        expected = {key: np.mean([month[key.upper()] for month in detail["used_monthly_inputs"].values()])
+                    for key in ("mtl", "mlw", "mhw")}
+    for key, value in expected.items():
+        assert values[key] == pytest.approx(value, abs=1e-12)
+    proof = Path(os.environ["OTC_ZERO_CONTROL_PROOF"])
+    (proof / "target-green.json").write_text(json.dumps({"row": row, "detail": detail}, sort_keys=True, indent=2) + "\n")
+    print(json.dumps({"set_id": row["set_id"], "method": detail["method"], "control": detail["control"],
+                      "independent_values": expected, "ineligible_denominators": len(rejected)}, sort_keys=True))
+
+
+def test_actual_cached_existing_valid_controls(cached_control_profiles):
+    p = producer()
+    cache, targets, primaries, run = cached_control_profiles
+    output = {}
+    for rid, target in targets.items():
+        if rid == "zwartsluistg-zwa-nld-cmems":
+            continue
+        row, detail = p.reduce_profile(copy.deepcopy(target), primaries, cache)
+        assert row["draft_datum"]["named"]
+        output[rid] = {"row": row, "detail": detail}
+    proof = Path(os.environ["OTC_ZERO_CONTROL_PROOF"])
+    baseline = proof / "valid-controls-before.json"
+    if baseline.exists():
+        before = json.loads(baseline.read_text())
+        for rid, actual in output.items():
+            assert actual["row"] == before[rid]["row"]
+            comparison = {key: value for key, value in actual["detail"].items() if key != "ineligible_controls"}
+            assert comparison == before[rid]["detail"]
+        print("three actual cached draft/control/method/month/binding witnesses exactly unchanged")
+    (proof / os.environ.get("OTC_ZERO_VALID_NAME", "valid-controls.json")).write_text(json.dumps(output, sort_keys=True, indent=2) + "\n")
+    names = {"timestamp", "good_hours", "is_primary", "input_binding", "measurement_segments", "compact_tabulation",
+             "save_tab", "measure_profile", "write_json", "write_checkpoint", "_initialize_measurement_worker",
+             "_measure_checkpoint", "_measurement_worker", "_complete_measurements", "canonical_hash", "sha256"}
+    tree = ast.parse(Path(p.__file__).read_text())
+    functions = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name in names]
+    digest = hashlib.sha256(ast.dump(ast.Module(body=functions, type_ignores=[]), include_attributes=False).encode()).hexdigest()
+    markers = [p.sha256(cache / f"{item['key']}.done.json") for item in run["targets"]]
+    excluded = {"choose_control", "reduce_profile", "produce", "_produce", "main", "authenticate_measured_inputs"}
+    surface = ast.Module(body=[node for node in tree.body if not
+                        (isinstance(node, ast.FunctionDef) and node.name in excluded)], type_ignores=[])
+    surface_digest = hashlib.sha256(ast.dump(surface, include_attributes=False).encode()).hexdigest()
+    (proof / "measurement-surface.json").write_text(json.dumps({"sha256": surface_digest}, sort_keys=True) + "\n")
+    auth_path = proof / "frozen-measurement-auth.json"
+    if auth_path.exists():
+        assert json.loads(auth_path.read_text())["functions_sha256"] == digest
+        return
+    auth_path.write_text(json.dumps({"run_sha256": p.sha256(cache.parent / "observed-run.json"),
+        "profile_manifests_sha256": p.canonical_hash({"ordered": markers}), "functions_sha256": digest,
+        "function_names": sorted(names), "producer_sha256": run["identity"]["implementation"]["producer_sha256"]}, sort_keys=True, indent=2) + "\n")
+    assert len(output) == 3
+
+
+@pytest.mark.skipif("OTC_ZERO_CONTROL_CACHE" not in os.environ, reason="requires frozen real measurements")
+def test_actual_measured_input_authentication_and_negative_controls(tmp_path, monkeypatch):
+    p = producer()
+    source = Path(os.environ["OTC_ZERO_CONTROL_CACHE"])
+    run = json.loads((source / "observed-run.json").read_text())
+    identity = copy.deepcopy(run["identity"])
+    identity["implementation"] = p.implementation_identity()
+    p.authenticate_measured_inputs(source, run, identity)
+    changed = copy.deepcopy(identity)
+    changed["inputs"]["release_sha256"] = "0" * 64
+    with pytest.raises(ValueError, match="current source"):
+        p.authenticate_measured_inputs(source, run, changed)
+    changed = copy.deepcopy(identity)
+    changed["implementation"]["modules"]["gesla.qc"] = "0" * 64
+    with pytest.raises(ValueError, match="scientific dependency"):
+        p.authenticate_measured_inputs(source, run, changed)
+    changed_source = tmp_path / "changed-producer.py"
+    changed_source.write_text(Path(p.__file__).read_text().replace("// 3600", "// 3601", 1))
+    with monkeypatch.context() as patch:
+        patch.setattr(p, "__file__", str(changed_source))
+        with pytest.raises(ValueError, match="measurement implementation"):
+            p.authenticate_measured_inputs(source, run, identity)
+    (tmp_path / "observed-run.json").write_text(json.dumps(run) + " ")
+    with pytest.raises(ValueError, match="frozen run"):
+        p.authenticate_measured_inputs(tmp_path, run, identity)
+    item = next(item for item in run["targets"] if item["set_id"].endswith("/zwartsluistg-zwa-nld-cmems"))
+    key, job_sha = item["key"], item["job_sha256"]
+    marker = source / "checkpoints" / f"{key}.done.json"
+    files = json.loads(marker.read_text())["files"]
+    for name in files:
+        (tmp_path / name).symlink_to(source / "checkpoints" / name)
+    (tmp_path / marker.name).write_bytes(marker.read_bytes())
+    assert p.read_checkpoint(tmp_path, key, job_sha, require_complete=True)["mm"]
+    profile = tmp_path / f"{key}.profile.json"
+    original = profile.read_bytes()
+    profile.unlink()
+    profile.write_bytes(original + b" ")
+    with pytest.raises(ValueError, match="artifact hash mismatch"):
+        p.read_checkpoint(tmp_path, key, job_sha, require_complete=True)
+    profile.unlink()
+    with pytest.raises(ValueError, match="checkpoint"):
+        p.read_checkpoint(tmp_path, key, job_sha, require_complete=True)
+    (tmp_path / marker.name).unlink()
+    (tmp_path / f"{key}.profile.json.part").write_bytes(original)
+    with pytest.raises(ValueError, match="checkpoint missing"):
+        p.read_checkpoint(tmp_path, key, job_sha, require_complete=True)
+    print("real frozen authentication PASS; changed source/code/dependency, corrupt/missing/partial checkpoints REFUSED")
 
 
 def months(first, last):

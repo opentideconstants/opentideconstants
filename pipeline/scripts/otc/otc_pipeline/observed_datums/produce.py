@@ -302,6 +302,14 @@ def choose_control(profile: dict, profiles: list[dict], cache: Path) -> tuple[di
         keys = sorted(set(ma) & set(mb))
         if not keys:
             continue
+        required = ("MN", "DLQ", "DHQ") if method == "standard" else ("MN", "GT") if method == "modified" else ()
+        undefined = [{"control_set_id": other["cs"]["set_id"], "month": f"{y:04d}-{m:02d}",
+                      "level": level, "reason": "zero_control_denominator" if mb[(y, m)][level] == 0 else "nonfinite_control_denominator"}
+                     for y, m in keys for level in required
+                     if not math.isfinite(mb[(y, m)][level]) or mb[(y, m)][level] == 0]
+        if undefined:
+            profile["report"].setdefault("ineligible_controls", []).extend(undefined)
+            continue
         if method == "direct":
             aa = {c["name"]: c["amplitude_m"] for c in cs["constituents"]}
             ab = {c["name"]: c["amplitude_m"] for c in other["cs"]["constituents"]}
@@ -636,27 +644,55 @@ def _complete_measurements(index: list[dict], cache: Path, context, worker_input
     return measured, reused
 
 
+def authenticate_measured_inputs(source: Path, previous: dict, identity: dict) -> None:
+    """Authenticate the frozen 1d0d487 measurement cohort, never rebind its hashes."""
+    import ast
+
+    if sha256(source / "observed-run.json") != "a8dfec8864ca6944a01d27a60d9e7a3f5799faec7d217a053d4cef75ef583728":
+        raise ValueError("measured-input frozen run identity mismatch")
+    old = previous["identity"]
+    if old["implementation"]["producer_sha256"] != "dd7ab607b2ac02d4236fc284259f64c1b4d21c45b9cf75e8502f5a849672fbe6":
+        raise ValueError("measured-input original producer mismatch")
+    if old["inputs"] != identity["inputs"] or old["roles_sha256"] != identity["roles_sha256"]:
+        raise ValueError("measured-input current source identity mismatch")
+    for key in ("modules", "numpy_version"):
+        if old["implementation"][key] != identity["implementation"][key]:
+            raise ValueError("measured-input scientific dependency mismatch")
+    tree = ast.parse(Path(__file__).read_text())
+    excluded = {"choose_control", "reduce_profile", "produce", "_produce", "main", "authenticate_measured_inputs"}
+    surface = ast.Module(body=[node for node in tree.body if not
+                        (isinstance(node, ast.FunctionDef) and node.name in excluded)], type_ignores=[])
+    digest = hashlib.sha256(ast.dump(surface, include_attributes=False).encode()).hexdigest()
+    if digest != "99d74b778dafef7362bfbd05dd995d185c63e7d21d75e4d3bb3ce561b0f16d7a":
+        raise ValueError("measured-input measurement implementation changed")
+
+
 def produce(release_path: Path, gesla_root: Path, fit_run: Path, tcd: Path, out: Path, *, resume: bool = False,
-            workers: int = 1) -> dict:
+            workers: int = 1, measured_inputs: Path | None = None) -> dict:
     """Bounded independent measurements precede ordered full-cohort reductions."""
     if type(workers) is not int or not 1 <= workers <= 4:
         raise ValueError("workers must be an integer from 1 to 4")
+    if measured_inputs is not None and (resume or out.resolve() == measured_inputs.resolve()):
+        raise ValueError("measured-input reduction requires a fresh separate output")
     out.mkdir(parents=True, exist_ok=True)
     with (out / ".lock").open("a+") as lock:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as exc:
             raise ValueError(f"{out}: producer is already running") from exc
-        return _produce(release_path, gesla_root, fit_run, tcd, out, resume=resume, workers=workers)
+        return _produce(release_path, gesla_root, fit_run, tcd, out, resume=resume, workers=workers,
+                        measured_inputs=measured_inputs)
 
 
-def _produce(release_path: Path, gesla_root: Path, fit_run: Path, tcd: Path, out: Path, *, resume: bool, workers: int) -> dict:
+def _produce(release_path: Path, gesla_root: Path, fit_run: Path, tcd: Path, out: Path, *, resume: bool,
+             workers: int, measured_inputs: Path | None = None) -> dict:
     run_path = out / "observed-run.json"
     if not resume and any(path.name != ".lock" for path in out.iterdir()):
         raise ValueError(f"{out}: occupied; use --resume with the identical inputs")
     if resume and not run_path.is_file():
         raise ValueError(f"{out}: no complete run manifest for --resume")
-    previous = json.loads(run_path.read_text()) if resume else None
+    source_run = (measured_inputs / "observed-run.json") if measured_inputs is not None else run_path
+    previous = json.loads(source_run.read_text()) if resume or measured_inputs is not None else None
     release = GeslaRelease(gesla_root)
     dump = gesla_sets.load_tcd_dump(tcd)
     manifest_path = fit_run / "timebase_manifest.json"
@@ -669,10 +705,13 @@ def _produce(release_path: Path, gesla_root: Path, fit_run: Path, tcd: Path, out
                       "results_sha256": sha256(fit_run / "results.jsonl"), "tcd_sha256": dump.sha256,
                       "gesla_manifest_sha256": sha256(gesla_root / "MANIFEST.json"), "timebase_sha256": audit.csv_sha256}
     identity = {"inputs": common_binding, "roles_sha256": sha256(roles_path), "implementation": implementation_identity()}
-    if previous is not None and (previous.get("format") != "otc-observed-run-v1" or previous.get("identity") != identity):
+    if measured_inputs is not None:
+        authenticate_measured_inputs(measured_inputs, previous, identity)
+    elif previous is not None and (previous.get("format") != "otc-observed-run-v1" or previous.get("identity") != identity):
         raise ValueError("resume source/implementation identity mismatch; old results cannot be rebound")
-    cache = out / "checkpoints"
-    cache.mkdir(exist_ok=True)
+    cache = (measured_inputs if measured_inputs is not None else out) / "checkpoints"
+    if measured_inputs is None:
+        cache.mkdir(exist_ok=True)
     index, seen = [], set()
     # Re-enumerate the actual complete release, authenticating each job from current inputs.
     with release_path.open() as stream:
@@ -693,21 +732,24 @@ def _produce(release_path: Path, gesla_root: Path, fit_run: Path, tcd: Path, out
                        "cs": cs, "binding": binding, "cache": f"{key}.npz"}
                 job_sha = canonical_hash(job)
                 job_path = cache / f"{key}.job.json"
-                if resume:
+                if resume or measured_inputs is not None:
                     if not job_path.is_file() or canonical_hash(json.loads(job_path.read_text())) != job_sha:
                         raise ValueError(f"resume current-input job mismatch: {cs['set_id']}")
                 else:
                     write_json(job_path, job)
                 index.append({"key": key, "job_sha256": job_sha, "set_id": cs["set_id"]})
     run = {"format": "otc-observed-run-v1", "identity": identity, "targets": index}
-    if previous is not None and previous != run:
+    if previous is not None and (previous["targets"] != index or (measured_inputs is None and previous != run)):
         raise ValueError("resume full-cohort target manifest mismatch")
     if not resume:
         write_json(run_path, run)
     completion_path = out / "observed-completion.json"
     context = (release, dump, fit_run, manifest, fit_rows, audit, roles)
-    measured, reused = _complete_measurements(index, cache, context, (gesla_root, fit_run, tcd, roles_path),
-                                             workers, completion_path.exists())
+    if measured_inputs is None:
+        measured, reused = _complete_measurements(index, cache, context, (gesla_root, fit_run, tcd, roles_path),
+                                                 workers, completion_path.exists())
+    else:
+        measured, reused = 0, len(index)
     primaries = []
     completed_profiles = []
     for item in index:
@@ -715,12 +757,23 @@ def _produce(release_path: Path, gesla_root: Path, fit_run: Path, tcd: Path, out
         profile = read_checkpoint(cache, key, job_sha, require_complete=True)
         if profile is None:
             raise ValueError(f"checkpoint missing after measurement barrier: {item['set_id']}")
+        if measured_inputs is not None:
+            job = json.loads((cache / f"{key}.job.json").read_text())
+            if any(profile.get(name) != job[name] for name in ("binding", "cs", "station", "cache")):
+                raise ValueError(f"measured-input checkpoint source context mismatch: {item['set_id']}")
         if profile.get("primary") and profile["report"].get("reason") is None:
             primaries.append(primary_summary(profile))
         completed_profiles.append(sha256(cache / f"{key}.done.json"))
         del profile
     # Full-cohort barrier: every profile is complete before any control selection.
     reduction_identity = {"run_sha256": sha256(run_path), "profile_manifests_sha256": canonical_hash({"ordered": completed_profiles})}
+    if measured_inputs is not None:
+        if reduction_identity["profile_manifests_sha256"] != "73fd254c82eb9832515799d74fb02cbb361c1c0e0530ac08e3eda550dcf5d5d4":
+            raise ValueError("measured-input frozen checkpoint cohort mismatch")
+        reduction_identity["measurement_source_run_sha256"] = sha256(source_run)
+        reduction_identity["measurement_producer_sha256"] = previous["identity"]["implementation"]["producer_sha256"]
+        write_json(out / "observed-measurement-reference.json", {"source": str(measured_inputs.resolve()),
+            "identity": reduction_identity, "measured": measured, "reused": reused})
     if completion_path.exists():
         completion = json.loads(completion_path.read_text())
         if completion.get("identity") != reduction_identity:
@@ -772,8 +825,10 @@ def main() -> None:
         parser.add_argument(f"--{name}", type=Path, required=True)
     parser.add_argument("--resume", action="store_true", help="resume only authenticated identical run inputs")
     parser.add_argument("--workers", type=int, choices=range(1, 5), default=1, help="independent measurement processes (1–4)")
+    parser.add_argument("--measured-inputs", type=Path, help="read-only frozen 1d0d487 measurements; no reconstruction")
     args = parser.parse_args()
-    report = produce(args.release, args.gesla_root, args.fit_run, args.tcd, args.out, resume=args.resume, workers=args.workers)
+    report = produce(args.release, args.gesla_root, args.fit_run, args.tcd, args.out, resume=args.resume,
+                     workers=args.workers, measured_inputs=args.measured_inputs)
     print(json.dumps(report["counts"], sort_keys=True))
 
 
