@@ -30,7 +30,7 @@ file by file before it reads anything.
     uv run python -m otc_pipeline.gesla_sets show --datestamp D
 
 What a set does not carry yet (each is another slot's, and is left out rather than guessed):
-datum zero and named levels (datums spec DT5f/DT5g/DT6: `datum` has only `msl_offset_m`),
+datum zero and named levels beyond individually confirmed stated chart zeros (DT5g/DT6),
 per-contributor licences (L-NC: the caller passes one licence id per record; none is assumed),
 short-record sets (expected_accuracy
 and the Rayleigh pairs), no_constants sets for unusable records (record_issues), and the
@@ -61,6 +61,7 @@ from gesla.timebase_audit import check_audit_outputs, correction_of, declared_co
 from gesla.timebase_verdict import Correction
 
 from otc_pipeline.adapter import SourceSet
+from otc_pipeline.datums import published
 
 DOC_VERSION = 3
 SOURCE = "gesla-fit"
@@ -776,7 +777,34 @@ def source_set(doc: Mapping, *, licence_id: str, retain_source_values: bool = Fa
     if not isinstance(licence_id, str) or not licence_id:
         raise ValueError(f"{doc.get('record_id')}: no licence id (the per-contributor licences, L-NC, assign it)")
     ss = comparator_set(doc, retain_findings=True, retain_source_values=retain_source_values)
-    return SourceSet(station_hint=ss.station_hint, constant_set={**ss.constant_set, "licence_id": licence_id})
+    return SourceSet(station_hint=ss.station_hint,
+                     constant_set={**ss.constant_set, "licence_id": licence_id,
+                                   "datum": _published_stated_zero(doc, ss.constant_set["datum"])})
+
+
+# Datums spec §4.4 admits a record's explicitly stated chart zero, not a vertical conversion.
+# Admit only individually confirmed facts from DT5f/out/gesla_stated_chart_datum.csv and
+# gesla_refmar_vs_shom.json: Brest has not_confirmed_by_shom_metadata=false; the cached
+# https://services.data.shom.fr/maregraphie/service/completetidegauge/3 states ZH.
+# Key: release, record, contributor, site code, country, normalized header. Unknowns fail closed.
+_CONFIRMED_STATED_CHART_ZEROS = {
+    ("4.1", "brest-3-fra-refmar", "REFMAR", "3", "FRA", "zero hydrographique"):
+        ("ZH", "Zero Hydrographique"),
+}
+
+
+def _published_stated_zero(doc: Mapping, datum: Mapping) -> dict:
+    """Retain a confirmed record's published chart zero without computing any named level."""
+    header = doc.get("datum_information")
+    key = (doc.get("source_version"), doc.get("record_id"), doc.get("contributor"),
+           doc.get("site_code"), doc.get("country"), header.strip().casefold() if isinstance(header, str) else None)
+    names = _CONFIRMED_STATED_CHART_ZEROS.get(key)
+    if names is None:
+        return dict(datum)
+    zero_name, source_name = names
+    return {**datum, "zero": "chart_datum", "zero_name": zero_name, "chart_datum": "cd",
+            "named": {**datum.get("named", {}), "cd": 0.0},
+            "basis": {**datum.get("basis", {}), "cd": published(source_name)}}
 
 
 def label_fallback(cs: dict, reason: str, finding: str, *, basis: str) -> None:
