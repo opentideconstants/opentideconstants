@@ -14,6 +14,200 @@ from jsonschema import Draft202012Validator
 from otc_pipeline import build_otc
 from otc_pipeline.lat_hat import EPOCH, START, END, computation_input_sha256, datum_draft
 from otc_pipeline import lat_hat
+from otc_pipeline.observed_datums import produce as observed_produce
+from otc_pipeline.release_writer import pinned_schema
+
+
+@pytest.fixture
+def native_observed_attachment():
+    root = os.environ.get("OTC_OBSERVED_ATTACHMENT_PROOF")
+    if not root:
+        pytest.skip("requires the pinned original observed reduction")
+    root = Path(root)
+    stations = [json.loads(line) for line in (root / "reduction/pilot-release.jsonl").read_text().splitlines()]
+    path = root / "reduction/pilot/observed-drafts.jsonl"
+    return {"stations": stations}, path, hashlib.sha256(path.read_bytes()).hexdigest(), {
+        "gesla_root": Path("/Users/jpr5/.local/share/opentideconstants/work/inputs/gesla/4.1"),
+        "fit_run": Path("/Users/jpr5/.local/share/copilotkit/cr/otc-impl/FIX-CONST/fit/fit-fc1"),
+        "tcd": Path("/Users/jpr5/.local/share/copilotkit/cr/otc-impl/FIX-CONST/astro/otc-tcd-20251228-ma2mb2-r2/tcd-1900-2100.json"),
+        "source_release": root / "reduction/pilot-release.jsonl",
+        "source_release_sha256": hashlib.sha256((root / "reduction/pilot-release.jsonl").read_bytes()).hexdigest(),
+    }
+
+
+def test_native_observed_attachment_three_original_value_flips(native_observed_attachment, tmp_path):
+    release, path, digest, inputs = native_observed_attachment
+    before = copy.deepcopy(release)
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+    available = [row for row in rows if row["draft_datum"]]
+    assert len(available) == 3
+    for row in available:
+        cs = next(cs for st in release["stations"] for cs in st["constant_sets"] if cs["set_id"] == row["set_id"])
+        missing = sorted(set(row["observed_keys"]) - cs["datum"]["named"].keys())
+        print(f"REAL BEFORE {row['set_id']}: missing={missing}; binding={row['input_binding']}")
+        assert missing == row["observed_keys"]
+    apply = getattr(build_otc, "apply_observed_datum_fallbacks", None)
+    assert callable(apply), "real producer cannot attach the three frozen original-bound observed reductions"
+    staged = build_otc.stage_observed_datums(release, path, digest, **inputs)
+    assert release == before
+    result = apply(release, path, digest, **inputs)
+    assert result["observed_basis_fallback_count"] == sum(len(row["observed_keys"]) for row in available)
+    assert staged["unavailable_set_count"] == 2
+    for old_st, new_st in zip(before["stations"], release["stations"]):
+        assert {k: v for k, v in old_st.items() if k != "constant_sets"} == {k: v for k, v in new_st.items() if k != "constant_sets"}
+        for old, new in zip(old_st["constant_sets"], new_st["constant_sets"]):
+            row = next(r for r in rows if r["set_id"] == new["set_id"])
+            if row["draft_datum"] is None:
+                assert new == old
+                continue
+            assert {k: v for k, v in new.items() if k != "datum"} == {k: v for k, v in old.items() if k != "datum"}
+            for key, value in old["datum"].items():
+                if key not in ("named", "basis"):
+                    assert new["datum"][key] == value
+            for key in old["datum"]["named"]:
+                assert new["datum"]["named"][key] == old["datum"]["named"][key]
+                assert new["datum"]["basis"][key] == old["datum"]["basis"][key]
+            for key in row["observed_keys"]:
+                assert new["datum"]["named"][key] == row["draft_datum"]["named"][key]
+                assert new["datum"]["basis"][key] == row["draft_datum"]["basis"][key]
+                basis = new["datum"]["basis"][key]
+                assert basis["kind"] == "observed"
+                assert basis["fallback"]["reason"] == "datum_gate_failed"
+                assert "uncertainty_m" not in basis and "uncertainty_basis" not in basis
+            print(f"REAL AFTER {new['set_id']}: {row['draft_datum']['named']}; prior values/set/ranking preserved")
+    source_root = Path(build_otc.__file__).resolve().parents[4]
+    assert Path(observed_produce.__file__).resolve().is_relative_to(source_root)
+    canonical = json.loads((source_root / "src/schema/otc-1.0.schema.json").read_text())
+    for schema in (canonical, pinned_schema()):
+        validator = Draft202012Validator({"$defs": schema["$defs"], "$ref": "#/$defs/station"})
+        for station in release["stations"]:
+            assert list(validator.iter_errors(station)) == []
+    output = tmp_path / "attached-pilot-stations.jsonl"
+    output.write_text("".join(json.dumps(station, sort_keys=True, allow_nan=False) + "\n" for station in release["stations"]))
+    print(f"COMBINED CONTRACT/IMPORT: 3 actual stations, canonical+pinned; output_sha256={hashlib.sha256(output.read_bytes()).hexdigest()}")
+
+
+@pytest.mark.parametrize("field", ["constituents", "time_base", "audit", "fit_segment", "datum", "source_record_id", "provenance"])
+def test_native_observed_attachment_rejects_changed_current_inputs(native_observed_attachment, field):
+    release, path, digest, inputs = native_observed_attachment
+    cs = next(cs for st in release["stations"] for cs in st["constant_sets"] if cs["source"] == "gesla-fit")
+    if field == "constituents":
+        cs[field][0]["amplitude_m"] += 0.01
+    elif field == "time_base":
+        cs[field]["published"] = "utc_mean_start60"
+    elif field == "audit":
+        cs["time_base"]["decided_build_commit"] = "0" * 40
+    elif field == "fit_segment":
+        cs[field] = {"start": "2021-01-01T00:00:00Z", "end": "2021-12-31T00:00:00Z"}
+    elif field == "datum":
+        cs[field]["msl_offset_m"] += 0.01
+    elif field == "provenance":
+        cs[field]["tcd_sha256"] = "0" * 64
+    else:
+        cs[field] = "foreign-original"
+    before = copy.deepcopy(release)
+    with pytest.raises(ValueError, match="binding"):
+        build_otc.apply_observed_datum_fallbacks(release, path, digest, **inputs)
+    assert release == before
+
+
+@pytest.mark.parametrize("defect", ["path", "hash", "bytes"])
+def test_native_observed_source_release_is_authenticated(native_observed_attachment, defect, tmp_path):
+    release, path, digest, inputs = native_observed_attachment
+    if defect == "hash":
+        inputs["source_release_sha256"] = "0" * 64
+    elif defect == "path":
+        inputs["source_release"] = tmp_path / "missing.jsonl"
+    else:
+        changed = tmp_path / "changed.jsonl"
+        changed.write_bytes(inputs["source_release"].read_bytes() + b"\n")
+        inputs["source_release"] = changed
+    with pytest.raises((ValueError, FileNotFoundError)):
+        build_otc.stage_observed_datums(release, path, digest, **inputs)
+
+
+def test_native_observed_regenerated_build_stamp_and_empty_stations(native_observed_attachment):
+    release, path, digest, inputs = native_observed_attachment
+    for station in release["stations"]:
+        for cs in station["constant_sets"]:
+            cs["provenance"]["build"]["build_commit"] = "1" * 40
+    empty = {"station_id": "empty", "constant_sets": []}
+    tombstone = {"station_id": "tombstone", "status": "merged"}
+    release["stations"].extend([empty, tombstone])
+    result = build_otc.apply_observed_datum_fallbacks(release, path, digest, **inputs)
+    assert result["staged_set_count"] == 3
+    assert release["stations"][-2:] == [empty, tombstone]
+
+
+@pytest.mark.parametrize("defect", ["duplicate", "foreign", "missing_binding", "stale_fit", "conflict", "ticon", "extra_key", "missing_key"])
+def test_native_observed_attachment_rejects_invalid_drafts(native_observed_attachment, defect, tmp_path):
+    release, path, digest, inputs = native_observed_attachment
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+    row = next(r for r in rows if r["draft_datum"])
+    if defect == "duplicate":
+        rows.append(copy.deepcopy(row))
+    elif defect == "foreign":
+        row["set_id"] = "foreign-set"
+    elif defect == "missing_binding":
+        del row["input_binding"]
+    elif defect == "stale_fit":
+        row["input_binding"]["fit_sha256"] = "0" * 64
+    elif defect == "conflict":
+        key = row["observed_keys"][0]
+        cs = next(cs for st in release["stations"] for cs in st["constant_sets"] if cs["set_id"] == row["set_id"])
+        cs["datum"]["named"][key] = 100.0
+        cs["datum"]["basis"][key] = {"kind": "computed"}
+    elif defect == "ticon":
+        target = next(r for r in rows if r["draft_datum"] is None)
+        target["draft_datum"] = copy.deepcopy(row["draft_datum"])
+        target["observed_keys"] = list(row["observed_keys"])
+    elif defect == "extra_key":
+        row["draft_datum"]["chart_datum"] = "mhw"
+    else:
+        row["observed_keys"].pop()
+    path = tmp_path / "invalid-observed.jsonl"
+    path.write_text("".join(json.dumps(r) + "\n" for r in rows))
+    before = copy.deepcopy(release)
+    with pytest.raises(ValueError):
+        build_otc.apply_observed_datum_fallbacks(release, path, hashlib.sha256(path.read_bytes()).hexdigest(), **inputs)
+    assert release == before
+
+
+def observed_cli_arguments():
+    return [value for name in ("fit-run", "audit-dir", "verdicts-dir", "calibration", "ticon-csv", "ticon-refs",
+                               "congen-run", "agency-cache", "currents-canary-cache", "out", "datestamp", "created")
+            for value in (f"--{name}", "unused")]
+
+
+@pytest.mark.parametrize("missing", ["drafts", "drafts-sha256", "source-release", "source-release-sha256"])
+def test_observed_cli_requires_authenticated_draft_and_source_pairs(missing):
+    arguments = observed_cli_arguments()
+    for name in ("drafts", "drafts-sha256", "source-release", "source-release-sha256"):
+        if name != missing:
+            arguments.extend([f"--observed-datum-{name}", "unused"])
+    with pytest.raises(ValueError, match="both paths and SHA-256 pins"):
+        build_otc.main(arguments)
+
+
+def test_observed_cli_publication_requires_pinned_inputs():
+    with pytest.raises(ValueError, match="pinned drafts and source release"):
+        build_otc.main([*observed_cli_arguments(), "--publish-labelled-observed-datums"])
+
+
+def test_observed_cli_accepts_all_publication_arguments_before_build(monkeypatch):
+    def stop_before_build(arguments):
+        assert arguments.observed_datum_source_release == Path("source.jsonl")
+        assert arguments.publish_labelled_observed_datums
+        raise RuntimeError("observed arguments accepted before build")
+
+    monkeypatch.setattr(build_otc.gb, "inventory_from_arguments", stop_before_build)
+    arguments = [*observed_cli_arguments(), "--observed-datum-drafts", "drafts.jsonl",
+                 "--observed-datum-drafts-sha256", "0" * 64,
+                 "--observed-datum-source-release", "source.jsonl",
+                 "--observed-datum-source-release-sha256", "1" * 64,
+                 "--publish-labelled-observed-datums"]
+    with pytest.raises(RuntimeError, match="observed arguments accepted"):
+        build_otc.main(arguments)
 
 
 @pytest.mark.skipif("OTC_GESLA_METADATA_PROOF" not in os.environ, reason="requires actual frozen GESLA metadata cases")

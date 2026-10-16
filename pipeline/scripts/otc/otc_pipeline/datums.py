@@ -14,12 +14,38 @@ from __future__ import annotations
 
 from datetime import date
 from functools import lru_cache
+import copy
 import hashlib
 import json
 import math
 from pathlib import Path
 
-__all__ = ["datum_build_errors", "derive_chart_datums", "period", "published"]
+__all__ = ["datum_build_errors", "derive_chart_datums", "observed_companions", "period", "published"]
+
+
+def observed_companions(datum: dict, draft: dict, keys: list[str], *, truncated_lows: bool = False) -> dict:
+    """Add observed keys without replacing a level, its basis, zero or chart pointer."""
+    allowed = {"mllw", "mlw", "msl", "mhw", "mhhw", "mtl", "dtl", "mn", "gt", "dhq", "dlq"}
+    if (set(draft) != {"named", "basis"} or len(keys) != len(set(keys))
+            or set(keys) != set(draft["named"]) or set(keys) != set(draft["basis"])):
+        raise ValueError("observed draft must contain exactly its declared new named/basis keys")
+    result = copy.deepcopy(datum)
+    named = result.setdefault("named", {})
+    bases = result.setdefault("basis", {})
+    for key in keys:
+        level = key.removeprefix("otc_")
+        basis = draft["basis"][key]
+        if level not in allowed or basis.get("kind") != "observed":
+            raise ValueError(f"invalid observed datum key/kind: {key}")
+        if key in named or key in bases:
+            raise ValueError(f"observed datum conflicts with existing level: {key}")
+        if key.startswith("otc_") and (level not in named or bases.get(level, {}).get("kind") != "published"):
+            raise ValueError(f"observed companion requires a published same-set level: {key}")
+        if truncated_lows and (level not in ("mhw", "mhhw") or "truncated_lows" not in basis.get("flags", [])):
+            raise ValueError(f"observed datum forbidden by known low-water cutoff: {key}")
+        named[key] = copy.deepcopy(draft["named"][key])
+        bases[key] = copy.deepcopy(basis)
+    return result
 
 
 def period(start: str, end: str, name: str | None = None) -> dict:

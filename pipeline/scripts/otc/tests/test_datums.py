@@ -12,6 +12,43 @@ from otc_pipeline.datums import datum_build_errors, period, published
 from otc_pipeline.gesla_sets import _published_stated_zero
 
 
+def test_observed_companion_preserves_published_level_and_chart_pointer():
+    datum = {"zero": "gauge_zero", "chart_datum": "mhw", "named": {"mhw": 3.0},
+             "basis": {"mhw": {"kind": "published", "method": "source", "source_name": "MHW"}}}
+    draft = {"named": {"otc_mhw": 2.9}, "basis": {"otc_mhw": {"kind": "observed"}}}
+    result = datums.observed_companions(datum, draft, ["otc_mhw"])
+    assert result["named"] == {"mhw": 3.0, "otc_mhw": 2.9}
+    assert result["basis"]["mhw"] == datum["basis"]["mhw"]
+    assert result["chart_datum"] == "mhw"
+    assert datum["named"] == {"mhw": 3.0}
+
+
+@pytest.mark.parametrize("defect", ["orphan", "computed_companion", "conflict", "unknown_key", "extra_metadata", "different_keys", "low_cutoff", "unflagged_cutoff"])
+def test_observed_companion_rejects_invalid_augmentation(defect):
+    datum = {"named": {}, "basis": {}}
+    draft = {"named": {"mhw": 2.9}, "basis": {"mhw": {"kind": "observed"}}}
+    truncated = False
+    if defect in ("orphan", "computed_companion"):
+        draft = {"named": {"otc_mhw": 2.9}, "basis": {"otc_mhw": {"kind": "observed"}}}
+        if defect == "computed_companion":
+            datum = {"named": {"mhw": 3.0}, "basis": {"mhw": {"kind": "computed"}}}
+    elif defect == "conflict":
+        datum = {"named": {"mhw": 3.0}, "basis": {"mhw": {"kind": "published"}}}
+    elif defect == "unknown_key":
+        draft = {"named": {"fake": 1.0}, "basis": {"fake": {"kind": "observed"}}}
+    elif defect == "extra_metadata":
+        draft["msl_offset_m"] = 9.0
+    elif defect == "different_keys":
+        draft["basis"] = {}
+    elif defect == "low_cutoff":
+        truncated = True
+        draft = {"named": {"mlw": 1.0}, "basis": {"mlw": {"kind": "observed", "flags": ["truncated_lows"]}}}
+    else:
+        truncated = True
+    with pytest.raises(ValueError):
+        datums.observed_companions(datum, draft, list(draft["named"]), truncated_lows=truncated)
+
+
 def test_period():
     assert period("1983-01-01", "2001-12-31", "NTDE 1983-2001") == {
         "start": "1983-01-01", "end": "2001-12-31", "name": "NTDE 1983-2001"}
