@@ -4,6 +4,7 @@ import hashlib
 import json
 import math
 import os
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -11,11 +12,56 @@ import numpy as np
 import pytest
 
 from otc_pipeline.observed_datums import monthly, tabulate
+from otc_pipeline.observed_datums import produce
 from otc_pipeline.observed_datums.tabulate import ANCHOR_S, TIDAL_DAY_S
 from gesla.tcd_table import TcdTable
 
 M2 = 12.4206012 * 3600
 K1 = 23.9344697 * 3600
+
+
+@pytest.mark.skipif("OTC_ZERO_CONTROL_CACHE" not in os.environ, reason="requires frozen actual measurement tables")
+def test_actual_cached_month_index_is_reused_per_invocation(monkeypatch):
+    root = Path(os.environ["OTC_ZERO_CONTROL_CACHE"])
+    proof = Path(os.environ["OTC_ZERO_CONTROL_PROOF"])
+    run = json.loads((root / "observed-run.json").read_text())
+    rids = ("zwartsluistg-zwa-nld-cmems", "werkendambuitentg-wer-nld-cmems", "penarth-pen-gbr-cco")
+    results = {}
+    original = tabulate.TidalDays.index
+    for rid in rids:
+        item = next(item for item in run["targets"] if item["set_id"].endswith("/gesla-fit/" + rid))
+        profile = produce.read_checkpoint(root / "checkpoints", item["key"], item["job_sha256"], require_complete=True)
+        tab = produce.load_tab(root / "checkpoints" / profile["cache"])
+        calls = []
+        def counted(self, times):
+            if self is tab.days and times is tab.msl_t:
+                calls.append(len(times))
+            return original(self, times)
+        with monkeypatch.context() as patch:
+            patch.setattr(tabulate.TidalDays, "index", counted)
+            start = time.perf_counter()
+            means = monthly.monthly_means(tab, days=tab.complete_days, min_days=monthly.MIN_COMMON_DAYS)
+            elapsed = time.perf_counter() - start
+        assert len(means) > 1
+        encoded = json.dumps({f"{y:04d}-{m:02d}": row for (y, m), row in means.items()}, sort_keys=True, allow_nan=False)
+        results[rid] = {"set_id": item["set_id"], "index_calls": len(calls), "elapsed_s": elapsed,
+                        "months": len(means), "monthly_json": encoded,
+                        "monthly_sha256": hashlib.sha256(encoded.encode()).hexdigest()}
+        # Mutate only this in-memory copy; the original checkpoint is read-only.
+        tab.msl_t[:] += 3600
+        mutated = monthly.monthly_means(tab, days=tab.complete_days, min_days=monthly.MIN_COMMON_DAYS)
+        for key in list(mutated)[:3]:
+            use = np.array([k for k in tab.days.month_days(*key) if int(k) in tab.complete_days], dtype=np.int64)
+            assert mutated[key] == monthly.month_means(tab, use)
+        assert any(mutated[key]["MSL"] != means[key]["MSL"] for key in set(mutated) & set(means))
+        print(json.dumps({key: value for key, value in results[rid].items() if key != "monthly_json"}, sort_keys=True))
+    phase = os.environ.get("OTC_MONTH_PHASE", "green")
+    (proof / f"month-index-{phase}.json").write_text(json.dumps(results, sort_keys=True, indent=2) + "\n")
+    baseline = proof / "month-index-red.json"
+    if phase != "red":
+        before = json.loads(baseline.read_text())
+        assert all(result["monthly_json"] == before[rid]["monthly_json"] for rid, result in results.items())
+    assert all(result["index_calls"] == 1 for result in results.values())
 
 
 @pytest.mark.skipif("OTC_OBSERVED_NATIVE_INPUTS" not in os.environ, reason="requires the pinned actual NOAA2015 tuning cache")
@@ -214,6 +260,31 @@ def test_common_tidal_days_need_24_in_the_month():
     ks = [int(k) for k in tab.days.month_days(2015, 1)]
     assert monthly.monthly_means(tab, days=set(ks[:24]), min_days=24)[(2015, 1)]["n_days"] == 24
     assert (2015, 1) not in monthly.monthly_means(tab, days=set(ks[:23]), min_days=24)
+
+
+def test_month_index_is_local_lazy_and_observes_array_and_day_mode_mutation(monkeypatch):
+    t, h = series(JAN - 3 * 86400, MAR + 3 * 86400)
+    tab = tabulate.tabulate(t, h, mixed, interval_s=360)
+    calls = []
+    original = tabulate.TidalDays.index
+    def counted(self, times):
+        calls.append(1)
+        return original(self, times)
+    monkeypatch.setattr(tabulate.TidalDays, "index", counted)
+    before = monthly.monthly_means(tab)
+    assert len(calls) == 1
+    assert monthly.monthly_means(tab, days=set(), min_days=24) == {}
+    assert len(calls) == 1
+    tab.msl_t[:] += 3600
+    after = monthly.monthly_means(tab)
+    assert len(calls) == 2
+    for key, value in after.items():
+        assert value == monthly.month_means(tab, tab.days.month_days(*key))
+    assert any(before[key]["MSL"] != after[key]["MSL"] for key in after)
+    use = tab.days.month_days(2015, 1)
+    assert monthly.month_means(tab, use) is not None
+    tab.days.mode = "anchored"
+    assert monthly.month_means(tab, use) is None
 
 
 def test_hourly_means_record_uses_the_means_for_msl():

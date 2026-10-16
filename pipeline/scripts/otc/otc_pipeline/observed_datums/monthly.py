@@ -36,12 +36,16 @@ def derived(lv: dict) -> dict:
 
 def month_means(tab: Tabulation, use: np.ndarray) -> dict | None:
     """The levels from the events and hourly heights of the tidal days `use`; None without a high and a low."""
+    return _month_means(tab, use, tab.days.index(tab.msl_t))
+
+
+def _month_means(tab: Tabulation, use: np.ndarray, hourly_days: np.ndarray) -> dict | None:
     ev = np.isin(tab.ev_day, use)
     hi = ev & (tab.ev_kind > 0)
     lo = ev & (tab.ev_kind < 0)
     hh = ev & (tab.ev_label == "HH")
     ll = ev & (tab.ev_label == "LL")
-    hrs = np.isin(tab.days.index(tab.msl_t), use)
+    hrs = np.isin(hourly_days, use)
     if not (hi.any() and lo.any() and hrs.any()):
         return None
     out = derived({"MHHW": float(tab.ev_h[hh].mean()), "MHW": float(tab.ev_h[hi].mean()),
@@ -61,6 +65,7 @@ def monthly_means(tab: Tabulation, *, days=None, min_days: int | None = None) ->
         return {}
     months = sorted({tab.days.month_of(k) for k in complete})
     out = {}
+    hourly_days = None
     for y, m in months:
         ks = tab.days.month_days(y, m)
         if days is None:
@@ -71,7 +76,9 @@ def monthly_means(tab: Tabulation, *, days=None, min_days: int | None = None) ->
             use = np.array([k for k in ks if int(k) in days and int(k) in complete], dtype=np.int64)
             if len(use) < min_days:
                 continue
-        r = month_means(tab, use)
+        if hourly_days is None:
+            hourly_days = tab.days.index(tab.msl_t)
+        r = _month_means(tab, use, hourly_days)
         if r is not None:
             out[(y, m)] = r
     return out

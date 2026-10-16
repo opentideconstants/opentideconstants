@@ -206,6 +206,10 @@ def stage_official_datums(release: dict, path: Path, sha256: str) -> dict:
 def apply_official_datum_fallbacks(release: dict, path: Path, sha256: str) -> dict:
     """Attach labelled computed levels while preserving every existing set and recommendation."""
     staged = stage_official_datums(release, path, sha256)
+    return _publish_official_datum_stage(release, staged)
+
+
+def _publish_official_datum_stage(release: dict, staged: dict) -> dict:
     from otc_pipeline.datums import derive_chart_datums
     from otc_pipeline.lat_hat import COMPUTED_FALLBACK
     by_id = {cs["set_id"]: cs for station in release["stations"] for cs in station.get("constant_sets", [])}
@@ -222,6 +226,220 @@ def apply_official_datum_fallbacks(release: dict, path: Path, sha256: str) -> di
             "normal_datum_gate_accepted": False, "computed_basis_fallback_count": count,
             "chart_datum_derivation": chart_datum_derivation,
             "admission": "labelled computed datum fallback only"}
+
+
+class _ObservedCurrentInputMismatch(ValueError):
+    """The authenticated draft does not match this current native publication view."""
+
+
+def stage_observed_datums(release: dict, path: Path, sha256: str, *, source_release: Path,
+                          source_release_sha256: str, gesla_root: Path, fit_run: Path, tcd: Path) -> dict:
+    """Authenticate frozen reductions against original bytes and current native scientific inputs."""
+    from gesla.read_gesla import GeslaRelease
+    from jsonschema import Draft202012Validator
+    from otc_pipeline.datums import datum_build_errors, observed_companions
+    from otc_pipeline.observed_datums import produce
+    from otc_pipeline.release_writer import pinned_schema
+
+    data = path.read_bytes()
+    if hashlib.sha256(data).hexdigest() != sha256:
+        raise ValueError("observed datum draft SHA-256 mismatch")
+    if produce.sha256(source_release) != source_release_sha256:
+        raise ValueError("observed source release SHA-256 mismatch")
+    rows = [json.loads(line) for line in data.decode().splitlines() if line.strip()]
+    required = {"station_id", "set_id", "source_record_id", "input_binding", "draft_datum", "observed_keys"}
+    if any(not isinstance(row, dict) or set(row) != required for row in rows):
+        raise ValueError("observed datum row requires identity, binding, draft and observed keys")
+    ids = [row["set_id"] for row in rows]
+    if len(ids) != len(set(ids)):
+        raise ValueError("duplicate observed datum draft binding")
+    wanted = set(ids)
+    native = {}
+    for station in release["stations"]:
+        for cs in station.get("constant_sets", []):
+            sid = cs["set_id"]
+            if sid in native:
+                raise ValueError(f"duplicate current observed set binding: {sid}")
+            native[sid] = (station, cs)
+    historical = {}
+    with source_release.open() as stream:
+        for line in stream:
+            if not line.strip():
+                continue
+            station = json.loads(line)
+            for cs in station.get("constant_sets", []):
+                sid = cs["set_id"]
+                if sid in wanted:
+                    if sid in historical:
+                        raise ValueError(f"duplicate source release observed binding: {sid}")
+                    historical[sid] = (station, cs)
+    originals = GeslaRelease(gesla_root)
+    manifest_path = fit_run / "timebase_manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    audit = gs.load_audit(Path(manifest["inputs"]["timebase_csv"]["path"]).parent)
+    dump = gs.load_tcd_dump(tcd)
+    manifest, fit_rows = gs.check_fit_run(fit_run, dump, originals, audit)
+    common = {"release_sha256": source_release_sha256, "fit_manifest_sha256": produce.sha256(manifest_path),
+              "results_sha256": produce.sha256(fit_run / "results.jsonl"), "tcd_sha256": dump.sha256,
+              "gesla_manifest_sha256": produce.sha256(gesla_root / "MANIFEST.json"),
+              "timebase_sha256": audit.csv_sha256}
+    schema = pinned_schema()
+    validator = Draft202012Validator({"$defs": schema["$defs"], "$ref": "#/$defs/datum"})
+    staged, unavailable, verified_members = [], [], set()
+    for row in rows:
+        sid, rid = row["set_id"], row["source_record_id"]
+        if sid not in native or sid not in historical:
+            raise ValueError(f"foreign observed datum binding: {sid}")
+        station, cs = native[sid]
+        old_station, old_cs = historical[sid]
+        if (cs.get("source") not in (gs.SOURCE, "ticon-4") or row["station_id"] != station["station_id"]
+                or rid != cs.get("source_record_id") or row["station_id"] != old_station["station_id"]
+                or rid != old_cs.get("source_record_id")
+                or any(station.get(key) != old_station.get(key) for key in ("lat", "lon", "country"))):
+            raise ValueError(f"observed source identity binding mismatch: {sid}")
+        member = originals.members.get(rid)
+        fit_path = fit_run / "fits" / f"{rid}.json"
+        fit_sha = produce.sha256(fit_path) if fit_path.is_file() else None
+        bound = produce.input_binding(old_station, old_cs, member=member, fit_sha256=fit_sha, **common)
+        if row["input_binding"] != bound:
+            raise ValueError(f"observed historical input binding mismatch: {sid}")
+        # Only this generated build stamp may differ. Audit decisions and every other
+        # provenance field remain part of the native scientific binding.
+        current = copy.deepcopy(cs)
+        build = current.get("provenance", {}).get("build")
+        old_build = old_cs.get("provenance", {}).get("build", {})
+        if isinstance(build, dict) and "build_commit" in build and "build_commit" in old_build:
+            build["build_commit"] = old_build["build_commit"]
+        if produce.input_binding(station, current, member=member, fit_sha256=fit_sha, **common) != bound:
+            raise _ObservedCurrentInputMismatch(f"observed current input binding mismatch: {sid}")
+        if member and rid not in verified_members:
+            originals.read_member(rid)  # verifies actual original bytes, not only manifest identity
+            verified_members.add(rid)
+        if row["draft_datum"] is None:
+            if row["observed_keys"] != []:
+                raise ValueError(f"unavailable observed draft has values: {sid}")
+            unavailable.append(copy.deepcopy(row))
+            continue
+        if (cs["source"] != gs.SOURCE or member is None or cs.get("quantity") != "water_level"
+                or cs.get("qc_status") == "no_constants" or not cs.get("constituents")
+                or any(issue.get("issue") == "no_tide" for issue in cs.get("record_issues", []))):
+            raise ValueError(f"observed original zero/measurement unavailable: {sid}")
+        if fit_sha != manifest["fits_sha256"].get(rid) or fit_rows.get(rid, {}).get("outcome") != "fitted":
+            raise ValueError(f"observed completed fit binding mismatch: {sid}")
+        fit = json.loads(fit_path.read_text())
+        correction = gs.published_correction(audit.rows.get(rid), gs.declared_hours(originals.metadata()[rid]))
+        if correction.label != cs.get("time_base", {}).get("published"):
+            raise ValueError(f"observed published clock binding mismatch: {sid}")
+        gs.check_stamp(rid, fit, correction.label, corr=correction, speed=lambda name: dump.table[name].speed,
+                       span=(fit["first_s"], fit["last_s"] + 3600))
+        draft, keys = row["draft_datum"], row["observed_keys"]
+        if not isinstance(draft, dict) or not isinstance(keys, list) or not keys:
+            raise ValueError(f"observed draft has no declared levels: {sid}")
+        for key in keys:
+            basis = draft.get("basis", {}).get(key, {})
+            fallback = basis.get("fallback", {})
+            finding = fallback.get("otc_finding", "")
+            if (basis.get("kind") != "observed" or fallback.get("reason") != "datum_gate_failed"
+                    or "Scientific T1 FAIL; normal acceptance false" not in finding
+                    or produce.DIAGNOSTIC_SHA256 not in finding or "uncertainty_m" in basis
+                    or "uncertainty_basis" in basis):
+                raise ValueError(f"invalid observed gate-failed diagnostic: {sid}:{key}")
+        datum = observed_companions(cs.get("datum", {}), draft, keys, truncated_lows=produce.cut_off_lows(cs))
+        json.dumps(datum, allow_nan=False)
+        errors = list(validator.iter_errors(datum))
+        if errors or datum_build_errors(datum):
+            raise ValueError(f"invalid observed datum contract: {sid}: {errors or datum_build_errors(datum)}")
+        staged.append({"station_id": station["station_id"], "set_id": sid, "datum": datum,
+                       "observed_keys": list(keys), "input_binding": copy.deepcopy(bound)})
+    if produce.sha256(source_release) != source_release_sha256:
+        raise ValueError("observed source release changed during staging")
+    return {"public_admission": False, "release_unchanged": True, "normal_datum_gate_accepted": False,
+            "input_path": str(path), "input_sha256": sha256, "source_release_path": str(source_release),
+            "source_release_sha256": source_release_sha256, "staged_set_count": len(staged),
+            "staged_level_count": sum(len(row["observed_keys"]) for row in staged),
+            "unavailable_set_count": len(unavailable), "unavailable": unavailable, "drafts": staged}
+
+
+def apply_observed_datum_fallbacks(release: dict, path: Path, sha256: str, **inputs) -> dict:
+    """Attach only authenticated new observed levels, retaining unrelated set and station fields."""
+    staged = stage_observed_datums(release, path, sha256, **inputs)
+    return _publish_observed_datum_stage(release, staged)
+
+
+def _publish_observed_datum_stage(release: dict, staged: dict) -> dict:
+    from otc_pipeline.datums import observed_companions
+
+    by_id = {cs["set_id"]: cs for station in release["stations"] for cs in station.get("constant_sets", [])}
+    pending = []
+    for entry in staged["drafts"]:
+        # Other authenticated stages may already have added disjoint computed
+        # levels and a chart pointer. Attach only this stage's new observed keys.
+        keys = entry["observed_keys"]
+        draft = {field: {key: entry["datum"][field][key] for key in keys} for field in ("named", "basis")}
+        datum = observed_companions(by_id[entry["set_id"]].get("datum", {}), draft, keys)
+        pending.append((entry, datum))
+    for entry, datum in pending:
+        by_id[entry["set_id"]]["datum"] = datum
+        entry["datum"] = datum
+    return {**staged, "public_admission": True, "release_unchanged": not bool(staged["drafts"]),
+            "observed_basis_fallback_count": staged["staged_level_count"],
+            "admission": "labelled observed datum fallback only"}
+
+
+def _official_datum_view(release: dict, staged: dict) -> dict:
+    """Preview only authenticated computed additions and cited chart designation."""
+    native = {cs["set_id"]: cs for station in release["stations"] for cs in station.get("constant_sets", [])}
+    for entry in staged["drafts"]:
+        old = native[entry["set_id"]].get("datum", {})
+        draft = entry["datum"]
+        if ({k: v for k, v in old.items() if k not in ("named", "basis")} !=
+                {k: v for k, v in draft.items() if k not in ("named", "basis")}
+                or set(draft.get("named", {})) - set(old.get("named", {})) != set(entry["computed_keys"])
+                or set(draft.get("basis", {})) - set(old.get("basis", {})) != set(entry["computed_keys"])):
+            raise ValueError(f"official publication view requires only computed level additions: {entry['set_id']}")
+    # Copy the mutable datum containers only. Source, harmonic and station context
+    # remains identical; this preview never mutates the caller's release.
+    stations = []
+    for station in release["stations"]:
+        copied = dict(station)
+        if "constant_sets" in station:
+            copied["constant_sets"] = [
+                {**cs, "datum": copy.deepcopy(cs["datum"])} if "datum" in cs else dict(cs)
+                for cs in station["constant_sets"]]
+        stations.append(copied)
+    preview = {**release, "stations": stations}
+    _publish_official_datum_stage(preview, copy.deepcopy(staged))
+    return preview
+
+
+def apply_datum_drafts(release: dict, *, official: tuple | None = None, observed: tuple | None = None,
+                       publish_official: bool = False, publish_observed: bool = False,
+                       observed_inputs: dict | None = None) -> tuple[dict | None, dict | None]:
+    """Authenticate exact native or official-published views before merging disjoint additions."""
+    official_stage = stage_official_datums(release, *official) if official is not None else None
+    observed_stage = None
+    if observed is not None:
+        try:
+            observed_stage = stage_observed_datums(release, *observed, **(observed_inputs or {}))
+        except _ObservedCurrentInputMismatch:
+            if not publish_official or official_stage is None:
+                raise
+            # Older accepted drafts bind the post-computed source release. Verify
+            # that exact view too; no binding field or historical hash is ignored.
+            preview = _official_datum_view(release, official_stage)
+            observed_stage = stage_observed_datums(preview, *observed, **(observed_inputs or {}))
+    if publish_official and publish_observed and official_stage is not None and observed_stage is not None:
+        observed_keys = {row["set_id"]: set(row["observed_keys"]) for row in observed_stage["drafts"]}
+        # Reject overlaps before either group mutates the release, including an
+        # unexpected extra named key in a computed draft.
+        for row in official_stage["drafts"]:
+            if set(row["datum"].get("named", {})) & observed_keys.get(row["set_id"], set()):
+                raise ValueError(f"conflicting official and observed datum drafts: {row['set_id']}")
+    if publish_official and official_stage is not None:
+        official_stage = _publish_official_datum_stage(release, official_stage)
+    if publish_observed and observed_stage is not None:
+        observed_stage = _publish_observed_datum_stage(release, observed_stage)
+    return official_stage, observed_stage
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -253,9 +471,23 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--official-datum-drafts-sha256")
     ap.add_argument("--publish-labelled-official-datums", action="store_true",
                     help="attach the staged official levels with per-level datum_gate_failed findings")
+    ap.add_argument("--observed-datum-drafts", type=Path,
+                    help="stage source-bound observed reductions without changing release values")
+    ap.add_argument("--observed-datum-drafts-sha256")
+    ap.add_argument("--observed-datum-source-release", type=Path,
+                    help="the immutable native JSONL input used to reduce the observed drafts")
+    ap.add_argument("--observed-datum-source-release-sha256")
+    ap.add_argument("--publish-labelled-observed-datums", action="store_true",
+                    help="attach pinned observed levels with their per-level datum_gate_failed findings")
     gb.inventory_arguments(ap)
     argv = sys.argv[1:] if argv is None else list(argv)
     a = ap.parse_args(argv)
+    observed_inputs = (a.observed_datum_drafts, a.observed_datum_drafts_sha256,
+                       a.observed_datum_source_release, a.observed_datum_source_release_sha256)
+    if any(value is not None for value in observed_inputs) and any(value is None for value in observed_inputs):
+        raise ValueError("observed datum drafts and source release require both paths and SHA-256 pins")
+    if a.publish_labelled_observed_datums and a.observed_datum_drafts is None:
+        raise ValueError("labelled observed datums require pinned drafts and source release")
     if (a.official_datum_drafts is None) != (a.official_datum_drafts_sha256 is None):
         raise ValueError("--official-datum-drafts and --official-datum-drafts-sha256 must be supplied together")
     if a.publish_labelled_official_datums and a.official_datum_drafts is None:
@@ -354,11 +586,18 @@ def main(argv: list[str] | None = None) -> int:
         log("noaa historical augmentation: " + json.dumps(
             {key: value for key, value in historical_augmentation.items() if key not in {"members", "input_roles"}},
             sort_keys=True))
-    datum_stage = None
-    if a.official_datum_drafts is not None:
-        apply = apply_official_datum_fallbacks if a.publish_labelled_official_datums else stage_official_datums
-        datum_stage = apply(release, a.official_datum_drafts, a.official_datum_drafts_sha256)
+    datum_stage, observed_stage = apply_datum_drafts(release,
+        official=(a.official_datum_drafts, a.official_datum_drafts_sha256) if a.official_datum_drafts is not None else None,
+        observed=(a.observed_datum_drafts, a.observed_datum_drafts_sha256) if a.observed_datum_drafts is not None else None,
+        publish_official=a.publish_labelled_official_datums, publish_observed=a.publish_labelled_observed_datums,
+        observed_inputs={"source_release": a.observed_datum_source_release,
+                         "source_release_sha256": a.observed_datum_source_release_sha256,
+                         "gesla_root": gs.GeslaRelease().root, "fit_run": a.fit_run, "tcd": tcd}
+                        if a.observed_datum_drafts is not None else None)
+    if datum_stage is not None:
         log(f"official datums: {datum_stage['staged_set_count']} sets; public_admission={datum_stage['public_admission']}")
+    if observed_stage is not None:
+        log(f"observed datums: {observed_stage['staged_set_count']} sets; public_admission={observed_stage['public_admission']}")
     errs = validate_release(release)
     log(f"validate_release: {len(errs)} errors")
     for e in errs[:20]:
@@ -373,6 +612,8 @@ def main(argv: list[str] | None = None) -> int:
     files = write_release(release, a.out, datestamp=a.datestamp, app_export=None, congen_run=parts.congen_run)
     if datum_stage is not None:
         (a.out / "DATUM_STAGE.json").write_text(json.dumps(datum_stage, allow_nan=False, sort_keys=True) + "\n")
+    if observed_stage is not None:
+        (a.out / "OBSERVED_DATUM_STAGE.json").write_text(json.dumps(observed_stage, allow_nan=False, sort_keys=True) + "\n")
     provenance = {"command_line": [sys.executable, "-m", "otc_pipeline.build_otc", *argv], "cwd": os.getcwd(),
                   **parts.provenance,
                   "agency_cache": {s: {"path": str((a.agency_cache / s).resolve()),
@@ -387,7 +628,10 @@ def main(argv: list[str] | None = None) -> int:
                     "original_derived_inputs": derived_inputs, "country_resolutions": country_resolutions,
                     "noaa_historical_augmentation": historical_augmentation,
                     **({"official_datum_stage": {key: value for key, value in datum_stage.items() if key != "drafts"}}
-                       if datum_stage is not None else {})},
+                       if datum_stage is not None else {}),
+                    **({"observed_datum_stage": {key: value for key, value in observed_stage.items()
+                                                 if key not in ("drafts", "unavailable")}}
+                       if observed_stage is not None else {})},
                     release=release, inventory=inventory)
     log(f"wrote {[p.name for p in files]} + BUILD_REPORT.json to {a.out}")
     return 0

@@ -9,7 +9,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 SITE = Path(os.environ["OTC_SITE_REPO"]) if os.environ.get("OTC_SITE_REPO") else None
-PIN = "6421ee6a8ce5d763d2495a2d749b665a22d8a557"
+PIN = "9cf0f68ba680c94b19bc9cabf14f6d5ea7fe1f69"
 
 
 def _site_has_pin():
@@ -58,7 +58,7 @@ def test_wrong_pin_does_not_replace_the_committed_copy(tree):
     t, tmpdir = tree
     script = t / "sync_schema.sh"
     text = script.read_text()
-    good = "ece2e192505d66ae9295b10ff3a5993d9b233d6529851b4b15feea5d64518155"
+    good = "9e12738d3f3e54019ddf7863084273ec5526d16ff29c21ad3f40cf207d8013a8"
     assert good in text
     script.write_text(text.replace(good, "0" * 64))
     schema = t / "schema" / "otc-1.0.schema.json"
