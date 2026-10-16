@@ -7,10 +7,12 @@ from __future__ import annotations
 
 import argparse
 import calendar
+import fcntl
 import hashlib
+import importlib
 import json
 import math
-import tempfile
+import os
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -277,7 +279,9 @@ def load_tab(path: Path) -> tabulate.Tabulation:
 def choose_control(profile: dict, profiles: list[dict], cache: Path) -> tuple[dict | None, dict | None, dict | None]:
     station, cs = profile["station"], profile["cs"]
     method = comparison_method(station, cs)
-    choices = []
+    best = None
+    nearest_short = None
+    candidate_count = 0
     ta = None
     for other in profiles:
         if not other.get("primary") or other["cs"]["set_id"] == cs["set_id"]:
@@ -309,22 +313,30 @@ def choose_control(profile: dict, profiles: list[dict], cache: Path) -> tuple[di
         scatter = float(np.std([ma[key][level] - mb[key][level] for key in keys], ddof=1)) if len(keys) >= 3 else None
         # Fewer than three months: nearest. Otherwise minimum monthly scatter, then distance.
         rank = (scatter if scatter is not None else math.inf, distance, other["cs"]["set_id"])
-        choices.append((rank, distance, other, keys, ma, tb))
-    if not choices:
+        candidate_count += 1
+        choice = (rank, distance, other)
+        if len(keys) >= 3:
+            if best is None or rank < best[0]:
+                best = choice
+        elif nearest_short is None or (distance, other["cs"]["set_id"]) < (nearest_short[1], nearest_short[2]["cs"]["set_id"]):
+            nearest_short = choice
+        # No candidate tabulation or monthly arrays are retained in the ranking.
+        del tb, ma, mb
+    chosen = best if best is not None else nearest_short
+    if chosen is None:
         return None, None, None
-    if all(len(row[3]) < 3 for row in choices):
-        choices.sort(key=lambda row: (row[1], row[2]["cs"]["set_id"]))
-    else:
-        choices.sort(key=lambda row: row[0])
-    _, _, other, keys, ma, tb = choices[0]
+    rank, distance, other = chosen
+    tb = load_tab(cache / other["cache"])
     common = ta.complete_days & tb.complete_days
+    ma = monthly.monthly_means(ta, days=common, min_days=monthly.MIN_COMMON_DAYS)
     mb = monthly.monthly_means(tb, days=common, min_days=monthly.MIN_COMMON_DAYS)
+    keys = sorted(set(ma) & set(mb))
     profile["report"]["comparison_inputs"] = {
         "short": {f"{y:04d}-{m:02d}": ma[(y, m)] for y, m in keys},
         "control": {f"{y:04d}-{m:02d}": mb[(y, m)] for y, m in keys},
         "control_primary": other["primary"],
-        "candidate_count": len(choices), "distance_km": choices[0][1],
-        "monthly_difference_sd_m": choices[0][0][0] if len(keys) >= 3 else None,
+        "candidate_count": candidate_count, "distance_km": distance,
+        "monthly_difference_sd_m": rank[0] if len(keys) >= 3 else None,
     }
     if method == "direct":
         values = {level: other["primary"][level] + float(np.mean([ma[k][level] - mb[k][level] for k in keys]))
@@ -338,23 +350,230 @@ def choose_control(profile: dict, profiles: list[dict], cache: Path) -> tuple[di
                                                   "set_id": other["cs"]["set_id"]}
 
 
-def produce(release_path: Path, gesla_root: Path, fit_run: Path, tcd: Path, out: Path) -> dict:
+def measure_profile(job: dict, release, dump, fit_run, manifest, fit_rows, audit, roles):
+    station, cs, binding = job["station"], job["cs"], job["binding"]
+    rid = cs["source_record_id"]
+    member = release.members.get(rid)
+    fit_path = fit_run / "fits" / f"{rid}.json"
+    fit_sha = binding["fit_sha256"]
+    detail = {"station_id": station["station_id"], "set_id": cs["set_id"], "source_record_id": rid,
+              "input_binding": binding, "disposition": "unavailable", "reason": None}
+    profile = {**job, "report": detail}
+    reason = None
+    if member is None:
+        reason = "original_member_unavailable"
+    elif cs.get("source") == ticon_sets.SOURCE:
+        reason = "ticon_original_zero_tie_unavailable"
+    elif cs.get("qc_status") == "no_constants" or not cs.get("constituents"):
+        reason = "no_constants"
+    elif any(r.get("issue") == "no_tide" for r in cs.get("record_issues", [])):
+        reason = "no_tide"
+    elif cs.get("quantity") != "water_level":
+        reason = "not_water_level"
+    if reason:
+        detail["reason"] = reason
+        return profile, None
+    try:
+        if fit_sha != manifest["fits_sha256"].get(rid) or fit_rows.get(rid, {}).get("outcome") != "fitted":
+            raise gesla_sets.FitIntegrityError(f"{rid}: fit bytes not bound to completed run")
+        fit = json.loads(fit_path.read_text())
+        meta = release.metadata()[rid]
+        corr = gesla_sets.published_correction(audit.rows.get(rid), gesla_sets.declared_hours(meta))
+        if corr.label != cs["time_base"]["published"]:
+            raise ValueError("published clock differs from bound fit-run correction")
+        gesla_sets.check_stamp(rid, fit, corr.label, corr=corr, speed=lambda n: dump.table[n].speed,
+                              span=(fit["first_s"], fit["last_s"] + 3600))
+        record = release.record(rid, roles)
+        series = clean(record, corr)
+        keep = (series.times_s >= timestamp(f"{dump.table.first_year}-01-01T00:00:00Z")) & (
+            series.times_s < timestamp(f"{dump.table.last_year + 1}-01-01T00:00:00Z"))
+        series = replace(series, times_s=series.times_s[keep], heights_m=series.heights_m[keep])
+        segments = measurement_segments(series, cs)
+        if not segments:
+            detail["reason"] = "datum_step_segment_unavailable"
+            return profile, None
+        predict = tabulate.predictor(dump.table, {c["name"]: (c["amplitude_m"], c["phase_deg"])
+            for c in cs["constituents"]}, cs.get("datum", {}).get("msl_offset_m", fit["z0_m"]))
+        sampling = "mean" if corr.kind == "utc_mean_start60" else "instantaneous"
+        mm = {}
+        for series in segments:
+            hours = good_hours(series.times_s)
+            duration_days = (int(series.times_s[-1]) - int(series.times_s[0])) / 86400 if len(series) else 0
+            if len(series) < 2 or hours < 4000 or duration_days < 365:
+                continue
+            tab, mm = compact_tabulation(series, predict, sampling)
+            if mm:
+                break
+        detail.update(qc=series.stats, qc_good_hours=hours, original_span_days=duration_days,
+                      original_zero=meta.get("DATUM INFORMATION"))
+        if len(series) < 2 or hours < 4000 or duration_days < 365:
+            detail["reason"] = "below_365_days_or_4000_qc_good_hours"
+            return profile, None
+        detail.update(counted_months=[f"{y:04d}-{m:02d}" for y, m in sorted(mm)],
+                      monthly_inputs={f"{y:04d}-{m:02d}": row for (y, m), row in sorted(mm.items())},
+                      actual_qc_span={"start": datetime.fromtimestamp(int(series.times_s[0]), timezone.utc).isoformat(),
+                                      "end": datetime.fromtimestamp(int(series.times_s[-1]), timezone.utc).isoformat()},
+                      filled_gaps=tab.filled_gaps, unfilled_gaps=tab.unfilled_gaps)
+        if not mm:
+            detail["reason"] = "no_counted_month"
+            return profile, None
+        profile["mm"] = mm
+        if is_primary(mm):
+            primary_tab = replace(tab, complete_days=frozenset(
+                k for k in tab.complete_days if 2002 <= tab.days.month_of(k)[0] <= 2020))
+            profile["primary"] = monthly.annual_from_gap_free(primary_tab)
+        return profile, tab
+    except (ValueError, KeyError, OSError) as exc:
+        detail.update(disposition="failed", reason=f"{type(exc).__name__}: {exc}")
+    return profile, None
+
+
+def reduce_profile(profile: dict, primaries: list[dict], cache: Path) -> tuple[dict, dict]:
+    detail, cs, mm = profile["report"], profile["cs"], profile.get("mm")
+    draft, components = None, {}
+    if mm and detail["reason"] is None:
+        control = None
+        primary = bool(profile.get("primary"))
+        method = "first_reduction"
+        if primary:
+            used = {key: row for key, row in mm.items() if 2002 <= key[0] <= 2020}
+            values = profile["primary"]
+        else:
+            values, used, control = choose_control(profile, primaries, cache)
+            if control:
+                method = comparison_method(profile["station"], cs)
+                method = "modified_range_ratio" if method == "modified" else method
+            else:
+                used = own_months(mm)
+                values = {key: float(np.mean([row[key] for row in used.values()]))
+                          for key in monthly.LEVELS} if used else None
+        if values and used:
+            draft, components = draft_datum(cs, values, used, method=method, control=control, primary=primary,
+                gaps=bool(detail["filled_gaps"] or detail["unfilled_gaps"]))
+            detail.update(disposition="reduced" if draft["named"] else "unavailable",
+                reason=None if draft["named"] else "existing_observed_or_computed_keys",
+                method=method, data_span=span_of(used), used_months=[f"{y:04d}-{m:02d}" for y, m in sorted(used)],
+                used_monthly_inputs={f"{y:04d}-{m:02d}": row for (y, m), row in sorted(used.items())},
+                uncertainty_components=components, control=control)
+            if not primary and control is None:
+                detail["own_record_limitation"] = (
+                    "Whole calendar-year window retains only its actually counted months, including interior gaps; "
+                    "the spec does not define an additional incomplete-year discard policy. No seasonal correction or "
+                    "calibrated own-record accuracy is established.")
+        else:
+            detail["reason"] = "no_whole_year_own_record_window"
+    row = {"station_id": profile["station"]["station_id"], "set_id": cs["set_id"],
+           "source_record_id": cs["source_record_id"], "input_binding": profile["binding"],
+           "draft_datum": draft, "observed_keys": sorted(draft["named"]) if draft else []}
+    return row, detail
+
+
+def write_json(path: Path, value: dict) -> None:
+    temporary = path.with_name(path.name + ".part")
+    with temporary.open("w") as stream:
+        json.dump(value, stream, sort_keys=True, allow_nan=False)
+        stream.write("\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.replace(temporary, path)
+
+
+def write_checkpoint(cache: Path, key: str, job_sha: str, profile: dict, tab) -> None:
+    """Publish the completion marker last; an interrupted write is never a hit."""
+    files = {}
+    if tab is not None:
+        temporary = cache / f"{key}.part.npz"
+        save_tab(temporary, tab)
+        os.replace(temporary, cache / f"{key}.npz")
+        files[f"{key}.npz"] = sha256(cache / f"{key}.npz")
+    payload = dict(profile)
+    if "mm" in payload:
+        payload["mm"] = {f"{y:04d}-{m:02d}": row for (y, m), row in payload["mm"].items()}
+    path = cache / f"{key}.profile.json"
+    write_json(path, payload)
+    files[path.name] = sha256(path)
+    write_json(cache / f"{key}.done.json", {"format": "otc-observed-checkpoint-v1", "job_sha256": job_sha,
+                                          "files": files})
+
+
+def read_checkpoint(cache: Path, key: str, job_sha: str, *, require_complete: bool = False) -> dict | None:
+    marker = cache / f"{key}.done.json"
+    if not marker.exists():
+        if require_complete:
+            raise ValueError(f"completed run checkpoint missing: {key}")
+        return None
+    try:
+        manifest = json.loads(marker.read_text())
+        if manifest.get("format") != "otc-observed-checkpoint-v1" or manifest.get("job_sha256") != job_sha:
+            raise ValueError("identity mismatch")
+        files = manifest["files"]
+        if set(files) not in ({f"{key}.profile.json"}, {f"{key}.profile.json", f"{key}.npz"}):
+            raise ValueError("unexpected artifact set")
+        for name, digest in files.items():
+            if sha256(cache / name) != digest:
+                raise ValueError(f"artifact hash mismatch: {name}")
+        profile = json.loads((cache / f"{key}.profile.json").read_text())
+        if "mm" in profile:
+            profile["mm"] = {tuple(map(int, ym.split("-"))): row for ym, row in profile["mm"].items()}
+        if profile.get("mm") and profile["report"].get("reason") is None and f"{key}.npz" not in files:
+            raise ValueError("measurement arrays missing")
+        return profile
+    except (KeyError, TypeError, ValueError, OSError) as exc:
+        raise ValueError(f"invalid checkpoint {key}: {exc}") from exc
+
+
+def implementation_identity() -> dict:
+    modules = ("gesla.qc", "gesla.read_gesla", "gesla.record", "gesla.timebase_verdict", "gesla.timebase_audit",
+               "gesla.tcd_table", "otc_pipeline.gesla_sets", "otc_pipeline.datum_t1",
+               "otc_pipeline.observed_datums.tabulate", "otc_pipeline.observed_datums.monthly")
+    return {"producer_sha256": sha256(Path(__file__)), "numpy_version": np.__version__,
+            "modules": {name: sha256(Path(importlib.import_module(name).__file__)) for name in modules}}
+
+
+def primary_summary(profile: dict) -> dict:
+    cs = profile["cs"]
+    # Only primary selection metadata; the full native inputs stay authenticated on disk.
+    short_cs = {key: cs[key] for key in ("set_id", "record_issues", "datum") if key in cs}
+    short_cs["constituents"] = [row for row in cs["constituents"] if row["name"] in ("M2", "S2", "K1", "O1")]
+    return {"station": profile["station"], "cs": short_cs, "primary": profile["primary"], "cache": profile["cache"]}
+
+
+def produce(release_path: Path, gesla_root: Path, fit_run: Path, tcd: Path, out: Path, *, resume: bool = False) -> dict:
+    """One serial run; durable original measurements precede full-cohort reductions."""
     out.mkdir(parents=True, exist_ok=True)
+    with (out / ".lock").open("a+") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise ValueError(f"{out}: producer is already running") from exc
+        return _produce(release_path, gesla_root, fit_run, tcd, out, resume=resume)
+
+
+def _produce(release_path: Path, gesla_root: Path, fit_run: Path, tcd: Path, out: Path, *, resume: bool) -> dict:
+    run_path = out / "observed-run.json"
+    if not resume and any(path.name != ".lock" for path in out.iterdir()):
+        raise ValueError(f"{out}: occupied; use --resume with the identical inputs")
+    if resume and not run_path.is_file():
+        raise ValueError(f"{out}: no complete run manifest for --resume")
+    previous = json.loads(run_path.read_text()) if resume else None
     release = GeslaRelease(gesla_root)
     dump = gesla_sets.load_tcd_dump(tcd)
     manifest_path = fit_run / "timebase_manifest.json"
     manifest = json.loads(manifest_path.read_text())
-    audit_path = Path(manifest["inputs"]["timebase_csv"]["path"])
-    audit = gesla_sets.load_audit(audit_path.parent)
+    audit = gesla_sets.load_audit(Path(manifest["inputs"]["timebase_csv"]["path"]).parent)
     manifest, fit_rows = gesla_sets.check_fit_run(fit_run, dump, release, audit)
-    roles = load_contributor_roles(Path(__file__).resolve().parents[4] / "data/gesla/contributor_roles.csv")
+    roles_path = Path(__file__).resolve().parents[4] / "data/gesla/contributor_roles.csv"
+    roles = load_contributor_roles(roles_path)
     common_binding = {"release_sha256": sha256(release_path), "fit_manifest_sha256": sha256(manifest_path),
                       "results_sha256": sha256(fit_run / "results.jsonl"), "tcd_sha256": dump.sha256,
                       "gesla_manifest_sha256": sha256(gesla_root / "MANIFEST.json"), "timebase_sha256": audit.csv_sha256}
-    report = {"format": "otc-observed-reduction-v1", "scientific_T1": "FAIL", "normal_acceptance": False,
-              "diagnostic_receipt_sha256": DIAGNOSTIC_SHA256, "inputs": common_binding, "records": [], "counts": {}}
-    targets = []
-    seen = set()
+    identity = {"inputs": common_binding, "roles_sha256": sha256(roles_path), "implementation": implementation_identity()}
+    if previous is not None and (previous.get("format") != "otc-observed-run-v1" or previous.get("identity") != identity):
+        raise ValueError("resume source/implementation identity mismatch; old results cannot be rebound")
+    cache = out / "checkpoints"
+    cache.mkdir(exist_ok=True)
+    index, seen = [], set()
+    # Re-enumerate the actual complete release, authenticating each job from current inputs.
     with release_path.open() as stream:
         for line in stream:
             station = json.loads(line)
@@ -364,140 +583,108 @@ def produce(release_path: Path, gesla_root: Path, fit_run: Path, tcd: Path, out:
                 if cs["set_id"] in seen:
                     raise ValueError(f"duplicate target set {cs['set_id']}")
                 seen.add(cs["set_id"])
-                targets.append((station, cs))
-    with tempfile.TemporaryDirectory(prefix=".observed-", dir=out) as temporary:
-        cache = Path(temporary)
-        profiles = []
-        for index, (station, cs) in enumerate(targets):
-            rid = cs["source_record_id"]
-            member = release.members.get(rid)
-            fit_path = fit_run / "fits" / f"{rid}.json"
-            fit_sha = sha256(fit_path) if fit_path.is_file() else None
-            binding = input_binding(station, cs, member=member, fit_sha256=fit_sha, **common_binding)
-            profile = {"station": station, "cs": cs, "binding": binding, "cache": f"{index}.npz"}
-            detail = {"station_id": station["station_id"], "set_id": cs["set_id"], "source_record_id": rid,
-                      "input_binding": binding, "disposition": "unavailable", "reason": None}
-            profile["report"] = detail
-            report["records"].append(detail)
-            profiles.append(profile)
-            reason = None
-            if member is None:
-                reason = "original_member_unavailable"
-            elif cs.get("source") == ticon_sets.SOURCE:
-                reason = "ticon_original_zero_tie_unavailable"
-            elif cs.get("qc_status") == "no_constants" or not cs.get("constituents"):
-                reason = "no_constants"
-            elif any(r.get("issue") == "no_tide" for r in cs.get("record_issues", [])):
-                reason = "no_tide"
-            elif cs.get("quantity") != "water_level":
-                reason = "not_water_level"
-            if reason:
-                detail["reason"] = reason
-                continue
-            try:
-                if fit_sha != manifest["fits_sha256"].get(rid) or fit_rows.get(rid, {}).get("outcome") != "fitted":
-                    raise gesla_sets.FitIntegrityError(f"{rid}: fit bytes not bound to completed run")
-                fit = json.loads(fit_path.read_text())
-                meta = release.metadata()[rid]
-                corr = gesla_sets.published_correction(audit.rows.get(rid), gesla_sets.declared_hours(meta))
-                if corr.label != cs["time_base"]["published"]:
-                    raise ValueError("published clock differs from bound fit-run correction")
-                gesla_sets.check_stamp(rid, fit, corr.label, corr=corr, speed=lambda n: dump.table[n].speed,
-                                      span=(fit["first_s"], fit["last_s"] + 3600))
-                record = release.record(rid, roles)
-                series = clean(record, corr)
-                keep = (series.times_s >= timestamp(f"{dump.table.first_year}-01-01T00:00:00Z")) & (
-                    series.times_s < timestamp(f"{dump.table.last_year + 1}-01-01T00:00:00Z"))
-                series = replace(series, times_s=series.times_s[keep], heights_m=series.heights_m[keep])
-                segments = measurement_segments(series, cs)
-                if not segments:
-                    detail["reason"] = "datum_step_segment_unavailable"
-                    continue
-                predict = tabulate.predictor(dump.table, {c["name"]: (c["amplitude_m"], c["phase_deg"])
-                    for c in cs["constituents"]}, cs.get("datum", {}).get("msl_offset_m", fit["z0_m"]))
-                sampling = "mean" if corr.kind == "utc_mean_start60" else "instantaneous"
-                mm = {}
-                for series in segments:
-                    hours = good_hours(series.times_s)
-                    duration_days = (int(series.times_s[-1]) - int(series.times_s[0])) / 86400 if len(series) else 0
-                    if len(series) < 2 or hours < 4000 or duration_days < 365:
-                        continue
-                    tab, mm = compact_tabulation(series, predict, sampling)
-                    if mm:
-                        break
-                detail.update(qc=series.stats, qc_good_hours=hours, original_span_days=duration_days,
-                              original_zero=meta.get("DATUM INFORMATION"))
-                if len(series) < 2 or hours < 4000 or duration_days < 365:
-                    detail["reason"] = "below_365_days_or_4000_qc_good_hours"
-                    continue
-                detail.update(counted_months=[f"{y:04d}-{m:02d}" for y, m in sorted(mm)],
-                              monthly_inputs={f"{y:04d}-{m:02d}": row for (y, m), row in sorted(mm.items())},
-                              actual_qc_span={"start": datetime.fromtimestamp(int(series.times_s[0]), timezone.utc).isoformat(),
-                                              "end": datetime.fromtimestamp(int(series.times_s[-1]), timezone.utc).isoformat()},
-                              filled_gaps=tab.filled_gaps, unfilled_gaps=tab.unfilled_gaps)
-                if not mm:
-                    detail["reason"] = "no_counted_month"
-                    continue
-                profile["mm"] = mm
-                if is_primary(mm):
-                    primary_tab = replace(tab, complete_days=frozenset(
-                        k for k in tab.complete_days if 2002 <= tab.days.month_of(k)[0] <= 2020))
-                    profile["primary"] = monthly.annual_from_gap_free(primary_tab)
-                save_tab(cache / profile["cache"], tab)
-            except (ValueError, KeyError, OSError) as exc:
-                detail.update(disposition="failed", reason=f"{type(exc).__name__}: {exc}")
-        with (out / "observed-drafts.jsonl").open("w") as drafts:
-            for profile in profiles:
-                detail, cs, mm = profile["report"], profile["cs"], profile.get("mm")
-                draft, components = None, {}
-                if mm and detail["reason"] is None:
-                    control = None
-                    primary = bool(profile.get("primary"))
-                    method = "first_reduction"
-                    if primary:
-                        used = {key: row for key, row in mm.items() if 2002 <= key[0] <= 2020}
-                        values = profile["primary"]
-                    else:
-                        values, used, control = choose_control(profile, profiles, cache)
-                        if control:
-                            method = comparison_method(profile["station"], cs)
-                            method = "modified_range_ratio" if method == "modified" else method
-                        else:
-                            used = own_months(mm)
-                            values = {key: float(np.mean([row[key] for row in used.values()]))
-                                      for key in monthly.LEVELS} if used else None
-                    if values and used:
-                        draft, components = draft_datum(cs, values, used, method=method, control=control, primary=primary,
-                            gaps=bool(detail["filled_gaps"] or detail["unfilled_gaps"]))
-                        detail.update(disposition="reduced" if draft["named"] else "unavailable",
-                            reason=None if draft["named"] else "existing_observed_or_computed_keys",
-                            method=method, data_span=span_of(used), used_months=[f"{y:04d}-{m:02d}" for y, m in sorted(used)],
-                            used_monthly_inputs={f"{y:04d}-{m:02d}": row for (y, m), row in sorted(used.items())},
-                            uncertainty_components=components, control=control)
-                        if not primary and control is None:
-                            detail["own_record_limitation"] = (
-                                "Whole calendar-year window retains only its actually counted months, including interior gaps; "
-                                "the spec does not define an additional incomplete-year discard policy. No seasonal correction or "
-                                "calibrated own-record accuracy is established.")
-                    else:
-                        detail["reason"] = "no_whole_year_own_record_window"
-                row = {"station_id": profile["station"]["station_id"], "set_id": cs["set_id"],
-                       "source_record_id": cs["source_record_id"], "input_binding": profile["binding"],
-                       "draft_datum": draft, "observed_keys": sorted(draft["named"]) if draft else []}
-                drafts.write(json.dumps(row, sort_keys=True, allow_nan=False) + "\n")
-                count = detail["disposition"]
-                report["counts"][count] = report["counts"].get(count, 0) + 1
-    report["counts"]["target_sets"] = len(profiles)
-    (out / "observed-reduction-report.json").write_text(json.dumps(report, sort_keys=True, indent=2, allow_nan=False) + "\n")
-    return report
+                rid = cs["source_record_id"]
+                fit_path = fit_run / "fits" / f"{rid}.json"
+                binding = input_binding(station, cs, member=release.members.get(rid),
+                    fit_sha256=sha256(fit_path) if fit_path.is_file() else None, **common_binding)
+                key = canonical_hash(binding)
+                job = {"station": {name: station[name] for name in ("station_id", "lat", "lon", "country") if name in station},
+                       "cs": cs, "binding": binding, "cache": f"{key}.npz"}
+                job_sha = canonical_hash(job)
+                job_path = cache / f"{key}.job.json"
+                if resume:
+                    if not job_path.is_file() or canonical_hash(json.loads(job_path.read_text())) != job_sha:
+                        raise ValueError(f"resume current-input job mismatch: {cs['set_id']}")
+                else:
+                    write_json(job_path, job)
+                index.append({"key": key, "job_sha256": job_sha, "set_id": cs["set_id"]})
+    run = {"format": "otc-observed-run-v1", "identity": identity, "targets": index}
+    if previous is not None and previous != run:
+        raise ValueError("resume full-cohort target manifest mismatch")
+    if not resume:
+        write_json(run_path, run)
+    completion_path = out / "observed-completion.json"
+    primaries, measured, reused, authenticated_members = [], 0, 0, set()
+    completed_profiles = []
+    for item in index:
+        key, job_sha = item["key"], item["job_sha256"]
+        job = json.loads((cache / f"{key}.job.json").read_text())
+        profile = read_checkpoint(cache, key, job_sha, require_complete=completion_path.exists())
+        if profile is None:
+            print(f"measure {item['set_id']}", flush=True)
+            profile, tab = measure_profile(job, release, dump, fit_run, manifest, fit_rows, audit, roles)
+            write_checkpoint(cache, key, job_sha, profile, tab)
+            del tab
+            measured += 1
+        else:
+            # Reuse never substitutes a caller's old context for authenticated original bytes.
+            rid = job["cs"]["source_record_id"]
+            if rid in release.members and rid not in authenticated_members:
+                release.read_member(rid)
+                authenticated_members.add(rid)
+            if profile.get("binding") != job["binding"] or profile.get("cs") != job["cs"] or profile.get("station") != job["station"]:
+                raise ValueError(f"checkpoint source context mismatch: {item['set_id']}")
+            reused += 1
+            print(f"reuse {item['set_id']}", flush=True)
+        if profile.get("primary") and profile["report"].get("reason") is None:
+            primaries.append(primary_summary(profile))
+        completed_profiles.append(sha256(cache / f"{key}.done.json"))
+        print(f"checkpoint {item['set_id']}", flush=True)
+        del profile, job
+    # Full-cohort barrier: every profile is complete before any control selection.
+    reduction_identity = {"run_sha256": sha256(run_path), "profile_manifests_sha256": canonical_hash({"ordered": completed_profiles})}
+    if completion_path.exists():
+        completion = json.loads(completion_path.read_text())
+        if completion.get("identity") != reduction_identity:
+            raise ValueError("completed reduction cohort/profile identity mismatch")
+        expected_names = {"observed-drafts.jsonl", "observed-reduction-report.json"}
+        if set(completion.get("files", {})) != expected_names:
+            raise ValueError("completed reduction output manifest mismatch")
+        for name, digest in completion["files"].items():
+            if not (out / name).is_file() or sha256(out / name) != digest:
+                raise ValueError(f"completed reduction artifact mismatch: {name}")
+        print(f"complete measured={measured} reused={reused}", flush=True)
+        return {"counts": completion["counts"]}
+    report = {"format": "otc-observed-reduction-v1", "scientific_T1": "FAIL", "normal_acceptance": False,
+              "diagnostic_receipt_sha256": DIAGNOSTIC_SHA256, "inputs": common_binding}
+    counts = {}
+    draft_temp = out / "observed-drafts.jsonl.part"
+    report_temp = out / "observed-reduction-report.json.part"
+    with draft_temp.open("w") as drafts, report_temp.open("w") as records:
+        prefix = json.dumps(report, sort_keys=True, allow_nan=False)
+        records.write(prefix[:-1] + ', "records": [')
+        for position, item in enumerate(index):
+            profile = read_checkpoint(cache, item["key"], item["job_sha256"], require_complete=True)
+            if profile is None:
+                raise ValueError(f"checkpoint disappeared after full-cohort barrier: {item['set_id']}")
+            row, detail = reduce_profile(profile, primaries, cache)
+            drafts.write(json.dumps(row, sort_keys=True, allow_nan=False) + "\n")
+            if position:
+                records.write(",\n")
+            records.write(json.dumps(detail, sort_keys=True, allow_nan=False))
+            disposition = detail["disposition"]
+            counts[disposition] = counts.get(disposition, 0) + 1
+            del row, detail, profile
+        counts["target_sets"] = len(index)
+        records.write('], "counts": ' + json.dumps(counts, sort_keys=True) + "}\n")
+        for stream in (drafts, records):
+            stream.flush()
+            os.fsync(stream.fileno())
+    os.replace(draft_temp, out / "observed-drafts.jsonl")
+    os.replace(report_temp, out / "observed-reduction-report.json")
+    files = {name: sha256(out / name) for name in ("observed-drafts.jsonl", "observed-reduction-report.json")}
+    write_json(completion_path, {"identity": reduction_identity, "files": files, "counts": counts})
+    print(f"complete measured={measured} reused={reused}", flush=True)
+    return {"counts": counts}
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("release", "gesla-root", "fit-run", "tcd", "out"):
         parser.add_argument(f"--{name}", type=Path, required=True)
+    parser.add_argument("--resume", action="store_true", help="resume only authenticated identical run inputs")
     args = parser.parse_args()
-    report = produce(args.release, args.gesla_root, args.fit_run, args.tcd, args.out)
+    report = produce(args.release, args.gesla_root, args.fit_run, args.tcd, args.out, resume=args.resume)
     print(json.dumps(report["counts"], sort_keys=True))
 
 

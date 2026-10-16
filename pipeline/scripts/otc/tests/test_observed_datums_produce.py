@@ -1,6 +1,7 @@
 """Original-record reduction orchestration and optional immutable native witnesses."""
 import copy
 import importlib
+import inspect
 import json
 import os
 from datetime import datetime, timezone
@@ -18,6 +19,43 @@ from otc_pipeline.observed_datums import monthly, tabulate
 
 def test_producer_entry_point_exists():
     assert importlib.util.find_spec("otc_pipeline.observed_datums.produce") is not None
+
+
+def test_producer_has_explicit_resume_without_workers_or_selection():
+    parameters = inspect.signature(producer().produce).parameters
+    assert parameters["resume"].default is False
+    assert "workers" not in parameters and "only" not in parameters
+
+
+@pytest.mark.parametrize("disposition", ("failed", "unavailable"))
+def test_checkpoint_retains_completed_disposition_and_rejects_corruption(tmp_path, disposition):
+    p = producer()
+    profile = {"report": {"disposition": disposition, "reason": "actual reason"}, "binding": {"member_sha256": "a"}}
+    p.write_checkpoint(tmp_path, "key", "job-sha", profile, None)
+    assert p.read_checkpoint(tmp_path, "key", "job-sha") == profile
+    payload = tmp_path / "key.profile.json"
+    payload.write_text(payload.read_text() + " ")
+    with pytest.raises(ValueError, match="checkpoint"):
+        p.read_checkpoint(tmp_path, "key", "job-sha")
+
+
+def test_checkpoint_missing_partial_and_wrong_identity_are_not_hits(tmp_path):
+    p = producer()
+    assert p.read_checkpoint(tmp_path, "key", "job-sha") is None
+    # An uncommitted temporary payload is incomplete, never a completed cache hit.
+    (tmp_path / "key.profile.json.part").write_text("partial")
+    assert p.read_checkpoint(tmp_path, "key", "job-sha") is None
+    p.write_checkpoint(tmp_path, "key", "job-sha", {"report": {"disposition": "unavailable"}}, None)
+    with pytest.raises(ValueError, match="checkpoint"):
+        p.read_checkpoint(tmp_path, "key", "wrong-job")
+    (tmp_path / "key.profile.json").unlink()
+    with pytest.raises(ValueError, match="checkpoint"):
+        p.read_checkpoint(tmp_path, "key", "job-sha")
+
+
+def test_completed_run_missing_checkpoint_must_refuse_instead_of_remeasure(tmp_path):
+    with pytest.raises(ValueError, match="checkpoint"):
+        producer().read_checkpoint(tmp_path, "key", "job-sha", require_complete=True)
 
 
 def producer():
@@ -200,7 +238,8 @@ def test_native_failed_clock_binding_is_reported_without_dropping_set(tmp_path):
         Path(recipe[recipe.index("--fit-run") + 1]),
         Path(receipt["inputs"]["tcd"]["path"]), tmp_path / "failed")
     assert result["counts"] == {"failed": 1, "target_sets": 1}
-    assert "published clock differs" in result["records"][0]["reason"]
+    saved_report = json.loads((tmp_path / "failed/observed-reduction-report.json").read_text())
+    assert "published clock differs" in saved_report["records"][0]["reason"]
     row = json.loads((tmp_path / "failed/observed-drafts.jsonl").read_text())
     assert row["set_id"] == station["constant_sets"][0]["set_id"]
     assert row["draft_datum"] is None and row["observed_keys"] == []
