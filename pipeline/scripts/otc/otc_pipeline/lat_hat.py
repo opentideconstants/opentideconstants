@@ -365,7 +365,7 @@ def main():
                 stream.flush()
         return
     if args.calibrate_official_rosters:
-        paths, expected = {}, {}
+        paths, expected, fingerprints = {}, {}, {}
         for roster_path in args.calibrate_official_rosters:
             for entry in json.loads(roster_path.read_text())["rows"]:
                 sid = entry["set_id"]
@@ -379,16 +379,19 @@ def main():
                 if payload["constant_set"]["set_id"] != sid:
                     raise ValueError("native roster/input identity differs")
                 paths[sid] = Path(entry["path"])
+                fingerprints[sid] = computation_input_sha256(payload)
                 expected.setdefault(source, set()).add(sid)
         rows = []
         for path in args.inputs:
             rows.extend(row for line in path.read_text().splitlines() if (row := json.loads(line)).get("set_id"))
+        for row in rows:
+            if row.get("computation_input_sha256") != fingerprints[row["set_id"]]:
+                raise ValueError(f"calibration computation input differs for {row['set_id']}; recompute extrema")
         calibration = official_calibration(rows, expected)
         with args.out.open("w") as stream:
             for row in rows:
                 payload = json.loads(paths[row["set_id"]].read_text())
                 result = calibrated_draft(payload["constant_set"], row, calibration)
-                result["computation_input_sha256"] = computation_input_sha256(payload)
                 stream.write(json.dumps(result, allow_nan=False, sort_keys=True) + "\n")
             stream.write(json.dumps({"official_calibration": calibration, "accepted": False}, allow_nan=False, sort_keys=True) + "\n")
         return

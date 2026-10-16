@@ -370,6 +370,70 @@ def test_missing_official_production_input_needs_no_published_comparator(tmp_pat
         lat_hat.read_production_input(path)
 
 
+@pytest.fixture
+def native_calibration_case(tmp_path, monkeypatch):
+    root = os.environ.get("OTC_DATUM_FIX_PROOF")
+    if root is None:
+        pytest.skip("requires saved native official inputs and completed extrema")
+    root = Path(root)
+    entries = json.loads((root / "full-t5/roster.json").read_text())["rows"][:3]
+    rows = {row["set_id"]: row for line in (root / "official-public-drafts-bound.jsonl").read_text().splitlines()
+            if (row := json.loads(line)).get("set_id")}
+
+    def prepare(index, change=None):
+        entry = entries[index]
+        payload = json.loads(Path(entry["path"]).read_text())
+        row = copy.deepcopy(rows[entry["set_id"]])
+        assert row["computation_input_sha256"] == lat_hat.computation_input_sha256(payload)
+        cs = payload["constant_set"]
+        if change == "amplitude":
+            cs["constituents"][0]["amplitude_m"] += 0.1
+        elif change == "phase":
+            cs["constituents"][0]["phase_deg"] += 1.0
+        elif change == "table":
+            table = next(iter(payload["astro_table"]["constituents"].values()))
+            table["v0u_deg"][0] += 1.0
+        elif change == "time_base":
+            cs["time_base"] = {"code": "verified", "published": "changed native time base"}
+        elif change == "missing":
+            row.pop("computation_input_sha256")
+        assert cs["set_id"] == row["set_id"] == entry["set_id"]
+        native = tmp_path / "native.json"
+        native.write_text(json.dumps(payload))
+        roster = tmp_path / "roster.json"
+        roster.write_text(json.dumps({"rows": [{**entry, "path": str(native)}]}))
+        completed = tmp_path / "completed.jsonl"
+        completed.write_text(json.dumps(row) + "\n")
+        out = tmp_path / "calibrated.jsonl"
+        monkeypatch.setattr(sys, "argv", ["lat_hat", str(completed), "--out", str(out),
+                                         "--calibrate-official-rosters", str(roster),
+                                         "--partition-data-dir", str(PARTITION_DATA)])
+        return row, out
+
+    return prepare
+
+
+@pytest.mark.parametrize("index", [0, 1, 2])
+@pytest.mark.parametrize("change", ["amplitude", "phase", "table", "time_base", "missing"])
+def test_native_recalibration_rejects_stale_calculation_binding(native_calibration_case, index, change):
+    _, out = native_calibration_case(index, change)
+    with pytest.raises(ValueError, match="computation input"):
+        lat_hat.main()
+    assert not out.exists()
+
+
+@pytest.mark.parametrize("index", [0, 1, 2])
+def test_native_recalibration_preserves_verified_calculation_binding(native_calibration_case, index):
+    row, out = native_calibration_case(index)
+    lat_hat.main()
+    result = json.loads(out.read_text().splitlines()[0])
+    assert result["raw"] == row["raw"]
+    assert result["computation_input_sha256"] == row["computation_input_sha256"]
+    for level in ("lat", "hat"):
+        assert result[f"{level}_residual_m"] == row[f"{level}_residual_m"]
+    assert result["draft_datum"]["named"] == row["draft_datum"]["named"]
+
+
 @pytest.mark.skipif("OTC_T5B_NATIVE_ROSTER" not in os.environ,
                     reason="unknown-quality proof requires the completed native T5b cohort")
 @pytest.mark.parametrize("index", [0, 1, 2])
