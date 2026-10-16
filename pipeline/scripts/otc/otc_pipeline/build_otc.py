@@ -206,6 +206,7 @@ def stage_official_datums(release: dict, path: Path, sha256: str) -> dict:
 def apply_official_datum_fallbacks(release: dict, path: Path, sha256: str) -> dict:
     """Attach labelled computed levels while preserving every existing set and recommendation."""
     staged = stage_official_datums(release, path, sha256)
+    from otc_pipeline.datums import derive_chart_datums
     from otc_pipeline.lat_hat import COMPUTED_FALLBACK
     by_id = {cs["set_id"]: cs for station in release["stations"] for cs in station.get("constant_sets", [])}
     count = 0
@@ -216,8 +217,10 @@ def apply_official_datum_fallbacks(release: dict, path: Path, sha256: str) -> di
                 datum["basis"][key]["fallback"] = dict(COMPUTED_FALLBACK)
             count += 1
         by_id[entry["set_id"]]["datum"] = datum
+    chart_datum_derivation = derive_chart_datums(release)
     return {**staged, "public_admission": True, "release_unchanged": False,
             "normal_datum_gate_accepted": False, "computed_basis_fallback_count": count,
+            "chart_datum_derivation": chart_datum_derivation,
             "admission": "labelled computed datum fallback only"}
 
 

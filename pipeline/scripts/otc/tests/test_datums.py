@@ -1,8 +1,13 @@
-"""otc_pipeline.datums: the published-level helpers and build checks 8, 9 and 13 (datums spec §3.6)."""
+"""Published-level helpers, chart-datum policy and build checks 8, 9 and 13."""
 from __future__ import annotations
+
+import copy
+import hashlib
+from pathlib import Path
 
 import pytest
 
+from otc_pipeline import datums
 from otc_pipeline.datums import datum_build_errors, period, published
 from otc_pipeline.gesla_sets import _published_stated_zero
 
@@ -114,3 +119,147 @@ def test_check_9_same_keys():
 def test_check_13_real_dates_in_order(ep):
     bad = {**GOOD, "basis": {**GOOD["basis"], "msl": {**published("MSL"), "epoch": ep}}}
     assert [e for e in datum_build_errors(bad) if "check 13" in e]
+
+
+def chart_candidate(country="GBR", *, uk_area=True):
+    """Small native-shaped policy input; numerical/native SDK proof is separate."""
+    basis = {"kind": "computed", "method": "harmonic_extremes",
+             "epoch": period("2020-01-01", "2038-12-31", "OTC LAT 2020-2038"),
+             "uncertainty_m": 0.1893589011529287, "uncertainty_basis": "calibrated",
+             "flags": ["time_base_unverified", "sampling_assumed"],
+             "fallback": {"reason": "datum_gate_failed", "basis": "existing strict engine",
+                          "otc_finding": "Accuracy is not validated; low-water eligibility is unknown."}}
+    cs = {"set_id": "test/fit", "source": "gesla-fit", "source_record_id": "native-gauge",
+          "source_type": "gauge", "record_issues": [], "provenance": {"input_sha256": ["a" * 64]},
+          "datum": {"msl_offset_m": 6.8869, "named": {"lat": -0.18679186340525789, "hat": 14.70597353102088},
+                    "basis": {"lat": basis, "hat": copy.deepcopy(basis)}}}
+    return {"station_id": "test", "country": country, "recommended_set_id": "test/fit",
+            "constant_sets": [cs], "source_records": [{"source": "gesla", "source_record_id": "native-gauge",
+                "original_metadata": {"COUNTRY": country, "COORDINATE SYSTEM": "UK National Grid" if uk_area else "Unspecified"}}]}
+
+
+def derive(release):
+    helper = getattr(datums, "derive_chart_datums", None)
+    assert callable(helper), "computed LAT has no convention-based chart-datum designation"
+    return helper(release)
+
+
+def test_derived_chart_preserves_everything_except_pointer_and_returns_citation():
+    station = chart_candidate()
+    before = copy.deepcopy(station)
+    receipt = derive({"stations": [station]})
+    assert station["constant_sets"][0]["datum"].pop("chart_datum") == "lat"
+    assert station == before
+    assert receipt["changed_places"] == receipt["changed_sets"] == 1
+    assert receipt["matched_places"] == receipt["lat_places"] == 1
+    table = Path(datums.__file__).with_name("chart_datum_conventions.json")
+    assert receipt["conventions_sha256"] == hashlib.sha256(table.read_bytes()).hexdigest()
+    assert receipt["by_convention"] == {"iho-2021-uk": {"matched_places": 1, "changed_places": 1, "changed_sets": 1}}
+    assert receipt["citations"]["iho-2021-uk"]["pdf_page_1_based"] == 2
+    assert receipt["citations"]["iho-2021-uk"]["stated_convention"] == "approximate LAT"
+
+
+@pytest.mark.parametrize("country", ["AUS", "FRA", "IND", "NZL", "ESP"])
+def test_unconditional_cited_country_rows_are_not_limited_to_uk_witnesses(country):
+    station = chart_candidate(country, uk_area=False)
+    assert derive({"stations": [station]})["changed_places"] == 1
+    assert station["constant_sets"][0]["datum"]["chart_datum"] == "lat"
+
+
+@pytest.mark.parametrize("country", ["GBR", "AUS", "FRA", "IND", "NZL", "ESP"])
+def test_conflicting_source_country_withholds_without_changing_source_identity(country):
+    station = chart_candidate(country)
+    station["source_records"].append({"source": "gesla", "original_metadata": {"COUNTRY": "KIR"}})
+    before = copy.deepcopy(station)
+    receipt = derive({"stations": [station]})
+    assert receipt["changed_places"] == 0
+    assert receipt["withheld"]["unknown_convention_or_area"] == 1
+    assert station == before
+
+
+@pytest.mark.parametrize("country", ["USA", "CAN", "BRA", "CHL", "ITA", "KOR", "SWE", "XXX",
+                                     "NOR", "DEU", "NLD", "PNG", "SLB", "GBR"])
+def test_non_lat_or_unresolved_area_has_no_country_default(country):
+    station = chart_candidate(country, uk_area=False)
+    before = copy.deepcopy(station)
+    receipt = derive({"stations": [station]})
+    assert receipt["changed_places"] == 0
+    assert station == before
+    assert receipt["withheld"]["unknown_convention_or_area" if country in {
+        "XXX", "NOR", "DEU", "NLD", "PNG", "SLB", "GBR"} else "non_lat_convention"] == 1
+
+
+@pytest.mark.parametrize("where", ["other_set", "subordinate_offsets"])
+def test_published_chart_precedence_is_station_wide(where):
+    station = chart_candidate()
+    datum = {"named": {"cd": 0.0}, "basis": {"cd": published("CD")}, "chart_datum": "cd"}
+    if where == "other_set":
+        station["constant_sets"].append({"set_id": "test/agency", "datum": datum})
+    else:
+        station["subordinate_offsets"] = {"datum": datum}
+    before = copy.deepcopy(station)
+    assert derive({"stations": [station]})["withheld"]["published_chart_datum"] == 1
+    assert station == before
+
+
+@pytest.mark.parametrize("kind", ["computed", "published", "observed"])
+def test_existing_chart_pointer_is_never_replaced(kind):
+    station = chart_candidate()
+    datum = station["constant_sets"][0]["datum"]
+    datum["chart_datum"] = "hat"
+    datum["basis"]["hat"]["kind"] = kind
+    before = copy.deepcopy(station)
+    assert derive({"stations": [station]})["changed_places"] == 0
+    assert station == before
+
+
+@pytest.mark.parametrize("cutoff", ["flatline", "truncated_lows"])
+def test_actual_cutoff_withholds_but_does_not_modify_existing_lat(cutoff):
+    station = chart_candidate()
+    cs = station["constant_sets"][0]
+    if cutoff == "flatline":
+        cs["record_issues"] = [{"issue": "flatline"}]
+    else:
+        cs["datum"]["basis"]["hat"]["flags"] = [cutoff]
+    before = copy.deepcopy(station)
+    assert derive({"stations": [station]})["withheld"]["actual_low_water_cutoff"] == 1
+    assert station == before
+
+
+@pytest.mark.parametrize("value,kind", [(float("nan"), "computed"), (float("inf"), "computed"),
+                                       (True, "computed"), ("0", "computed"), (0.0, "published"), (0.0, "observed")])
+def test_only_finite_computed_lat_is_designated(value, kind):
+    station = chart_candidate()
+    cs = station["constant_sets"][0]
+    cs["datum"]["named"]["lat"] = value
+    cs["datum"]["basis"]["lat"]["kind"] = kind
+    assert derive({"stations": [station]})["changed_places"] == 0
+    assert "chart_datum" not in cs["datum"]
+
+
+def test_saved_dt5f_explicit_exclusion_cannot_be_overridden_by_country_or_uk_metadata():
+    station = chart_candidate()
+    station["constant_sets"][0]["source_record_id"] = "aarhus-aar-dnk-cmems"
+    assert derive({"stations": [station]})["withheld"]["baltic_or_bscd2000"] == 1
+
+
+def test_counts_places_once_and_second_call_is_idempotent():
+    station = chart_candidate()
+    station["constant_sets"].append(copy.deepcopy(station["constant_sets"][0]))
+    receipt = derive({"stations": [station]})
+    assert receipt["changed_places"] == 1
+    assert receipt["changed_sets"] == 2
+    before = copy.deepcopy(station)
+    assert derive({"stations": [station]})["changed_places"] == 0
+    assert station == before
+
+
+def test_lat_place_receipt_includes_published_subordinate_datums():
+    station = {"station_id": "subordinate", "country": "USA", "constant_sets": [],
+               "subordinate_offsets": {"datum": {"named": {"lat": -0.215, "mllw": 0.0},
+                   "basis": {"lat": published("LAT"), "mllw": published("MLLW")}, "chart_datum": "mllw"}}}
+    before = copy.deepcopy(station)
+    receipt = derive({"stations": [station]})
+    assert receipt["lat_places"] == 1
+    assert receipt["changed_places"] == 0
+    assert station == before
