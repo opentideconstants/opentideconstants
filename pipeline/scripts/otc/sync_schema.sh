@@ -19,9 +19,9 @@
 # same schema SHA-256 (SCHEMA_SHA256) and refuses a copy that does not match it.
 set -euo pipefail
 
-SITE_COMMIT=e2ae45addc8834c95c028e031d6f5b197eaf3f0e   # approved source identities, original rows and restricted TICON policies
+SITE_COMMIT=6421ee6a8ce5d763d2495a2d749b665a22d8a557   # computed datum fallback labels
 SCHEMA_SRC=src/schema/otc-1.0.schema.json
-SCHEMA_SHA256=33a760ad17ea48301f4a7fa4371608de328522c2c9625458aef8e7353d5b09fd
+SCHEMA_SHA256=ece2e192505d66ae9295b10ff3a5993d9b233d6529851b4b15feea5d64518155
 EXAMPLE_SRC=src/schema/example.json
 EXAMPLE_SHA256=568014659b42af433a198c8ff1a81ad624b638099794baea5758d4d12e7d28df
 
