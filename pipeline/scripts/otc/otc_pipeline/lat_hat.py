@@ -159,6 +159,19 @@ def datum_draft(constant_set: dict, raw: dict, *, flatline: bool | None = None) 
         key = f"otc_{level}" if basis.get(level, {}).get("kind") == "published" else level
         named[key] = _finite(raw[f"{level}_m"], level)
         basis[key] = {"kind": "computed", "method": "harmonic_extremes", "epoch": dict(EPOCH)}
+        flags = []
+        time_base = constant_set.get("time_base", {}).get("code")
+        if time_base in ("unverified", "disputed"):
+            flags.append(f"time_base_{time_base}")
+        hours = constant_set.get("record_span", {}).get("good_hours")
+        if ((hours is not None and hours < 365.25 * 24)
+                or any(f.get("flag") == "short_record" for f in constant_set.get("qc_flags", []))):
+            flags.append("short_record")
+        if sum(c["amplitude_m"] for c in constant_set["constituents"]
+               if c["name"] in ("M2", "S2", "K1", "O1")) < 0.05:
+            flags.append("microtidal")
+        if flags:
+            basis[key]["flags"] = flags
         if unknown_fit_eligibility:
             basis[key]["fallback"] = {**COMPUTED_FALLBACK,
                                       "otc_finding": COMPUTED_FALLBACK["otc_finding"] +
@@ -315,8 +328,9 @@ def calibrated_draft(constant_set: dict, row: dict, calibration: dict) -> dict:
         raise ValueError("GESLA uncertainty is diagnostic fallback only")
     if group.get("status") != "available" and not diagnostic:
         return out
-    time_base = constant_set.get("time_base", {})
-    verified = time_base.get("code") in ("verified", "corrected") and bool(time_base.get("published"))
+    # time_base verifies timestamp coordinates, not instantaneous/hourly-mean sampling.
+    # These native sets carry no sampling-class verification evidence.
+    verified = False
     amplitude = 0.0
     for c in constant_set["constituents"]:
         if c["name"] in ("M2", "S2"):

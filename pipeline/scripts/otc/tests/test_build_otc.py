@@ -13,6 +13,69 @@ from jsonschema import Draft202012Validator
 
 from otc_pipeline import build_otc
 from otc_pipeline.lat_hat import EPOCH, START, END, computation_input_sha256, datum_draft
+from otc_pipeline import lat_hat
+
+
+@pytest.mark.skipif("OTC_GESLA_METADATA_PROOF" not in os.environ, reason="requires actual frozen GESLA metadata cases")
+@pytest.mark.parametrize("index", range(3))
+def test_native_gesla_sampling_class_is_not_timestamp_verification(index, tmp_path):
+    root = Path(os.environ["OTC_GESLA_METADATA_PROOF"])
+    directory = root / "missing-gesla"
+    facts = json.loads((directory / "metadata-issue-facts.json").read_text())
+    sid = facts["actual_gesla_wrong_sampling_examples"][index]["set_id"]
+    entry = next(e for e in json.loads((directory / "roster.json").read_text())["rows"] if e["set_id"] == sid)
+    payload = json.loads(Path(entry["path"]).read_text())
+    assert hashlib.sha256(Path(entry["path"]).read_bytes()).hexdigest() == entry["input_sha256"]
+    frozen = None
+    for path in [directory / "pilot.jsonl", *[directory / f"shard-{n}.jsonl" for n in range(4)]]:
+        with path.open() as stream:
+            for line in stream:
+                candidate = json.loads(line)
+                if candidate["set_id"] == sid:
+                    frozen = candidate
+                    break
+        if frozen is not None:
+            break
+    assert frozen is not None
+    calibration = json.loads((directory / "diagnostic-calibration.json").read_text())
+    cs = payload["constant_set"]
+    original = copy.deepcopy((cs, frozen))
+    assert cs["time_base"]["code"] == "verified"
+    assert not any("sampl" in key for key in cs)
+    row = lat_hat.calibrated_draft(cs, frozen, calibration)
+    sampling = 0.011 * sum(c["amplitude_m"] for c in cs["constituents"] if c["name"] in ("M2", "S2"))
+    assert sampling > 0
+    for level in ("lat", "hat"):
+        parts = row["uncertainty_components"][level]
+        assert parts["sampling_verified"] is False
+        assert parts["sampling_m"] == sampling
+        basis = row["draft_datum"]["basis"][level]
+        assert basis["uncertainty_m"] == calibration["gesla-fit"][level]["sample_sd_m"] + sampling
+        expected_label = "propagated" if sampling >= parts["base_m"] else "calibrated"
+        assert basis["uncertainty_basis"] == expected_label
+        assert "sampling_assumed" in basis["flags"]
+        assert basis["fallback"]["reason"] == "datum_gate_failed"
+        assert f"plus sampling {sampling:.9g} m" in basis["fallback"]["otc_finding"]
+    release = json.loads((root / "native-build/OTC_20261011.meta.json").read_text())
+    with (root / "native-build/OTC_20261011.jsonl").open() as stream:
+        station = next(s for line in stream if (s := json.loads(line))["station_id"] == entry["station_id"])
+    release["stations"] = [station]
+    before = copy.deepcopy(release)
+    target = next(c for c in station["constant_sets"] if c["set_id"] == sid)
+    path = tmp_path / "actual-metadata-draft.jsonl"
+    sha = write_actual_draft(row, path)
+    receipt = build_otc.apply_official_datum_fallbacks(release, path, sha)
+    assert receipt["computed_basis_fallback_count"] == 2
+    from otc_pipeline.release_writer import validate_release
+    assert validate_release(release) == []
+    for level in ("lat", "hat"):
+        assert target["datum"]["named"][level] == frozen["raw"][f"{level}_m"]
+        assert target["datum"]["basis"][level] == row["draft_datum"]["basis"][level]
+    target["datum"] = copy.deepcopy(cs["datum"])
+    assert release == before
+    assert (cs, frozen) == original
+    print(json.dumps({"set_id": sid, "sampling_m": sampling, "literal_sum_and_basis": True,
+                      "raw_values_sources_published_rankings_and_bindings_preserved": True}))
 
 
 @pytest.mark.skipif("OTC_GESLA_PILOT_RESULTS" not in os.environ, reason="requires the completed three missing-place pilot")
