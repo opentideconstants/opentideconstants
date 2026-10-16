@@ -6,6 +6,7 @@ import importlib
 import inspect
 import json
 import os
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -203,7 +204,9 @@ def test_actual_measured_input_authentication_and_negative_controls(tmp_path, mo
     run = json.loads((source / "observed-run.json").read_text())
     identity = copy.deepcopy(run["identity"])
     identity["implementation"] = p.implementation_identity()
-    p.authenticate_measured_inputs(source, run, identity)
+    # The frozen run includes misaligned hourly means; it must not be rebound.
+    with pytest.raises(ValueError, match="measurement implementation"):
+        p.authenticate_measured_inputs(source, run, identity)
     changed = copy.deepcopy(identity)
     changed["inputs"]["release_sha256"] = "0" * 64
     with pytest.raises(ValueError, match="current source"):
@@ -246,7 +249,7 @@ def test_actual_measured_input_authentication_and_negative_controls(tmp_path, mo
     (tmp_path / f"{key}.profile.json.part").write_bytes(original)
     with pytest.raises(ValueError, match="checkpoint missing"):
         p.read_checkpoint(tmp_path, key, job_sha, require_complete=True)
-    print("real frozen authentication PASS; changed source/code/dependency, corrupt/missing/partial checkpoints REFUSED")
+    print("legacy mean measurements REFUSED; changed source/code/dependency, corrupt/missing/partial checkpoints REFUSED")
 
 
 def test_actual_cached_serial_and_four_reductions_are_exact(cached_control_profiles, monkeypatch, tmp_path):
@@ -498,3 +501,136 @@ def test_original_months_before_producer():
             print(json.dumps(fixture, sort_keys=True))
     assert len(fixtures) == 3
     (root / "existing-monthly-witnesses.json").write_text(json.dumps(fixtures, sort_keys=True, indent=2) + "\n")
+
+
+@pytest.mark.skipif("OTC_MEAN_CLOCK_PROOF" not in os.environ, reason="requires original hourly-mean witnesses")
+def test_actual_hourly_mean_clock_integration(monkeypatch):
+    """Real reader/QC/fit-clock integration, with bounded original-data tabulation windows."""
+    p = producer()
+    proof = Path(os.environ["OTC_MEAN_CLOCK_PROOF"])
+    inputs = json.loads((proof / "inputs.json").read_text())
+    cache = Path(inputs["original"]) / "checkpoints"
+    run = json.loads((cache.parent / "observed-run.json").read_text())
+    roles_path = Path(__file__).resolve().parents[3] / "data/gesla/contributor_roles.csv"
+    p._initialize_measurement_worker(Path(inputs["gesla_root"]), Path(inputs["fit_run"]),
+                                     Path(inputs["tcd"]), roles_path)
+    release, dump, fit_run, manifest, fit_rows, audit, roles = p._WORKER_CONTEXT
+    original_compact = p.compact_tabulation
+    witnesses = []
+    for item in inputs["targets"]:
+        old = p.read_checkpoint(cache, item["key"], item["job_sha256"], require_complete=True)
+        job = json.loads((cache / f"{item['key']}.job.json").read_text())
+        rid = job["cs"]["source_record_id"]
+        record = release.record(rid, roles)
+        assert record.member_sha256 == job["binding"]["member_sha256"]
+        # The published convention independently identifies raw stamps as interval starts.
+        raw = clean(record)
+        corr = p.gesla_sets.published_correction(audit.rows.get(rid),
+                                               p.gesla_sets.declared_hours(release.metadata()[rid]))
+        assert corr.kind == "utc_mean_start60"
+        centred = clean(record, corr)
+        np.testing.assert_array_equal(centred.times_s, raw.times_s + 1800)
+        assert p.canonical_hash(job) == item["job_sha256"]
+        common = dict(run["identity"]["inputs"])
+        current_binding = p.input_binding(job["station"], job["cs"], member=release.members[rid],
+            fit_sha256=p.sha256(fit_run / "fits" / f"{rid}.json"), **common)
+        assert current_binding == job["binding"]
+        consumers = [row for row in inputs["consumers"] if row["control"]["set_id"] == item["set_id"]]
+        consumer = None
+        for row in consumers:
+            consumer_item = next(target for target in run["targets"] if target["set_id"] == row["set_id"])
+            candidate = p.read_checkpoint(cache, consumer_item["key"], consumer_item["job_sha256"], require_complete=True)
+            overlap = sorted(set(candidate.get("mm", {})) & set(old["mm"]))
+            if overlap:
+                consumer = candidate
+                year, month = overlap[len(overlap) // 2]
+                break
+        if consumer is None:
+            year, month = 2022, 1
+        start = p.timestamp(f"{year:04d}-{month:02d}-01T00:00:00Z") - 32 * 86400
+        end = start + 96 * 86400
+        use = (raw.times_s >= start) & (raw.times_s < end)
+        interval_starts = replace(raw, times_s=raw.times_s[use], heights_m=raw.heights_m[use])
+        captured = {}
+
+        def bounded_compact(series, predict, sampling):
+            assert sampling == "mean"
+            window = (series.times_s >= start) & (series.times_s < end)
+            selected = replace(series, times_s=series.times_s[window], heights_m=series.heights_m[window])
+            actual_tab, actual_mm = original_compact(selected, predict, sampling)
+            oracle_tab, oracle_mm = original_compact(interval_starts, predict, "mean")
+            _, actual_centres = tabulate._sampled(predict, selected.times_s, 3600, sampling)
+            expected_centres = interval_starts.times_s + 1800
+            captured.update(actual=actual_tab, oracle=oracle_tab, actual_mm=actual_mm, oracle_mm=oracle_mm,
+                            centre_error_s=int(actual_centres[0] - expected_centres[0]),
+                            exact_arrays=all(np.array_equal(getattr(actual_tab, key), getattr(oracle_tab, key))
+                                for key in ("msl_t", "msl_h", "ev_t", "ev_h", "ev_kind", "ev_day", "ev_label")))
+            return actual_tab, actual_mm
+
+        monkeypatch.setattr(p, "compact_tabulation", bounded_compact)
+        actual_profile, actual_tab = p.measure_profile(job, release, dump, fit_run, manifest, fit_rows, audit, roles)
+        assert actual_profile["report"]["reason"] is None
+        assert actual_profile["report"]["actual_qc_span"]["start"] == old["report"]["actual_qc_span"]["start"]
+        values = captured["actual_mm"][(year, month)]
+        expected = captured["oracle_mm"][(year, month)]
+        witness = {"set_id": item["set_id"], "member_sha256": record.member_sha256,
+                   "job_sha256": item["job_sha256"], "month": f"{year:04d}-{month:02d}",
+                   "centre_error_s": captured["centre_error_s"], "exact_arrays": captured["exact_arrays"],
+                   "actual": values, "interval_oracle": expected,
+                   "qc_span_unchanged": actual_profile["report"]["actual_qc_span"] == old["report"]["actual_qc_span"]}
+        if consumer is not None:
+            target_tab = p.load_tab(cache / consumer["cache"])
+            method = p.comparison_method(consumer["station"], consumer["cs"])
+            if method == "direct":
+                common_days = target_tab.complete_days & actual_tab.complete_days & captured["oracle"].complete_days
+                ma = monthly.monthly_means(target_tab, days=common_days, min_days=monthly.MIN_COMMON_DAYS)
+                before = monthly.monthly_means(actual_tab, days=common_days, min_days=monthly.MIN_COMMON_DAYS)
+                after = monthly.monthly_means(captured["oracle"], days=common_days, min_days=monthly.MIN_COMMON_DAYS)
+                pair = sorted(set(ma) & set(before) & set(after))
+                assert pair
+                effect = {"actual": float(np.mean([ma[key]["MHW"] - before[key]["MHW"] for key in pair])),
+                          "oracle": float(np.mean([ma[key]["MHW"] - after[key]["MHW"] for key in pair]))}
+            else:
+                before = p.datum_t1.compare_reduce(target_tab, actual_tab, old["primary"], monthly, method, common=True)
+                after = p.datum_t1.compare_reduce(target_tab, captured["oracle"], old["primary"], monthly, method, common=True)
+                assert before is not None and after is not None
+                effect = {"actual": before, "oracle": after}
+            witness["control_effect"] = {"actual_selected_consumer": consumer["cs"]["set_id"], "method": method,
+                "scope": "bounded common-month operands with legacy primary held fixed; not refreshed full reduction", **effect}
+        witnesses.append(witness)
+        print(json.dumps(witness, sort_keys=True), flush=True)
+    (proof / "native-result.json").write_text(json.dumps(witnesses, sort_keys=True, indent=2) + "\n")
+    assert len(witnesses) == 3
+    assert all(row["centre_error_s"] == 0 and row["exact_arrays"] for row in witnesses)
+    assert all(row["actual"] == row["interval_oracle"] for row in witnesses)
+    assert all(row["qc_span_unchanged"] for row in witnesses)
+    assert all("control_effect" in row for row in witnesses)
+    assert all(row["control_effect"]["actual"] == row["control_effect"]["oracle"]
+               for row in witnesses if "control_effect" in row)
+
+
+@pytest.mark.skipif("OTC_MEAN_CLOCK_PROOF" not in os.environ, reason="requires frozen full-cohort metadata")
+def test_actual_hourly_mean_refresh_scope():
+    p = producer()
+    proof = Path(os.environ["OTC_MEAN_CLOCK_PROOF"])
+    inputs = json.loads((proof / "inputs.json").read_text())
+    source = Path(inputs["original"])
+    assert p.sha256(source / "observed-run.json") == "a8dfec8864ca6944a01d27a60d9e7a3f5799faec7d217a053d4cef75ef583728"
+    run = json.loads((source / "observed-run.json").read_text())
+    impacted = []
+    for item in run["targets"]:
+        cache = source / "checkpoints"
+        job = json.loads((cache / f"{item['key']}.job.json").read_text())
+        assert p.canonical_hash(job) == item["job_sha256"]
+        if job["cs"].get("time_base", {}).get("published") != "utc_mean_start60":
+            continue
+        old = p.read_checkpoint(cache, item["key"], item["job_sha256"], require_complete=True)
+        assert old.get("mm") and old["report"]["reason"] is None
+        impacted.append({**item, "old_marker_sha256": p.sha256(cache / f"{item['key']}.done.json")})
+    assert {row["set_id"] for row in impacted} == {
+        row["set_id"] for row in json.loads((proof / "impacted.json").read_text())}
+    result = {"frozen_run_sha256": p.sha256(source / "observed-run.json"), "targets": len(run["targets"]),
+              "invalid_mean_measurements": len(impacted), "unchanged_measurements": len(run["targets"]) - len(impacted),
+              "impacted": impacted}
+    (proof / "authenticated-impact.json").write_text(json.dumps(result, sort_keys=True, indent=2) + "\n")
+    print(json.dumps({key: value for key, value in result.items() if key != "impacted"}, sort_keys=True))

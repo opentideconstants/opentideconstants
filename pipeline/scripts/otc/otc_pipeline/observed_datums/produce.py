@@ -424,7 +424,9 @@ def measure_profile(job: dict, release, dump, fit_run, manifest, fit_rows, audit
             duration_days = (int(series.times_s[-1]) - int(series.times_s[0])) / 86400 if len(series) else 0
             if len(series) < 2 or hours < 4000 or duration_days < 365:
                 continue
-            tab, mm = compact_tabulation(series, predict, sampling)
+            # QC centres hourly means; the tabulator consumes interval starts.
+            samples = replace(series, times_s=series.times_s - 1800) if sampling == "mean" else series
+            tab, mm = compact_tabulation(samples, predict, sampling)
             if mm:
                 break
         detail.update(qc=series.stats, qc_good_hours=hours, original_span_days=duration_days,
