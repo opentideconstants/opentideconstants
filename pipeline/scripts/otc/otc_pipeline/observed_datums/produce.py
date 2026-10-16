@@ -424,7 +424,9 @@ def measure_profile(job: dict, release, dump, fit_run, manifest, fit_rows, audit
             duration_days = (int(series.times_s[-1]) - int(series.times_s[0])) / 86400 if len(series) else 0
             if len(series) < 2 or hours < 4000 or duration_days < 365:
                 continue
-            tab, mm = compact_tabulation(series, predict, sampling)
+            # QC centres hourly means; the tabulator consumes interval starts.
+            samples = replace(series, times_s=series.times_s - 1800) if sampling == "mean" else series
+            tab, mm = compact_tabulation(samples, predict, sampling)
             if mm:
                 break
         detail.update(qc=series.stats, qc_good_hours=hours, original_span_days=duration_days,
@@ -516,7 +518,7 @@ def write_checkpoint(cache: Path, key: str, job_sha: str, profile: dict, tab) ->
     write_json(path, payload)
     files[path.name] = sha256(path)
     write_json(cache / f"{key}.done.json", {"format": "otc-observed-checkpoint-v1", "job_sha256": job_sha,
-                                          "files": files})
+                                          "files": files, "measurement_implementation": implementation_identity()})
 
 
 def read_checkpoint(cache: Path, key: str, job_sha: str, *, require_complete: bool = False) -> dict | None:
@@ -658,7 +660,7 @@ def _complete_measurements(index: list[dict], cache: Path, context, worker_input
 
 
 def authenticate_measured_inputs(source: Path, previous: dict, identity: dict) -> None:
-    """Authenticate the frozen 1d0d487 measurement cohort, never rebind its hashes."""
+    """Authenticate one pinned legacy-to-corrected-mean transition, never rebind hashes."""
     import ast
 
     if sha256(source / "observed-run.json") != "a8dfec8864ca6944a01d27a60d9e7a3f5799faec7d217a053d4cef75ef583728":
@@ -678,13 +680,72 @@ def authenticate_measured_inputs(source: Path, previous: dict, identity: dict) -
             old["implementation"]["numpy_version"] != identity["implementation"]["numpy_version"]):
         raise ValueError("measured-input scientific dependency mismatch")
     tree = ast.parse(Path(__file__).read_text())
-    excluded = {"choose_control", "reduce_profile", "produce", "_produce", "main", "authenticate_measured_inputs",
-                "_initialize_reduction_worker", "_reduction_worker", "reduction_results"}
     surface = ast.Module(body=[node for node in tree.body if not
-                        (isinstance(node, ast.FunctionDef) and node.name in excluded)], type_ignores=[])
+                        (isinstance(node, ast.FunctionDef) and node.name == "authenticate_measured_inputs")], type_ignores=[])
     digest = hashlib.sha256(ast.dump(surface, include_attributes=False).encode()).hexdigest()
-    if digest != "99d74b778dafef7362bfbd05dd995d185c63e7d21d75e4d3bb3ce561b0f16d7a":
+    if (digest != "504bac4b6455375e582144330456f15d7b5874d90ad9e4901b83ec075843736c" or
+            identity["implementation"]["producer_sha256"] != sha256(Path(__file__))):
         raise ValueError("measured-input measurement implementation changed")
+
+
+def prepare_mean_refresh(source: Path, cache: Path, index: list[dict], identity: dict, reference_path: Path) -> list[dict]:
+    """Preserve legacy nonmeans byte-for-byte; only corrected means may be measured."""
+    previous = json.loads((source / "observed-run.json").read_text())
+    authenticate_measured_inputs(source, previous, identity)
+    if index != previous["targets"]:
+        raise ValueError("mean-refresh complete target cohort mismatch")
+    original = source / "checkpoints"
+    markers, refreshed = {}, []
+    for item in index:
+        key, job_sha = item["key"], item["job_sha256"]
+        job = json.loads((original / f"{key}.job.json").read_text())
+        if canonical_hash(job) != job_sha:
+            raise ValueError(f"mean-refresh source job mismatch: {item['set_id']}")
+        profile = read_checkpoint(original, key, job_sha, require_complete=True)
+        if any(profile.get(name) != job[name] for name in ("binding", "cs", "station", "cache")):
+            raise ValueError(f"mean-refresh source context mismatch: {item['set_id']}")
+        marker_path = original / f"{key}.done.json"
+        markers[key] = sha256(marker_path)
+        mean = job["cs"].get("time_base", {}).get("published") == "utc_mean_start60"
+        if mean:
+            refreshed.append(item)
+        names = [f"{key}.job.json"]
+        if not mean:
+            names += [f"{key}.done.json", *json.loads(marker_path.read_text())["files"]]
+        for name in names:
+            target = cache / name
+            expected = original / name
+            if target.exists() or target.is_symlink():
+                if not target.is_symlink() or target.resolve() != expected.resolve():
+                    raise ValueError(f"mean-refresh retained reference mismatch: {name}")
+            else:
+                target.symlink_to(expected.resolve())
+        if mean:
+            for suffix in ("done.json", "profile.json", "npz"):
+                if (cache / f"{key}.{suffix}").is_symlink():
+                    raise ValueError(f"stale mean checkpoint reference: {item['set_id']}")
+            completed = cache / f"{key}.done.json"
+            if completed.exists():
+                marker = json.loads(completed.read_text())
+                if marker.get("measurement_implementation") != identity["implementation"]:
+                    raise ValueError(f"stale mean measurement implementation: {item['set_id']}")
+                read_checkpoint(cache, key, job_sha, require_complete=True)
+                old_table = json.loads(marker_path.read_text())["files"].get(f"{key}.npz")
+                if old_table and marker["files"].get(f"{key}.npz") == old_table:
+                    raise ValueError(f"stale mean measurement arrays: {item['set_id']}")
+    if len(refreshed) != 141 or canonical_hash({"ordered": list(markers.values())}) != "73fd254c82eb9832515799d74fb02cbb361c1c0e0530ac08e3eda550dcf5d5d4":
+        raise ValueError("mean-refresh frozen checkpoint cohort mismatch")
+    reference = {"source": str(source.resolve()), "source_run_sha256": sha256(source / "observed-run.json"),
+        "original_measurement_implementation": previous["identity"]["implementation"],
+        "corrected_mean_measurement_implementation": identity["implementation"],
+        "original_checkpoint_markers": markers, "corrected_mean_keys": [item["key"] for item in refreshed],
+        "measured": len(refreshed), "reused": len(index) - len(refreshed)}
+    if reference_path.exists():
+        if json.loads(reference_path.read_text()) != reference:
+            raise ValueError("mean-refresh provenance mismatch")
+    else:
+        write_json(reference_path, reference)
+    return refreshed
 
 
 def _initialize_reduction_worker(cache: Path, primaries: list[dict]) -> None:
@@ -811,9 +872,8 @@ def _produce(release_path: Path, gesla_root: Path, fit_run: Path, tcd: Path, out
         authenticate_measured_inputs(measured_inputs, previous, identity)
     elif previous is not None and (previous.get("format") != "otc-observed-run-v1" or previous.get("identity") != identity):
         raise ValueError("resume source/implementation identity mismatch; old results cannot be rebound")
-    cache = (measured_inputs if measured_inputs is not None else out) / "checkpoints"
-    if measured_inputs is None:
-        cache.mkdir(exist_ok=True)
+    cache = out / "checkpoints"
+    cache.mkdir(exist_ok=True)
     index, seen = [], set()
     # Re-enumerate the actual complete release, authenticating each job from current inputs.
     with release_path.open() as stream:
@@ -833,7 +893,7 @@ def _produce(release_path: Path, gesla_root: Path, fit_run: Path, tcd: Path, out
                 job = {"station": {name: station[name] for name in ("station_id", "lat", "lon", "country") if name in station},
                        "cs": cs, "binding": binding, "cache": f"{key}.npz"}
                 job_sha = canonical_hash(job)
-                job_path = cache / f"{key}.job.json"
+                job_path = ((measured_inputs / "checkpoints") if measured_inputs is not None else cache) / f"{key}.job.json"
                 if resume or measured_inputs is not None:
                     if not job_path.is_file() or canonical_hash(json.loads(job_path.read_text())) != job_sha:
                         raise ValueError(f"resume current-input job mismatch: {cs['set_id']}")
@@ -853,7 +913,10 @@ def _produce(release_path: Path, gesla_root: Path, fit_run: Path, tcd: Path, out
         measured, reused = _complete_measurements(index, cache, context, (gesla_root, fit_run, tcd, roles_path),
                                                  workers, completion_path.exists())
     else:
-        measured, reused = 0, len(index)
+        refresh = prepare_mean_refresh(measured_inputs, cache, index, identity, out / "observed-measurement-reference.json")
+        measured, _ = _complete_measurements(refresh, cache, context, (gesla_root, fit_run, tcd, roles_path),
+                                             workers, completion_path.exists())
+        reused = len(index) - measured
     primaries = []
     completed_profiles = []
     for item in index:
@@ -865,6 +928,8 @@ def _produce(release_path: Path, gesla_root: Path, fit_run: Path, tcd: Path, out
             job = json.loads((cache / f"{key}.job.json").read_text())
             if any(profile.get(name) != job[name] for name in ("binding", "cs", "station", "cache")):
                 raise ValueError(f"measured-input checkpoint source context mismatch: {item['set_id']}")
+            if item in refresh and json.loads((cache / f"{key}.done.json").read_text()).get("measurement_implementation") != identity["implementation"]:
+                raise ValueError(f"corrected mean measurement implementation mismatch: {item['set_id']}")
         if profile.get("primary") and profile["report"].get("reason") is None:
             primaries.append(primary_summary(profile))
         completed_profiles.append(sha256(cache / f"{key}.done.json"))
@@ -872,12 +937,8 @@ def _produce(release_path: Path, gesla_root: Path, fit_run: Path, tcd: Path, out
     # Full-cohort barrier: every profile is complete before any control selection.
     reduction_identity = {"run_sha256": sha256(run_path), "profile_manifests_sha256": canonical_hash({"ordered": completed_profiles})}
     if measured_inputs is not None:
-        if reduction_identity["profile_manifests_sha256"] != "73fd254c82eb9832515799d74fb02cbb361c1c0e0530ac08e3eda550dcf5d5d4":
-            raise ValueError("measured-input frozen checkpoint cohort mismatch")
         reduction_identity["measurement_source_run_sha256"] = sha256(source_run)
-        reduction_identity["measurement_producer_sha256"] = previous["identity"]["implementation"]["producer_sha256"]
-        write_json(out / "observed-measurement-reference.json", {"source": str(measured_inputs.resolve()),
-            "identity": reduction_identity, "measured": measured, "reused": reused})
+        reduction_identity["measurement_reference_sha256"] = sha256(out / "observed-measurement-reference.json")
     if completion_path.exists():
         completion = json.loads(completion_path.read_text())
         if completion.get("identity") != reduction_identity:
@@ -925,7 +986,7 @@ def main() -> None:
         parser.add_argument(f"--{name}", type=Path, required=True)
     parser.add_argument("--resume", action="store_true", help="resume only authenticated identical run inputs")
     parser.add_argument("--workers", type=int, choices=range(1, 5), default=1, help="independent measurement/reduction processes (1–4)")
-    parser.add_argument("--measured-inputs", type=Path, help="read-only frozen 1d0d487 measurements; no reconstruction")
+    parser.add_argument("--measured-inputs", type=Path, help="preserve frozen 1d0d487 measurements and refresh its 141 hourly means")
     args = parser.parse_args()
     report = produce(args.release, args.gesla_root, args.fit_run, args.tcd, args.out, resume=args.resume,
                      workers=args.workers, measured_inputs=args.measured_inputs)
