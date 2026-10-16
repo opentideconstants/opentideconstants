@@ -5,6 +5,7 @@ import json
 import math
 import os
 from pathlib import Path
+from statistics import mean, stdev
 import subprocess
 import sys
 
@@ -19,6 +20,105 @@ from otc_pipeline import lat_hat
 PARTITION_DATA = Path(__file__).resolve().parents[3] / "data/datums"
 EXTERNAL_ENGINE = pytest.mark.skipif("OTC_ENGINE_WORKTREE" not in os.environ,
                                      reason="strict reference integration requires OTC_ENGINE_WORKTREE")
+
+
+@pytest.mark.skipif("OTC_GESLA_PROOF" not in os.environ, reason="requires actual cached GESLA production inputs")
+@pytest.mark.parametrize("index", range(3))
+def test_native_missing_gesla_production_route(index):
+    root = Path(os.environ["OTC_GESLA_PROOF"])
+    entry = json.loads((root / "missing-gesla/roster.json").read_text())["rows"][index]
+    payload = lat_hat.read_production_input(Path(entry["path"]))
+    assert payload["constant_set"]["set_id"] == entry["set_id"]
+    assert not any(k in payload["constant_set"]["datum"].get("named", {}) for k in ("lat", "hat", "otc_lat", "otc_hat"))
+
+
+@pytest.mark.skipif("OTC_GESLA_PROOF" not in os.environ, reason="requires actual frozen T5b outputs")
+@pytest.mark.parametrize("index", range(3))
+def test_native_gesla_diagnostic_uncertainty(index):
+    root = Path(os.environ["OTC_GESLA_PROOF"])
+    entries = json.loads((root / "full-t5b/roster.json").read_text())["rows"]
+    rows = [r for line in (root / "full-t5b/all-results.jsonl").read_text().splitlines()
+            if (r := json.loads(line)).get("set_id")]
+    group = {"status": "diagnostic", "cohort_complete": True, "gate_passed": False}
+    for level in ("lat", "hat"):
+        values = [r[f"{level}_residual_m"] for r in rows]
+        group[level] = {"sample_sd_m": stdev(values), "signed_bias_m": mean(values), "n": len(values)}
+    payload = json.loads(Path(entries[index]["path"]).read_text())
+    cs = payload["constant_set"]
+    row = next(r for r in rows if r["set_id"] == cs["set_id"])
+    result = calibrated_draft(cs, row, {"gesla-fit": group})
+    assert result["calibration_status"] == "diagnostic"
+    assert result["accepted"] is False
+    sampling = 0.011 * sum(c["amplitude_m"] for c in cs["constituents"] if c["name"] in ("M2", "S2"))
+    tb = cs.get("time_base", {})
+    if tb.get("code") in ("verified", "corrected") and tb.get("published"):
+        sampling = 0.0
+    for level in ("lat", "hat"):
+        basis = result["draft_datum"]["basis"][level]
+        assert basis["uncertainty_m"] == group[level]["sample_sd_m"] + sampling
+        assert basis["fallback"]["reason"] == "datum_gate_failed"
+        assert "unknown" in basis["fallback"]["otc_finding"]
+        assert "diagnostic" in basis["fallback"]["otc_finding"].lower()
+
+
+@pytest.mark.skipif("OTC_GESLA_PROOF" not in os.environ, reason="requires frozen360 tuning inputs and native release")
+def test_native_gesla_calibration_artifact():
+    root = Path(os.environ["OTC_GESLA_PROOF"])
+    result_bytes = (root / "full-t5b/all-results.jsonl").read_bytes()
+    assert hashlib.sha256(result_bytes).hexdigest() == "89662b6310d9ad65b30655afd6b3546267f2f50eb085cd80eec2810b14e435a8"
+    rows = [r for line in result_bytes.splitlines() if (r := json.loads(line)).get("set_id")]
+    entries = json.loads((root / "full-t5b/roster.json").read_text())["rows"]
+    fingerprints = {}
+    for entry in entries:
+        payload = read_tuning_input(Path(entry["path"]), tier="T5b")
+        fingerprints[entry["set_id"]] = lat_hat.computation_input_sha256(payload)
+    meta = json.loads((root / "native-build/OTC_20261011.meta.json").read_text())
+    tables = {t["astro_table_id"]: t for t in meta["astro_tables"]}
+    conventions = {c["convention_id"]: c for c in meta["conventions"]}
+    matched = set()
+    with (root / "native-build/OTC_20261011.jsonl").open() as stream:
+        for line in stream:
+            for cs in json.loads(line).get("constant_sets", []):
+                if cs["set_id"] not in fingerprints:
+                    continue
+                table = tables[conventions[cs["convention_id"]]["astro_table_id"]]
+                assert lat_hat.computation_input_sha256({"constant_set": cs, "astro_table": table}) == fingerprints[cs["set_id"]]
+                matched.add(cs["set_id"])
+    assert len(rows) == len(matched) == 360
+    calibration = lat_hat.gesla_calibration(rows, matched)
+    group = calibration["gesla-fit"]
+    assert group["status"] == "diagnostic" and group["gate_passed"] is False
+    assert group["station_gate"]["station_count"] == 310
+    for level in ("lat", "hat"):
+        assert group[level]["n"] == 360
+        assert group[level]["sample_sd_m"] == stdev(r[f"{level}_residual_m"] for r in rows)
+    path = root / "missing-gesla/diagnostic-calibration.json"
+    path.write_text(json.dumps(calibration, sort_keys=True, allow_nan=False) + "\n")
+    (root / "missing-gesla/calibration-receipt.json").write_text(json.dumps({
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(), "frozen_fit_inputs_matched": len(matched),
+        "raw_predictions_rerun": 0, "diagnostic_calibration": calibration}, indent=2) + "\n")
+
+
+@pytest.mark.skipif("OTC_GESLA_RUN_PILOT" not in os.environ, reason="explicit actual three-place strict pilot")
+def test_native_gesla_production_three_place_pilot():
+    root = Path(os.environ["OTC_GESLA_PROOF"])
+    entries = json.loads((root / "missing-gesla/roster.json").read_text())["rows"][:3]
+    calibration = root / "missing-gesla/diagnostic-calibration.json"
+    command = [sys.executable, "-m", "otc_pipeline.lat_hat", "--production-calibration", str(calibration),
+               "--production-official-calibration-sha256", hashlib.sha256(calibration.read_bytes()).hexdigest(),
+               "--out", str(root / "missing-gesla/pilot.jsonl"), "--ruby", os.environ["OTC_PILOT_RUBY"],
+               *[entry["path"] for entry in entries]]
+    subprocess.run(command, check=True)
+    rows = [json.loads(line) for line in (root / "missing-gesla/pilot.jsonl").read_text().splitlines()]
+    assert len(rows) == 3
+    for entry, row in zip(entries, rows, strict=True):
+        assert row["set_id"] == entry["set_id"]
+        assert row["calibration_status"] == "diagnostic"
+        assert row["normal_datum_gate_accepted"] is False
+        for level in ("lat", "hat"):
+            assert row["draft_datum"]["named"][level] == row["raw"][f"{level}_m"]
+            assert row["draft_datum"]["basis"][level]["fallback"]["reason"] == "datum_gate_failed"
+            assert row["uncertainty_components"][level]["n"] == 360
 
 
 def simple_input():

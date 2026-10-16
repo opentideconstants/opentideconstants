@@ -1,15 +1,125 @@
 """Direct consumer checks for staging official computed datums without admission."""
 import copy
 import hashlib
+import importlib
 import json
 import os
 from pathlib import Path
+from statistics import stdev
+import sys
 
 import pytest
 from jsonschema import Draft202012Validator
 
 from otc_pipeline import build_otc
-from otc_pipeline.lat_hat import EPOCH, START, END, computation_input_sha256
+from otc_pipeline.lat_hat import EPOCH, START, END, computation_input_sha256, datum_draft
+
+
+@pytest.mark.skipif("OTC_GESLA_PILOT_RESULTS" not in os.environ, reason="requires the completed three missing-place pilot")
+def test_native_missing_gesla_pilot_public_values_and_sdk(tmp_path):
+    root = Path(os.environ["OTC_GESLA_PROOF"])
+    path = Path(os.environ["OTC_GESLA_PILOT_RESULTS"])
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+    ids = {r["set_id"] for r in rows}
+    station_ids = {r["station_id"] for r in rows}
+    assert len(ids) == len(station_ids) == 3
+    release = json.loads((root / "native-build/OTC_20261011.meta.json").read_text())
+    release["stations"] = []
+    with (root / "native-build/OTC_20261011.jsonl").open() as stream:
+        for line in stream:
+            station = json.loads(line)
+            if station["station_id"] in station_ids:
+                release["stations"].append(station)
+    original = copy.deepcopy(release)
+    from otc_pipeline.release_writer import validate_release
+    assert validate_release(release) == []
+    missing = sum(level not in c.get("datum", {}).get("named", {}) for s in release["stations"]
+                  for c in s["constant_sets"] if c["set_id"] in ids for level in ("lat", "hat"))
+    assert missing == 6
+    receipt = build_otc.apply_official_datum_fallbacks(release, path, hashlib.sha256(path.read_bytes()).hexdigest())
+    assert receipt["computed_basis_fallback_count"] == 6
+    assert receipt["normal_datum_gate_accepted"] is False
+    assert validate_release(release) == []
+    expected = {r["set_id"]: r for r in rows}
+    witnesses = []
+    for old, station in zip(original["stations"], release["stations"], strict=True):
+        assert station["recommended_set_id"] == old["recommended_set_id"]
+        for before, cs in zip(old["constant_sets"], station["constant_sets"], strict=True):
+            if cs["set_id"] not in ids:
+                assert cs == before
+                continue
+            assert {k: v for k, v in cs.items() if k != "datum"} == {k: v for k, v in before.items() if k != "datum"}
+            for k, v in before["datum"].get("named", {}).items():
+                assert cs["datum"]["named"][k] == v
+                assert cs["datum"]["basis"][k] == before["datum"]["basis"][k]
+            for level in ("lat", "hat"):
+                row = expected[cs["set_id"]]
+                assert cs["datum"]["named"][level] == row["raw"][f"{level}_m"]
+                basis = cs["datum"]["basis"][level]
+                parts = row["uncertainty_components"][level]
+                assert basis["uncertainty_m"] == parts["base_m"] + parts["sampling_m"]
+                assert "unknown" in basis["fallback"]["otc_finding"]
+    sys.path.insert(0, os.environ["OTC_DATUM_SDK_SOURCE"])
+    try:
+        otc = importlib.import_module("opentideconstants")
+        for mode in ("eager", "stream"):
+            fixture = tmp_path / ("OTC_20261011.json" if mode == "eager" else "OTC_20261011.jsonl")
+            if mode == "eager":
+                fixture.write_text(json.dumps(release))
+            else:
+                fixture.write_text("".join(json.dumps(s) + "\n" for s in release["stations"]))
+                fixture.with_name("OTC_20261011.meta.json").write_text(json.dumps({k: v for k, v in release.items() if k != "stations"}))
+            with otc.OpenTideConstants(file=fixture, mode=mode) as client:
+                for row in rows:
+                    info = client.datums(row["station_id"], set_id=row["set_id"])
+                    for level in ("lat", "hat"):
+                        exposed = next(v for v in info.levels if v.key == level)
+                        assert exposed.value_m == row["raw"][f"{level}_m"]
+                        assert exposed.uncertainty_m == row["draft_datum"]["basis"][level]["uncertainty_m"]
+                        assert exposed.fallback["reason"] == "datum_gate_failed"
+                        assert dict(exposed.fallback) == row["draft_datum"]["basis"][level]["fallback"]
+                    witnesses.append({"mode": mode, "set_id": row["set_id"], "values": {v.key: v.value_m for v in info.levels}})
+    finally:
+        sys.path.pop(0)
+    (root / "missing-gesla/pilot-public-green.json").write_text(json.dumps({
+        "new_places": 3, "new_levels": 6, "native_validation_errors": 0,
+        "old_sources_values_and_rankings_unchanged": True, "sdk_witnesses": witnesses}, indent=2) + "\n")
+
+
+@pytest.mark.skipif("OTC_GESLA_PROOF" not in os.environ, reason="requires actual native GESLA sets and frozen extrema")
+@pytest.mark.parametrize("index", range(3))
+def test_native_gesla_fallback_admission_preserves_sources(index, tmp_path):
+    root = Path(os.environ["OTC_GESLA_PROOF"])
+    entry = json.loads((root / "full-t5b/roster.json").read_text())["rows"][index]
+    payload = json.loads(Path(entry["path"]).read_text())
+    comparisons = [r for line in (root / "full-t5b/all-results.jsonl").read_text().splitlines()
+                   if (r := json.loads(line)).get("set_id")]
+    row = next(r for r in comparisons if r["set_id"] == entry["set_id"])
+    release = json.loads((root / "native-build/OTC_20261011.meta.json").read_text())
+    with (root / "native-build/OTC_20261011.jsonl").open() as stream:
+        station = next(s for line in stream if (s := json.loads(line))["station_id"] == payload["station_id"])
+    release["stations"] = [station]
+    cs = next(c for c in station["constant_sets"] if c["set_id"] == entry["set_id"])
+    before = copy.deepcopy(release)
+    draft = datum_draft(cs, row["raw"])
+    # Independently calculate the existing sample-spread and literal-sum rule.
+    sampling = 0.011 * sum(c["amplitude_m"] for c in cs["constituents"] if c["name"] in ("M2", "S2"))
+    for level in ("lat", "hat"):
+        spread = stdev(r[f"{level}_residual_m"] for r in comparisons)
+        draft["basis"][level].update(uncertainty_m=spread + sampling, uncertainty_basis="calibrated")
+    row.update(draft_datum=draft, calibration_status="diagnostic",
+               computation_input_sha256=computation_input_sha256({"constant_set": cs, "astro_table": payload["astro_table"]}))
+    path = tmp_path / "native-gesla.jsonl"
+    sha = write_actual_draft(row, path)
+    receipt = build_otc.apply_official_datum_fallbacks(release, path, sha)
+    assert receipt["normal_datum_gate_accepted"] is False
+    assert receipt["computed_basis_fallback_count"] == 2
+    for key in ("lat", "hat"):
+        assert cs["datum"]["named"][key] == row["raw"][f"{key}_m"]
+        assert cs["datum"]["basis"][key]["fallback"]["reason"] == "datum_gate_failed"
+        assert "unknown" in cs["datum"]["basis"][key]["fallback"]["otc_finding"]
+    cs["datum"] = before["stations"][0]["constant_sets"][station["constant_sets"].index(cs)]["datum"]
+    assert release == before
 
 
 @pytest.fixture
