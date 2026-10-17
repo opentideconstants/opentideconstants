@@ -552,6 +552,18 @@ def observed_cli_arguments():
             for value in (f"--{name}", "unused")]
 
 
+def test_fes_cli_requires_pinned_cache_pair():
+    with pytest.raises(ValueError, match="--fes-cache and --fes-manifest-sha256"):
+        build_otc.main([*observed_cli_arguments(), "--fes-cache", "private-input"])
+
+
+def test_fes_cli_rejects_changed_manifest_before_build(tmp_path):
+    (tmp_path / "MANIFEST.json").write_text("{}\n")
+    with pytest.raises(ValueError, match="FES manifest SHA-256 mismatch"):
+        build_otc.main([*observed_cli_arguments(), "--fes-cache", str(tmp_path),
+                        "--fes-manifest-sha256", "0" * 64])
+
+
 @pytest.mark.parametrize("missing", ["drafts", "drafts-sha256", "source-release", "source-release-sha256"])
 def test_observed_cli_requires_authenticated_draft_and_source_pairs(missing):
     arguments = observed_cli_arguments()

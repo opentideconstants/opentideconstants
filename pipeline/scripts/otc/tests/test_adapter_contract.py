@@ -487,7 +487,7 @@ def test_cli_rejects_empty_only(tmp_path):
 
 
 def test_cli_names_an_unregistered_source(tmp_path):
-    got = _cli(tmp_path, "fes2022")   # registered last (A-FES waits on owner step O1)
+    got = _cli(tmp_path, "eot20")   # remains unregistered
     assert got.returncode == 1 and "no registered adapter" in got.stdout + got.stderr
     assert "CONTRACT FAIL" in got.stdout
 
