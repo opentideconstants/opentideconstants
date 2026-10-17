@@ -15,6 +15,115 @@ from otc_pipeline.gesla_sets import _published_stated_zero
 
 
 @pytest.fixture(scope="module")
+def native_computed_chart_cases():
+    path = os.environ.get("OTC_COMPUTED_CHART_CANDIDATE")
+    if not path:
+        pytest.skip("requires the pinned native computed chart candidate")
+    source = Path(path)
+    with source.open("rb") as stream:
+        assert hashlib.file_digest(stream, "sha256").hexdigest() == "4c49cd4eb198f620f0e52c362c4ba4c0faefdd02851835e39dbab88195a0c994"
+    wanted = {
+        8957: ("OTC-8fc5a96e", "roonagh_pier-roo-irl-mi_c", -1.9520731465557302),
+        12099: ("OTC-c146e862", "inishmore-ini-irl-mi_c", -2.7427211249859993),
+        13001: ("OTC-d02f0d69", "killybegs_port-kil-irl-mi_c", -2.248872469229044),
+    }
+    cases = []
+    with source.open() as stream:
+        for number, line in enumerate(stream, 1):
+            if number not in wanted:
+                continue
+            station = json.loads(line)
+            station_id, record_id, value = wanted[number]
+            assert station["station_id"] == station_id
+            cs = next(c for c in station["constant_sets"]
+                      if c["set_id"] == f"{station_id}/gesla-fit/{record_id}")
+            assert cs["datum"]["named"]["lat"] == value
+            assert cs["datum"]["basis"]["lat"]["kind"] == "computed"
+            assert "chart_datum" not in cs["datum"]
+            assert "zero" not in cs["datum"] and "zero_name" not in cs["datum"]
+            cases.append((station, cs["set_id"]))
+            if number == max(wanted):
+                break
+    assert len(cases) == 3
+    return cases
+
+
+@pytest.mark.parametrize("index", range(3))
+def test_native_computed_approximate_chart(native_computed_chart_cases, index):
+    original, set_id = native_computed_chart_cases[index]
+    station = copy.deepcopy(original)
+    cs = next(c for c in station["constant_sets"] if c["set_id"] == set_id)
+    receipt = datums.derive_chart_datums({"stations": [station]})
+    print(f"REAL COMPUTED {set_id}: lat={cs['datum']['named']['lat']!r}; "
+          f"before=None; after={cs['datum'].get('chart_datum')!r}; zero/zero_name absent")
+    assert cs["datum"].get("chart_datum") == "lat"
+    fallback = cs["datum"]["basis"]["lat"]["fallback"]
+    assert "approximate chart-reference stand-in: existing computed LAT (nonofficial)" in fallback["basis"]
+    assert "agency chart-datum convention, equivalence and vertical tie are not established" in fallback["otc_finding"]
+    assert receipt["approximate_changed_places"] == receipt["approximate_changed_sets"] == 1
+    assert receipt["by_convention"] == {} and receipt["citations"] == {}
+    after = copy.deepcopy(station)
+    assert datums.derive_chart_datums({"stations": [station]})["changed_sets"] == 0
+    assert station == after
+    del cs["datum"]["chart_datum"]
+    old = next(c for c in original["constant_sets"] if c["set_id"] == set_id)
+    fallback.update(old["datum"]["basis"]["lat"]["fallback"])
+    assert station == original
+
+
+@pytest.mark.parametrize("defect", ["missing_own", "foreign_own", "country_conflict", "published_other",
+    "published_subordinate", "existing_pointer", "flatline", "truncated_lows", "nonfinite", "boolean",
+    "wrong_basis", "missing_fallback", "wrong_fallback", "missing_fallback_text", "blank_fallback_text",
+    "unknown_country", "other_contributor", "other_frame", "conflicting_filename"])
+def test_native_computed_chart_controls_preserve_payload(native_computed_chart_cases, defect):
+    original, set_id = native_computed_chart_cases[0]
+    station = copy.deepcopy(original)
+    cs = next(c for c in station["constant_sets"] if c["set_id"] == set_id)
+    own = next(r for r in station["source_records"] if r["source"] == "gesla"
+               and r["source_record_id"] == cs["source_record_id"])
+    datum = cs["datum"]
+    if defect == "missing_own":
+        station["source_records"].remove(own)
+    elif defect == "foreign_own":
+        own["source_record_id"] = "different-source-record"
+    elif defect == "country_conflict":
+        own["original_metadata"]["COUNTRY"] = "CAN"
+    elif defect == "unknown_country":
+        station["country"] = own["original_metadata"]["COUNTRY"] = "XXX"
+    elif defect in ("other_contributor", "other_frame", "conflicting_filename"):
+        field = {"other_contributor": "CONTRIBUTOR (ABBREVIATED)", "other_frame": "DATUM INFORMATION",
+                 "conflicting_filename": "FILE NAME"}[defect]
+        own["original_metadata"][field] = "Unspecified"
+    elif defect in ("published_other", "published_subordinate"):
+        agency = {"named": {"cd": 0.0}, "basis": {"cd": published("CD")}, "chart_datum": "cd"}
+        if defect == "published_other":
+            station["constant_sets"].append({"set_id": "agency", "datum": agency})
+        else:
+            station["subordinate_offsets"] = {"datum": agency}
+    elif defect == "existing_pointer":
+        datum["chart_datum"] = "hat"
+    elif defect == "flatline":
+        cs.setdefault("record_issues", []).append({"issue": "flatline"})
+    elif defect == "truncated_lows":
+        datum["basis"]["lat"].setdefault("flags", []).append("truncated_lows")
+    elif defect in ("nonfinite", "boolean"):
+        datum["named"]["lat"] = float("inf") if defect == "nonfinite" else True
+    elif defect == "wrong_basis":
+        datum["basis"]["lat"]["kind"] = "observed"
+    elif defect == "missing_fallback":
+        del datum["basis"]["lat"]["fallback"]
+    elif defect == "wrong_fallback":
+        datum["basis"]["lat"]["fallback"]["reason"] = "record_unreliable"
+    elif defect == "missing_fallback_text":
+        del datum["basis"]["lat"]["fallback"]["otc_finding"]
+    else:
+        datum["basis"]["lat"]["fallback"]["basis"] = "  "
+    before = copy.deepcopy(station)
+    assert datums.derive_chart_datums({"stations": [station]})["changed_sets"] == 0
+    assert station == before
+
+
+@pytest.fixture(scope="module")
 def native_approximate_chart_cases():
     root = os.environ.get("OTC_APPROXIMATE_CHART_PROOF")
     assert root, "OTC_APPROXIMATE_CHART_PROOF must name the pinned approximate chart evidence"
