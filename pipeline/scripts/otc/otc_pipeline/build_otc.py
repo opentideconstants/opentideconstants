@@ -489,8 +489,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--noaa-historical-inputs-sha256")
     ap.add_argument("--noaa-historical-comparison", type=Path)
     ap.add_argument("--noaa-historical-comparison-sha256")
-    ap.add_argument("--fes-cache", type=Path, help="private, complete FES2022b ocean/loading input cache")
-    ap.add_argument("--fes-manifest-sha256", help="SHA-256 of that cache's MANIFEST.json")
+    ap.add_argument("--fes-cache", type=Path, help="private, complete FES2022b ocean input cache")
+    ap.add_argument("--fes-manifest-sha256", help=f"SHA-256 of that cache's {fes2022.OCEAN_MANIFEST_NAME}")
     ap.add_argument("--official-datum-drafts", type=Path,
                     help="stage pinned official computed drafts in DATUM_STAGE.json; release values stay unchanged")
     ap.add_argument("--official-datum-drafts-sha256")
@@ -509,7 +509,7 @@ def main(argv: list[str] | None = None) -> int:
     a = ap.parse_args(argv)
     if (a.fes_cache is None) != (a.fes_manifest_sha256 is None):
         raise ValueError("--fes-cache and --fes-manifest-sha256 must be supplied together")
-    if a.fes_cache is not None and _sha256(a.fes_cache / "MANIFEST.json") != a.fes_manifest_sha256:
+    if a.fes_cache is not None and _sha256(a.fes_cache / fes2022.OCEAN_MANIFEST_NAME) != a.fes_manifest_sha256:
         raise ValueError("FES manifest SHA-256 mismatch")
     observed_inputs = (a.observed_datum_drafts, a.observed_datum_drafts_sha256,
                        a.observed_datum_source_release, a.observed_datum_source_release_sha256)

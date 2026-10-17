@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from otc_pipeline.adapter import sha256_file
-from otc_pipeline.adapters.fes2022 import Fes2022Adapter, load_manifest, mapped_name
+from otc_pipeline.adapters.fes2022 import Fes2022Adapter, OCEAN_MANIFEST_NAME, load_manifest, mapped_name
 from otc_pipeline.constituent_speeds import TableSpeeds
 
 
@@ -139,22 +139,27 @@ def test_actual_m2_attachment_has_valid_release_contract(native_m2_attachment):
 
 def test_complete_native_cache_contract_and_all_point_results(tmp_path):
     from otc_pipeline.adapter import check_contract
-    from otc_pipeline.adapters.fes2022 import NATIVE_NAMES, station_roster
+    from otc_pipeline.adapters.fes2022 import NATIVE_NAMES, OCEAN_DIRECTORY, station_roster
     root = os.environ.get("OTC_FES_COMPLETE_CACHE")
     if not root:
-        pytest.skip("requires all 68 acquired FES ocean/loading files and final manifest")
+        pytest.skip("requires all 34 acquired FES ocean files and pinned ocean manifest")
     stations = json.loads(Path(os.environ["OTC_FES_NATIVE_STATIONS"]).read_text())
     adapter = Fes2022Adapter(stations=station_roster({"stations": stations}),
                             speeds=TableSpeeds.from_tcd_dump(Path(os.environ["OTC_FES_TCD"])),
                             manifest_sha256=os.environ["OTC_FES_MANIFEST_SHA256"])
     fetched = adapter.fetch(Path(root))
     assert check_contract(adapter, fetched) == []
-    assert len(fetched.files) == 68
+    assert {f"{OCEAN_DIRECTORY}/{name}_fes2022.nc" for name in NATIVE_NAMES} <= {file.path for file in fetched.files}
     assert set(fetched.items) == {station["station_id"] for station in stations}
     for item in fetched.items.values():
         assert {row["native_name"] for row in item["native"]} == set(NATIVE_NAMES)
     for sid in ("OTC-bb22c37b", "OTC-ee4593cd", "OTC-35cdc643"):
         assert {row["name"] for row in fetched.items[sid]["constituents"]} >= {"M2", "S2", "K1", "O1"}
+        unsupported = [row for row in fetched.items[sid]["native"] if row["native_name"] in {"msqm", "mtm"}]
+        assert len(unsupported) == 2
+        assert all(row["amplitude_m"] >= 0 for row in unsupported)
+    for source_set in adapter.sets(fetched):
+        assert {row["name"] for row in source_set.constant_set["dropped_constituents"]} == {"MSQM", "MTM"}
 
 
 def test_registry_constructor_does_not_read_private_files():
@@ -164,11 +169,23 @@ def test_registry_constructor_does_not_read_private_files():
     assert adapter.contract_sample == ("8443970", "9447130", "9414290")
 
 
+def test_incomplete_ocean_inventory_is_rejected(tmp_path):
+    member = tmp_path / "ocean_tide_20241025" / "m2_fes2022.nc"
+    member.parent.mkdir()
+    member.write_bytes(b"inventory must be checked before sampling")
+    (tmp_path / OCEAN_MANIFEST_NAME).write_text(json.dumps({"source_version": "FES2022b", "files": [{
+        "path": "ocean_tide_20241025/m2_fes2022.nc", "sha256": sha256_file(member),
+        "size": member.stat().st_size, "source_url": "https://example.test/m2.nc.xz",
+        "fetched_at": "2026-10-17T00:00:00Z"}]}))
+    with pytest.raises(ValueError, match="33 required ocean files missing"):
+        Fes2022Adapter().fetch(tmp_path)
+
+
 def test_manifest_pin_and_each_actual_file_are_checked(tmp_path):
     member = tmp_path / "ocean_tide_20241025" / "m2_fes2022.nc"
     member.parent.mkdir()
     member.write_bytes(b"not a grid: validation must precede extraction")
-    manifest = tmp_path / "MANIFEST.json"
+    manifest = tmp_path / OCEAN_MANIFEST_NAME
     manifest.write_text(json.dumps({"source_version": "FES2022b", "files": [{
         "path": "ocean_tide_20241025/m2_fes2022.nc", "sha256": sha256_file(member),
         "size": member.stat().st_size, "source_url": "https://example.test/m2.nc.xz",
@@ -183,7 +200,7 @@ def test_manifest_pin_and_each_actual_file_are_checked(tmp_path):
 
 
 def test_manifest_cannot_escape_private_root(tmp_path):
-    (tmp_path / "MANIFEST.json").write_text(json.dumps({"source_version": "FES2022b", "files": [{
+    (tmp_path / OCEAN_MANIFEST_NAME).write_text(json.dumps({"source_version": "FES2022b", "files": [{
         "path": "../secret", "sha256": "0" * 64, "size": 1,
         "source_url": "https://example.test/m2", "fetched_at": "2026-10-17T00:00:00Z"}]}))
     with pytest.raises(ValueError, match="inside"):

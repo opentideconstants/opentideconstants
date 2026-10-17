@@ -558,7 +558,7 @@ def test_fes_cli_requires_pinned_cache_pair():
 
 
 def test_fes_cli_rejects_changed_manifest_before_build(tmp_path):
-    (tmp_path / "MANIFEST.json").write_text("{}\n")
+    (tmp_path / build_otc.fes2022.OCEAN_MANIFEST_NAME).write_text("{}\n")
     with pytest.raises(ValueError, match="FES manifest SHA-256 mismatch"):
         build_otc.main([*observed_cli_arguments(), "--fes-cache", str(tmp_path),
                         "--fes-manifest-sha256", "0" * 64])

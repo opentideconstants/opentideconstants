@@ -25,6 +25,7 @@ from otc_pipeline.gesla_sets import label_fallback
 
 SOURCE_VERSION = "FES2022b"
 OCEAN_DIRECTORY = "ocean_tide_20241025"
+OCEAN_MANIFEST_NAME = "OCEAN_MANIFEST.json"
 NATIVE_NAMES = ("2n2", "eps2", "j1", "k1", "k2", "l2", "lambda2", "m2", "m3", "m4", "m6",
                 "m8", "mf", "mks2", "mm", "mn4", "ms4", "msf", "msqm", "mtm", "mu2", "n2",
                 "n4", "nu2", "o1", "p1", "q1", "r2", "s1", "s2", "s4", "sa", "ssa", "t2")
@@ -58,7 +59,7 @@ CONTRACT_STATIONS = {
 def load_manifest(root: Path, expected_sha256: str | None = None) -> tuple[dict, str, tuple[InputFile, ...]]:
     """Verify the manifest and all its expanded members before sampling any model values."""
     root = Path(root)
-    path = root / "MANIFEST.json"
+    path = root / OCEAN_MANIFEST_NAME
     pin = sha256_file(path)
     if expected_sha256 is not None and pin != expected_sha256:
         raise ValueError("FES manifest SHA-256 mismatch")
@@ -179,11 +180,10 @@ class Fes2022Adapter:
             raise ValueError(f"unknown FES station: {sorted(unknown)}")
         root = Path(os.environ.get("OTC_FES_INPUT_ROOT", cache_dir))
         manifest, pin, files = load_manifest(root, self.manifest_sha256)
-        required = {f"{directory}/{name}_fes2022.nc" for directory in (OCEAN_DIRECTORY, "load_tide")
-                    for name in NATIVE_NAMES}
+        required = {f"{OCEAN_DIRECTORY}/{name}_fes2022.nc" for name in NATIVE_NAMES}
         missing = required - {f.path for f in files}
         if missing:
-            raise ValueError(f"FES2022b input inventory incomplete: {len(missing)} required ocean/loading files missing")
+            raise ValueError(f"FES2022b input inventory incomplete: {len(missing)} required ocean files missing")
         items = extract(root, manifest, pin, files, {key: self.stations[key] for key in wanted}, self.speeds,
                         derived_dir=Path(cache_dir) / "derived")
         return FetchResult(self.source, SOURCE_VERSION, root, files, items)
@@ -206,7 +206,7 @@ class Fes2022Adapter:
         for rid, item in sorted(fetched.items.items()):
             if not item["constituents"]:
                 continue
-            dropped = [dropped_no_row(row["native_name"]) for row in item["native"]
+            dropped = [dropped_no_row(row["native_name"].upper()) for row in item["native"]
                        if row.get("mapped_name") is None and row["status"] == "available"]
             cs = {
                 "source": self.source, "source_type": self.source_type, "quantity": self.quantity,
