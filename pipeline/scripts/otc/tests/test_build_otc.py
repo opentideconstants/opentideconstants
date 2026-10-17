@@ -19,20 +19,32 @@ from otc_pipeline.release_writer import pinned_schema
 from test_datums import native_observed_chart_cases as native_observed_chart_cases
 from test_datums import native_approximate_chart_cases as native_approximate_chart_cases
 from test_datums import native_computed_chart_cases as native_computed_chart_cases
+from test_datums import native_nld_computed_chart_cases as native_nld_computed_chart_cases
+
+
+def _expected_computed_reference_basis(original):
+    expected = copy.deepcopy(original)
+    expected["fallback"]["basis"] += "; approximate chart-reference stand-in: existing computed LAT (nonofficial)"
+    expected["fallback"]["otc_finding"] += (
+        "; approximate chart-reference stand-in; agency chart-datum convention, equivalence and vertical tie are not established")
+    return expected
 
 
 @pytest.fixture
-def native_computed_chart_composition(native_computed_chart_cases, tmp_path):
-    ids = {set_id for _, set_id in native_computed_chart_cases}
-    ids.add("OTC-2ecb58d9/gesla-fit/aranmore_island_leabgarrow-ara-irl-mi_c")
-    ids.add("OTC-000180a3/gesla-fit/idsl_panormos-ids-grc-cmems")
+def native_computed_chart_composition(native_computed_chart_cases, tmp_path, request):
+    if getattr(request, "param", None) == "nld":
+        ids = {set_id for _, set_id in request.getfixturevalue("native_nld_computed_chart_cases")}
+    else:
+        ids = {set_id for _, set_id in native_computed_chart_cases}
+        ids.add("OTC-2ecb58d9/gesla-fit/aranmore_island_leabgarrow-ara-irl-mi_c")
+        ids.add("OTC-000180a3/gesla-fit/idsl_panormos-ids-grc-cmems")
     root = Path("/Users/jpr5/.local/share/copilotkit/cr/otc-impl")
     source = root / "derived-chart-datum/postfix-candidate/native-build/OTC_20261011.jsonl"
     assert observed_produce.sha256(source) == "14a12b36365f0e057633bb8cdf266a50cc24a3d0d417524f29e35547d299e111"
     station_ids = {sid.split("/")[0] for sid in ids}
     with source.open() as stream:
         stations = [s for line in stream if (s := json.loads(line))["station_id"] in station_ids]
-    assert len(stations) == 5
+    assert len(stations) == len(station_ids)
     metadata = json.loads(source.with_suffix(".meta.json").read_text())
     release = {"stations": stations, **{k: metadata[k] for k in ("conventions", "astro_tables")}}
     postcomputed = copy.deepcopy(release)
@@ -67,7 +79,7 @@ def native_computed_chart_composition(native_computed_chart_cases, tmp_path):
         assert observed_produce.sha256(original) == sha
         with original.open() as stream:
             lines = [line for line in stream if json.loads(line)["set_id"] in ids]
-        assert len(lines) == 5
+        assert len(lines) == len(ids)
         path = tmp_path / f"four-native-{name}-drafts.jsonl"
         path.write_text("".join(lines))
         paths.append((path, observed_produce.sha256(path)))
@@ -121,8 +133,10 @@ def test_native_computed_chart_composition(native_computed_chart_composition, tm
     assert release == expected
 
 
+@pytest.mark.parametrize("case_fixture", ["native_computed_chart_cases", "native_nld_computed_chart_cases"])
 @pytest.mark.parametrize("combined", [False, True])
-def test_native_computed_chart_publication(native_computed_chart_cases, tmp_path, combined):
+def test_native_computed_chart_publication(request, case_fixture, tmp_path, combined):
+    native_computed_chart_cases = request.getfixturevalue(case_fixture)
     release = {"stations": [copy.deepcopy(station) for station, _ in native_computed_chart_cases]}
     before = copy.deepcopy(release)
     empty = tmp_path / "no-new-computed-drafts.jsonl"
@@ -152,6 +166,70 @@ def test_native_computed_chart_publication(native_computed_chart_cases, tmp_path
         assert "existing computed LAT (nonofficial)" in fallback["basis"]
         assert "agency chart-datum convention, equivalence and vertical tie are not established" in fallback["otc_finding"]
         fallback.update(old["datum"]["basis"]["lat"]["fallback"])
+    assert release == before
+
+
+@pytest.mark.parametrize("native_computed_chart_composition", ["nld"], indirect=True)
+def test_native_nld_computed_chart_composition(native_computed_chart_composition):
+    release, postcomputed, official, observed, inputs, ids = native_computed_chart_composition
+    before = copy.deepcopy(release)
+    official_only = copy.deepcopy(release)
+    official_receipt = build_otc.apply_official_datum_fallbacks(official_only, *official)
+    assert official_receipt["computed_basis_fallback_count"] == 6
+    assert official_receipt["chart_datum_derivation"]["approximate_changed_sets"] == 3
+    serial = copy.deepcopy(official_only)
+    serial_receipt = build_otc.apply_observed_datum_fallbacks(serial, *observed, **inputs)
+    official_receipt, observed_receipt = build_otc.apply_datum_drafts(release, official=official, observed=observed,
+        publish_official=True, publish_observed=True, observed_inputs=inputs)
+    assert release == serial
+    assert observed_receipt["observed_basis_fallback_count"] == serial_receipt["observed_basis_fallback_count"] == 33
+    assert observed_receipt["normal_datum_gate_accepted"] is False
+    expected = copy.deepcopy(postcomputed)
+    drafts = {row["set_id"]: row for row in map(json.loads, observed[0].read_text().splitlines())}
+    for station in expected["stations"]:
+        for cs in station["constant_sets"]:
+            if cs["set_id"] in ids:
+                for field in ("named", "basis"):
+                    cs["datum"][field].update(drafts[cs["set_id"]]["draft_datum"][field])
+    for output, baseline in ((official_only, postcomputed), (release, expected)):
+        for station in output["stations"]:
+            for cs in station["constant_sets"]:
+                if cs["set_id"] not in ids:
+                    continue
+                old = next(c for s in baseline["stations"] for c in s["constant_sets"]
+                           if c["set_id"] == cs["set_id"])
+                print(f"REAL NLD COMPOSITION {cs['set_id']}: lat={cs['datum']['named']['lat']!r}; "
+                      f"chart={cs['datum'].get('chart_datum')!r}; observed={'msl' in cs['datum']['named']}")
+                assert cs["datum"].pop("chart_datum") == "lat"
+                fallback = cs["datum"]["basis"]["lat"]["fallback"]
+                assert "existing computed LAT (nonofficial)" in fallback["basis"]
+                assert "agency chart-datum convention, equivalence and vertical tie are not established" in fallback["otc_finding"]
+                fallback.update(old["datum"]["basis"]["lat"]["fallback"])
+        assert output == baseline
+    assert before != postcomputed  # Exact native pre-computed input was authenticated.
+
+
+@pytest.mark.parametrize("native_computed_chart_composition", ["nld"], indirect=True)
+@pytest.mark.parametrize("defect", ["number", "provenance", "fallback_basis", "fallback_finding", "pointer", "metadata"])
+def test_native_nld_finalized_chart_rejects_tampered_binding(native_computed_chart_composition, defect):
+    release, _, official, observed, inputs, ids = native_computed_chart_composition
+    build_otc.apply_official_datum_fallbacks(release, *official)
+    cs = next(c for s in release["stations"] for c in s["constant_sets"] if c["set_id"] in ids)
+    assert cs["datum"]["chart_datum"] == "lat"
+    if defect == "number":
+        cs["datum"]["named"]["lat"] += 0.01
+    elif defect == "provenance":
+        cs["provenance"]["tcd_sha256"] = "0" * 64
+    elif defect in ("fallback_basis", "fallback_finding"):
+        key = "basis" if defect == "fallback_basis" else "otc_finding"
+        cs["datum"]["basis"]["lat"]["fallback"][key] += "; tampered"
+    elif defect == "pointer":
+        cs["datum"]["chart_datum"] = "hat"
+    else:
+        cs["datum"]["zero_name"] = "invented frame"
+    before = copy.deepcopy(release)
+    with pytest.raises(build_otc._ObservedCurrentInputMismatch, match=cs["set_id"]):
+        build_otc.apply_observed_datum_fallbacks(release, *observed, **inputs)
     assert release == before
 
 
@@ -354,7 +432,11 @@ def test_native_observed_attachment_three_original_value_flips(native_observed_a
                     assert new["datum"][key] == value
             for key in old["datum"]["named"]:
                 assert new["datum"]["named"][key] == old["datum"]["named"][key]
-                assert new["datum"]["basis"][key] == old["datum"]["basis"][key]
+                expected_basis = old["datum"]["basis"][key]
+                if new["source_record_id"] == "werkendambuitentg-wer-nld-cmems" and key == "lat":
+                    expected_basis = _expected_computed_reference_basis(expected_basis)
+                    assert new["datum"]["chart_datum"] == "lat"
+                assert new["datum"]["basis"][key] == expected_basis
             for key in row["observed_keys"]:
                 assert new["datum"]["named"][key] == row["draft_datum"]["named"][key]
                 assert new["datum"]["basis"][key] == row["draft_datum"]["basis"][key]
@@ -609,6 +691,9 @@ def test_native_combined_official_and_observed(native_combined_datum_inputs):
             for stage in (official, observed):
                 for field in ("named", "basis"):
                     for key, value in stage["datum"].get(field, {}).items():
+                        if cs["source_record_id"] == "werkendambuitentg-wer-nld-cmems" and field == "basis" and key == "lat":
+                            value = _expected_computed_reference_basis(value)
+                            assert cs["datum"]["chart_datum"] == "lat"
                         assert cs["datum"][field][key] == value
             if cs["source_record_id"] == "penarth-pen-gbr-cco":
                 assert cs["datum"]["chart_datum"] == "lat"
