@@ -115,13 +115,14 @@ def _chart_conventions() -> tuple[dict, str]:
     return json.loads(raw), hashlib.sha256(raw).hexdigest()
 
 
-def derive_chart_datums(release: dict) -> dict:
+def derive_chart_datums(release: dict, *, include_computed_approximate: bool = True) -> dict:
     """Designate existing levels, with explicit labels for approximate stand-ins.
 
     Adds missing chart_datum pointers and appends stand-in findings where applicable.
     Receipt counts places separately from sets; withheld counts are sets.
     Unresolved geographic conditions are unknown, including GBR without UK source facts.
     Conflicting original COUNTRY identities leave new designations unresolved.
+    Computed publication defers new approximate references until observed authentication finishes.
     """
     from otc_pipeline.lat_hat import low_water_suppressed
 
@@ -223,7 +224,8 @@ def derive_chart_datums(release: dict) -> dict:
             if datum.get("chart_datum") is not None:
                 continue
             observed_approximate = cs["set_id"] in approximate_keys
-            computed_approximate = (key == "lat" and cs["set_id"] in computed_approximate_sets
+            computed_approximate = (include_computed_approximate and key == "lat"
+                                    and cs["set_id"] in computed_approximate_sets
                                     and not convention and not excluded)
             approximate = observed_approximate or computed_approximate
             kind = "observed" if key == "mllw" or observed_approximate else "computed"

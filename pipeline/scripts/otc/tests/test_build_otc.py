@@ -21,6 +21,106 @@ from test_datums import native_approximate_chart_cases as native_approximate_cha
 from test_datums import native_computed_chart_cases as native_computed_chart_cases
 
 
+@pytest.fixture
+def native_computed_chart_composition(native_computed_chart_cases, tmp_path):
+    ids = {set_id for _, set_id in native_computed_chart_cases}
+    ids.add("OTC-2ecb58d9/gesla-fit/aranmore_island_leabgarrow-ara-irl-mi_c")
+    ids.add("OTC-000180a3/gesla-fit/idsl_panormos-ids-grc-cmems")
+    root = Path("/Users/jpr5/.local/share/copilotkit/cr/otc-impl")
+    source = root / "derived-chart-datum/postfix-candidate/native-build/OTC_20261011.jsonl"
+    assert observed_produce.sha256(source) == "14a12b36365f0e057633bb8cdf266a50cc24a3d0d417524f29e35547d299e111"
+    station_ids = {sid.split("/")[0] for sid in ids}
+    with source.open() as stream:
+        stations = [s for line in stream if (s := json.loads(line))["station_id"] in station_ids]
+    assert len(stations) == 5
+    metadata = json.loads(source.with_suffix(".meta.json").read_text())
+    release = {"stations": stations, **{k: metadata[k] for k in ("conventions", "astro_tables")}}
+    postcomputed = copy.deepcopy(release)
+    roster_root = root / "datum-lat-hat/missing-gesla"
+    roster = json.loads((roster_root / "roster.json").read_text())
+    originals = {}
+    for row in roster["rows"]:
+        if row["set_id"] in ids:
+            path = Path(row["path"])
+            assert observed_produce.sha256(path) == row["input_sha256"]
+            originals[row["set_id"]] = json.loads(path.read_text())["constant_set"]
+    assert set(originals) == ids
+    for station in stations:
+        for cs in station["constant_sets"]:
+            if cs["set_id"] in ids:
+                original = originals[cs["set_id"]]
+                assert cs["constituents"] == original["constituents"]
+                assert {k: v for k, v in cs["datum"].items() if k not in ("named", "basis", "chart_datum")} == original["datum"]
+                cs["datum"] = copy.deepcopy(original["datum"])
+    inputs = {
+        "gesla_root": Path("/Users/jpr5/.local/share/opentideconstants/work/inputs/gesla/4.1"),
+        "fit_run": root / "FIX-CONST/fit/fit-fc1",
+        "tcd": root / "FIX-CONST/astro/otc-tcd-20251228-ma2mb2-r2/tcd-1900-2100.json",
+        "source_release": source,
+        "source_release_sha256": observed_produce.sha256(source),
+    }
+    paths = []
+    for name, original, sha in (
+            ("official", roster_root / "all-public-drafts.jsonl", "77006af6f3274eae6437651abc93440c3d2a9d7d6452c9a6f7fa50a82b21fa99"),
+            ("observed", root / "datum-observed-fallback/review/fix-mean-clock/refresh/full/observed-drafts.jsonl",
+             "cfb0299eaf9247cd9cb5bba1be294250c3bf439a5d0d1c8086b8a9534a093053")):
+        assert observed_produce.sha256(original) == sha
+        with original.open() as stream:
+            lines = [line for line in stream if json.loads(line)["set_id"] in ids]
+        assert len(lines) == 5
+        path = tmp_path / f"four-native-{name}-drafts.jsonl"
+        path.write_text("".join(lines))
+        paths.append((path, observed_produce.sha256(path)))
+    return release, postcomputed, paths[0], paths[1], inputs, ids
+
+
+@pytest.mark.parametrize("index", [None, 0, 1, 2, 3])
+def test_native_computed_chart_composition(native_computed_chart_composition, tmp_path, index):
+    release, postcomputed, official, observed, inputs, ids = native_computed_chart_composition
+    if index is not None:
+        selected = sorted(sid for sid in ids if sid.endswith("mi_c"))[index]
+        lines = [line for line in observed[0].read_text().splitlines(keepends=True)
+                 if json.loads(line)["set_id"] == selected]
+        path = tmp_path / "single-native-observed-draft.jsonl"
+        path.write_text("".join(lines))
+        observed = (path, observed_produce.sha256(path))
+    else:
+        with pytest.raises(build_otc._ObservedCurrentInputMismatch, match="OTC-000180a3"):
+            build_otc.stage_observed_datums(release, *observed, **inputs)
+        print("REAL COMPOSITION initial Panormos current-binding mismatch requires computed preview")
+    serial = copy.deepcopy(release)
+    official_result, observed_result = build_otc.apply_datum_drafts(release, official=official, observed=observed,
+        publish_official=True, publish_observed=True, observed_inputs=inputs)
+    assert official_result["computed_basis_fallback_count"] == 10
+    assert observed_result["observed_basis_fallback_count"] == (44 if index is None else 11)
+    if index is None:
+        build_otc.apply_official_datum_fallbacks(serial, *official)
+        build_otc.apply_observed_datum_fallbacks(serial, *observed, **inputs)
+        assert serial == release
+        print("REAL COMPOSITION serial official→observed equals combined publication on all five native records")
+    expected = copy.deepcopy(postcomputed)
+    drafts = {row["set_id"]: row for row in map(json.loads, observed[0].read_text().splitlines())}
+    for station in expected["stations"]:
+        for cs in station["constant_sets"]:
+            if cs["set_id"] in drafts:
+                row = drafts[cs["set_id"]]
+                if row["draft_datum"] is None:
+                    continue
+                for field in ("named", "basis"):
+                    cs["datum"][field].update(row["draft_datum"][field])
+    for station in release["stations"]:
+        for cs in station["constant_sets"]:
+            if cs["set_id"] not in ids or not cs["set_id"].endswith("mi_c"):
+                continue
+            print(f"REAL COMPUTED COMPOSITION {cs['set_id']}: chart={cs['datum'].get('chart_datum')!r}; "
+                  f"observed_msl={cs['datum']['named'].get('msl')!r}; authenticated=True")
+            assert cs["datum"].pop("chart_datum") == "lat"
+            original = next(c for s in postcomputed["stations"] for c in s["constant_sets"]
+                            if c["set_id"] == cs["set_id"])
+            cs["datum"]["basis"]["lat"]["fallback"] = original["datum"]["basis"]["lat"]["fallback"]
+    assert release == expected
+
+
 @pytest.mark.parametrize("combined", [False, True])
 def test_native_computed_chart_publication(native_computed_chart_cases, tmp_path, combined):
     release = {"stations": [copy.deepcopy(station) for station, _ in native_computed_chart_cases]}
@@ -36,13 +136,12 @@ def test_native_computed_chart_publication(native_computed_chart_cases, tmp_path
         receipt = build_otc.apply_official_datum_fallbacks(release, empty, sha)
     assert receipt["computed_basis_fallback_count"] == 0
     assert receipt["normal_datum_gate_accepted"] is False
-    assert receipt["chart_datum_derivation"]["approximate_changed_sets"] == 3
+    assert receipt["chart_datum_derivation"]["approximate_changed_sets"] == 0
     for station, (_, set_id) in zip(release["stations"], native_computed_chart_cases, strict=True):
         cs = next(c for c in station["constant_sets"] if c["set_id"] == set_id)
-        print(f"REAL COMPUTED PRODUCER {set_id}: chart={cs['datum'].get('chart_datum')!r}; combined={combined}")
-        assert cs["datum"].pop("chart_datum") == "lat"
-        old = next(c for s in before["stations"] for c in s["constant_sets"] if c["set_id"] == set_id)
-        cs["datum"]["basis"]["lat"]["fallback"] = old["datum"]["basis"]["lat"]["fallback"]
+        print(f"REAL COMPUTED PRODUCER {set_id}: chart={cs['datum'].get('chart_datum')!r}; "
+              f"approximate deferred until observed authentication; combined={combined}")
+        assert "chart_datum" not in cs["datum"]
     assert release == before
 
 

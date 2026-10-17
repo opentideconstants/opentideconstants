@@ -221,7 +221,9 @@ def _publish_official_datum_stage(release: dict, staged: dict) -> dict:
                 datum["basis"][key]["fallback"] = dict(COMPUTED_FALLBACK)
             count += 1
         by_id[entry["set_id"]]["datum"] = datum
-    chart_datum_derivation = derive_chart_datums(release)
+    # Historical observed drafts authenticate this computed view before new
+    # approximate annotations are added by the observed publication stage.
+    chart_datum_derivation = derive_chart_datums(release, include_computed_approximate=False)
     return {**staged, "public_admission": True, "release_unchanged": False,
             "normal_datum_gate_accepted": False, "computed_basis_fallback_count": count,
             "chart_datum_derivation": chart_datum_derivation,
