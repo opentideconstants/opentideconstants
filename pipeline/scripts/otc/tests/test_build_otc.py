@@ -17,6 +17,70 @@ from otc_pipeline import lat_hat
 from otc_pipeline.observed_datums import produce as observed_produce
 from otc_pipeline.release_writer import pinned_schema
 from test_datums import native_observed_chart_cases as native_observed_chart_cases
+from test_datums import native_approximate_chart_cases as native_approximate_chart_cases
+
+
+@pytest.fixture
+def native_approximate_chart_stage(native_approximate_chart_cases, tmp_path):
+    facts, stations = native_approximate_chart_cases
+    release = {"stations": [copy.deepcopy(stations[row["station_id"]]) for row in facts["witnesses"]]}
+    expected = copy.deepcopy(release)
+    source = Path("/Users/jpr5/.local/share/copilotkit/cr/otc-impl/datum-observed-fallback/review/fix-mean-clock/refresh/full/observed-drafts.jsonl")
+    with source.open("rb") as stream:
+        assert hashlib.file_digest(stream, "sha256").hexdigest() == "cfb0299eaf9247cd9cb5bba1be294250c3bf439a5d0d1c8086b8a9534a093053"
+    ids = {row["set_id"] for row in facts["witnesses"]}
+    rows = {}
+    with source.open() as stream:
+        for line in stream:
+            row = json.loads(line)
+            if row["set_id"] in ids:
+                rows[row["set_id"]] = row
+    assert set(rows) == ids
+    for station in release["stations"]:
+        for cs in station["constant_sets"]:
+            if cs["set_id"] in rows:
+                row = rows[cs["set_id"]]
+                for key in row["observed_keys"]:
+                    for field in ("named", "basis"):
+                        assert cs["datum"][field].pop(key) == row["draft_datum"][field][key]
+    path = tmp_path / "nine-native-observed-drafts.jsonl"
+    path.write_text("".join(json.dumps(row) + "\n" for row in rows.values()))
+    inputs = {
+        "gesla_root": Path("/Users/jpr5/.local/share/opentideconstants/work/inputs/gesla/4.1"),
+        "fit_run": Path("/Users/jpr5/.local/share/copilotkit/cr/otc-impl/FIX-CONST/fit/fit-fc1"),
+        "tcd": Path("/Users/jpr5/.local/share/copilotkit/cr/otc-impl/FIX-CONST/astro/otc-tcd-20251228-ma2mb2-r2/tcd-1900-2100.json"),
+        "source_release": Path("/Users/jpr5/.local/share/copilotkit/cr/otc-impl/derived-chart-datum/postfix-candidate/native-build/OTC_20261011.jsonl"),
+        "source_release_sha256": "14a12b36365f0e057633bb8cdf266a50cc24a3d0d417524f29e35547d299e111"}
+    return release, expected, path, hashlib.sha256(path.read_bytes()).hexdigest(), inputs, facts
+
+
+@pytest.mark.parametrize("combined", [False, True])
+def test_native_approximate_chart_publication(native_approximate_chart_stage, tmp_path, combined):
+    release, expected, path, digest, inputs, facts = native_approximate_chart_stage
+    before = copy.deepcopy(release)
+    staged = build_otc.stage_observed_datums(release, path, digest, **inputs)
+    assert release == before and "chart_datum_derivation" not in staged
+    if combined:
+        empty = tmp_path / "no-new-official-drafts.jsonl"
+        empty.write_text("")
+        _, result = build_otc.apply_datum_drafts(release,
+            official=(empty, hashlib.sha256(empty.read_bytes()).hexdigest()), observed=(path, digest),
+            publish_official=True, publish_observed=True, observed_inputs=inputs)
+    else:
+        result = build_otc.apply_observed_datum_fallbacks(release, path, digest, **inputs)
+    for row in facts["witnesses"]:
+        station = next(s for s in release["stations"] if s["station_id"] == row["station_id"])
+        cs = next(c for c in station["constant_sets"] if c["set_id"] == row["set_id"])
+        key = row["key"]
+        print(f"REAL APPROXIMATE PRODUCER {row['station_id']}: {key}={cs['datum']['named'][key]!r}; "
+              f"chart={cs['datum'].get('chart_datum')!r}; combined={combined}")
+        assert cs["datum"].pop("chart_datum") == key
+        fallback = cs["datum"]["basis"][key]["fallback"]
+        assert "approximate chart-reference stand-in" in fallback["basis"]
+        fallback.update(row["existing_basis"]["fallback"])
+    assert release == expected
+    assert result["chart_datum_derivation"]["approximate_changed_places"] == 9
+    assert result["normal_datum_gate_accepted"] is False
 
 
 @pytest.fixture
