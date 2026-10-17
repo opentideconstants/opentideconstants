@@ -145,11 +145,14 @@ def derive_chart_datums(release: dict, *, include_computed_approximate: bool = T
                 continue
             lat_basis = cs.get("datum", {}).get("basis", {}).get("lat", {})
             lat_fallback = lat_basis.get("fallback", {})
-            # Match the inspected native source/frame, not an Irish chart convention.
+            # Match inspected native source/frame metadata, not a national chart convention.
             own_malin = all(m.get("COUNTRY") == "IRL" and m.get("CONTRIBUTOR (ABBREVIATED)") == "MI_C"
                             and m.get("DATUM INFORMATION") == "Malin Ordnance Datum"
                             and m.get("FILE NAME") == cs.get("source_record_id") for m in own)
-            if (own_malin and lat_basis.get("kind") == "computed"
+            own_nld_msl = all(m.get("COUNTRY") == "NLD" and m.get("CONTRIBUTOR (ABBREVIATED)") == "CMEMS"
+                              and m.get("DATUM INFORMATION") == "MSL"
+                              and m.get("FILE NAME") == cs.get("source_record_id") for m in own)
+            if ((own_malin or own_nld_msl) and lat_basis.get("kind") == "computed"
                     and lat_fallback.get("reason") == "datum_gate_failed"
                     and isinstance(lat_fallback.get("basis"), str) and lat_fallback["basis"].strip()
                     and isinstance(lat_fallback.get("otc_finding"), str) and lat_fallback["otc_finding"].strip()):

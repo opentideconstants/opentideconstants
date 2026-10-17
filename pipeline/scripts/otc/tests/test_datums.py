@@ -15,6 +15,40 @@ from otc_pipeline.gesla_sets import _published_stated_zero
 
 
 @pytest.fixture(scope="module")
+def native_nld_computed_chart_cases():
+    root = os.environ.get("OTC_NLD_CHART_PROOF")
+    if not root:
+        pytest.skip("requires the pinned NLD computed chart evidence")
+    path = Path(root) / "receipt.json"
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == "0e5569e16ac1198426537b218e6d9162f1a77370d9e8055ded3362482a084166"
+    facts = json.loads(path.read_text())
+    source = Path(facts["input_pins"]["candidate"]["path"])
+    with source.open("rb") as stream:
+        assert hashlib.file_digest(stream, "sha256").hexdigest() == facts["input_pins"]["candidate"]["sha256"]
+    wanted = {row["candidate_line"]: row for row in facts["target_records"]}
+    cases = []
+    with source.open("rb") as stream:
+        for number, line in enumerate(stream, 1):
+            if number not in wanted:
+                continue
+            row = wanted[number]
+            assert hashlib.sha256(line).hexdigest() == row["line_sha256"]
+            station = json.loads(line)
+            assert station["station_id"] == row["station_id"]
+            cs = next(c for c in station["constant_sets"] if c["set_id"] == row["set_id"])
+            assert cs["datum"]["named"]["lat"] == row["lat_m"]
+            assert cs["datum"]["msl_offset_m"] == row["msl_offset_m"]
+            assert cs["datum"]["basis"]["lat"] == row["lat_basis"]
+            assert "zero" not in cs["datum"] and "zero_name" not in cs["datum"]
+            assert "chart_datum" not in cs["datum"]
+            cases.append((station, row["set_id"]))
+            if number == max(wanted):
+                break
+    assert len(cases) == 3
+    return cases
+
+
+@pytest.fixture(scope="module")
 def native_computed_chart_cases():
     path = os.environ.get("OTC_COMPUTED_CHART_CANDIDATE")
     if not path:
@@ -48,9 +82,10 @@ def native_computed_chart_cases():
     return cases
 
 
+@pytest.mark.parametrize("case_fixture", ["native_computed_chart_cases", "native_nld_computed_chart_cases"])
 @pytest.mark.parametrize("index", range(3))
-def test_native_computed_approximate_chart(native_computed_chart_cases, index):
-    original, set_id = native_computed_chart_cases[index]
+def test_native_computed_approximate_chart(request, case_fixture, index):
+    original, set_id = request.getfixturevalue(case_fixture)[index]
     station = copy.deepcopy(original)
     cs = next(c for c in station["constant_sets"] if c["set_id"] == set_id)
     receipt = datums.derive_chart_datums({"stations": [station]})
@@ -75,8 +110,9 @@ def test_native_computed_approximate_chart(native_computed_chart_cases, index):
     "published_subordinate", "existing_pointer", "flatline", "truncated_lows", "nonfinite", "boolean",
     "wrong_basis", "missing_fallback", "wrong_fallback", "missing_fallback_text", "blank_fallback_text",
     "unknown_country", "other_contributor", "other_frame", "conflicting_filename"])
-def test_native_computed_chart_controls_preserve_payload(native_computed_chart_cases, defect):
-    original, set_id = native_computed_chart_cases[0]
+@pytest.mark.parametrize("case_fixture", ["native_computed_chart_cases", "native_nld_computed_chart_cases"])
+def test_native_computed_chart_controls_preserve_payload(request, case_fixture, defect):
+    original, set_id = request.getfixturevalue(case_fixture)[0]
     station = copy.deepcopy(original)
     cs = next(c for c in station["constant_sets"] if c["set_id"] == set_id)
     own = next(r for r in station["source_records"] if r["source"] == "gesla"
