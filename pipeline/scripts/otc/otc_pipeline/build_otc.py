@@ -209,7 +209,7 @@ def apply_official_datum_fallbacks(release: dict, path: Path, sha256: str) -> di
     return _publish_official_datum_stage(release, staged)
 
 
-def _publish_official_datum_stage(release: dict, staged: dict) -> dict:
+def _publish_official_datum_stage(release: dict, staged: dict, *, finalize_chart: bool = True) -> dict:
     from otc_pipeline.datums import derive_chart_datums
     from otc_pipeline.lat_hat import COMPUTED_FALLBACK
     by_id = {cs["set_id"]: cs for station in release["stations"] for cs in station.get("constant_sets", [])}
@@ -221,9 +221,9 @@ def _publish_official_datum_stage(release: dict, staged: dict) -> dict:
                 datum["basis"][key]["fallback"] = dict(COMPUTED_FALLBACK)
             count += 1
         by_id[entry["set_id"]]["datum"] = datum
-    # Historical observed drafts authenticate this computed view before new
-    # approximate annotations are added by the observed publication stage.
-    chart_datum_derivation = derive_chart_datums(release, include_computed_approximate=False)
+    # Authentication previews and a following observed publication retain the
+    # historical computed view. An official-only publication is already final.
+    chart_datum_derivation = derive_chart_datums(release, include_computed_approximate=finalize_chart)
     return {**staged, "public_admission": True, "release_unchanged": False,
             "normal_datum_gate_accepted": False, "computed_basis_fallback_count": count,
             "chart_datum_derivation": chart_datum_derivation,
@@ -239,7 +239,7 @@ def stage_observed_datums(release: dict, path: Path, sha256: str, *, source_rele
     """Authenticate frozen reductions against original bytes and current native scientific inputs."""
     from gesla.read_gesla import GeslaRelease
     from jsonschema import Draft202012Validator
-    from otc_pipeline.datums import datum_build_errors, observed_companions
+    from otc_pipeline.datums import datum_build_errors, derive_chart_datums, observed_companions
     from otc_pipeline.observed_datums import produce
     from otc_pipeline.release_writer import pinned_schema
 
@@ -312,6 +312,21 @@ def stage_observed_datums(release: dict, path: Path, sha256: str, *, source_rele
         old_build = old_cs.get("provenance", {}).get("build", {})
         if isinstance(build, dict) and "build_commit" in build and "build_commit" in old_build:
             build["build_commit"] = old_build["build_commit"]
+        if (current.get("datum", {}).get("chart_datum") == "lat"
+                and old_cs.get("datum", {}).get("chart_datum") is None):
+            # A serial official publication may already have finalized the new
+            # computed reference. Replay that exact policy on the authentic old
+            # datum; accept no other change to values, findings or metadata.
+            preview_station = copy.deepcopy(old_station)
+            preview_cs = next(c for c in preview_station["constant_sets"] if c["set_id"] == sid)
+            preview_cs["datum"] = copy.deepcopy(old_cs["datum"])
+            preview = {"stations": [preview_station]}
+            derive_chart_datums(preview, include_computed_approximate=False)
+            unchanged = preview_cs["datum"] == old_cs["datum"]
+            derived = derive_chart_datums(preview)
+            if (unchanged and derived["approximate_changed_sets"]
+                    and preview_cs["datum"] == current["datum"]):
+                current["datum"] = copy.deepcopy(old_cs["datum"])
         if produce.input_binding(station, current, member=member, fit_sha256=fit_sha, **common) != bound:
             raise _ObservedCurrentInputMismatch(f"observed current input binding mismatch: {sid}")
         if member and rid not in verified_members:
@@ -413,7 +428,7 @@ def _official_datum_view(release: dict, staged: dict) -> dict:
                 for cs in station["constant_sets"]]
         stations.append(copied)
     preview = {**release, "stations": stations}
-    _publish_official_datum_stage(preview, copy.deepcopy(staged))
+    _publish_official_datum_stage(preview, copy.deepcopy(staged), finalize_chart=False)
     return preview
 
 
@@ -441,7 +456,8 @@ def apply_datum_drafts(release: dict, *, official: tuple | None = None, observed
             if set(row["datum"].get("named", {})) & observed_keys.get(row["set_id"], set()):
                 raise ValueError(f"conflicting official and observed datum drafts: {row['set_id']}")
     if publish_official and official_stage is not None:
-        official_stage = _publish_official_datum_stage(release, official_stage)
+        official_stage = _publish_official_datum_stage(release, official_stage,
+            finalize_chart=not (publish_observed and observed_stage is not None))
     if publish_observed and observed_stage is not None:
         observed_stage = _publish_observed_datum_stage(release, observed_stage)
     return official_stage, observed_stage

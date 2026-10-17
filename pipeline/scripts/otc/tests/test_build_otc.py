@@ -136,12 +136,46 @@ def test_native_computed_chart_publication(native_computed_chart_cases, tmp_path
         receipt = build_otc.apply_official_datum_fallbacks(release, empty, sha)
     assert receipt["computed_basis_fallback_count"] == 0
     assert receipt["normal_datum_gate_accepted"] is False
-    assert receipt["chart_datum_derivation"]["approximate_changed_sets"] == 0
+    actual = []
     for station, (_, set_id) in zip(release["stations"], native_computed_chart_cases, strict=True):
         cs = next(c for c in station["constant_sets"] if c["set_id"] == set_id)
         print(f"REAL COMPUTED PRODUCER {set_id}: chart={cs['datum'].get('chart_datum')!r}; "
-              f"approximate deferred until observed authentication; combined={combined}")
-        assert "chart_datum" not in cs["datum"]
+              f"official-only publication; combined={combined}")
+        actual.append(cs["datum"].get("chart_datum"))
+    assert actual == ["lat"] * 3
+    assert receipt["chart_datum_derivation"]["approximate_changed_sets"] == 3
+    for station, (old_station, set_id) in zip(release["stations"], native_computed_chart_cases, strict=True):
+        cs = next(c for c in station["constant_sets"] if c["set_id"] == set_id)
+        old = next(c for c in old_station["constant_sets"] if c["set_id"] == set_id)
+        assert cs["datum"].pop("chart_datum") == "lat"
+        fallback = cs["datum"]["basis"]["lat"]["fallback"]
+        assert "existing computed LAT (nonofficial)" in fallback["basis"]
+        assert "agency chart-datum convention, equivalence and vertical tie are not established" in fallback["otc_finding"]
+        fallback.update(old["datum"]["basis"]["lat"]["fallback"])
+    assert release == before
+
+
+@pytest.mark.parametrize("defect", ["number", "provenance", "fallback_basis", "fallback_finding", "pointer", "metadata"])
+def test_native_finalized_computed_chart_rejects_tampered_binding(native_computed_chart_composition, defect):
+    release, _, official, observed, inputs, _ = native_computed_chart_composition
+    build_otc.apply_official_datum_fallbacks(release, *official)
+    station = next(s for s in release["stations"] if s["station_id"] == "OTC-8fc5a96e")
+    cs = next(c for c in station["constant_sets"] if c["source_record_id"] == "roonagh_pier-roo-irl-mi_c")
+    assert cs["datum"]["chart_datum"] == "lat"
+    if defect == "number":
+        cs["datum"]["named"]["lat"] += 0.01
+    elif defect == "provenance":
+        cs["provenance"]["tcd_sha256"] = "0" * 64
+    elif defect in ("fallback_basis", "fallback_finding"):
+        key = "basis" if defect == "fallback_basis" else "otc_finding"
+        cs["datum"]["basis"]["lat"]["fallback"][key] += "; tampered"
+    elif defect == "pointer":
+        cs["datum"]["chart_datum"] = "hat"
+    else:
+        cs["datum"]["zero_name"] = "invented frame"
+    before = copy.deepcopy(release)
+    with pytest.raises(build_otc._ObservedCurrentInputMismatch, match="OTC-8fc5a96e"):
+        build_otc.apply_observed_datum_fallbacks(release, *observed, **inputs)
     assert release == before
 
 
