@@ -3,8 +3,9 @@
 A published level is the publisher's number, converted to metres and re-expressed above the set's
 zero, with a `basis` of kind `published`, method `source`, the publisher's own name for it and,
 only where the publisher states one, its epoch and control station. Nothing here computes a level.
-An existing computed LAT or US coastal observed MLLW can be designated as a labelled fallback without changing
-its value or basis, subject to the cited country/area convention and station-wide precedence.
+An existing computed LAT or US coastal observed MLLW can be designated without changing its value.
+Source-bound gate-failed levels can also supply explicitly nonofficial approximate references;
+these establish no agency convention, equivalence or vertical tie.
 
 `datum_build_errors` runs the release build checks the schema cannot express that touch a single
 datum object: check 8 (chart_datum names a key of named), check 9 (basis and named have the same
@@ -133,6 +134,7 @@ def derive_chart_datums(release: dict) -> dict:
     for station in release.get("stations", []):
         sets = station.get("constant_sets", [])
         approximate_keys = {}
+        computed_approximate_sets = set()
         for cs in sets:
             if cs.get("source") != "gesla-fit":
                 continue
@@ -140,6 +142,17 @@ def derive_chart_datums(release: dict) -> dict:
                    if r.get("source") == "gesla" and r.get("source_record_id") == cs.get("source_record_id")]
             if not own or not all(m.get("COUNTRY") == station.get("country") for m in own):
                 continue
+            lat_basis = cs.get("datum", {}).get("basis", {}).get("lat", {})
+            lat_fallback = lat_basis.get("fallback", {})
+            # Match the inspected native source/frame, not an Irish chart convention.
+            own_malin = all(m.get("COUNTRY") == "IRL" and m.get("CONTRIBUTOR (ABBREVIATED)") == "MI_C"
+                            and m.get("DATUM INFORMATION") == "Malin Ordnance Datum"
+                            and m.get("FILE NAME") == cs.get("source_record_id") for m in own)
+            if (own_malin and lat_basis.get("kind") == "computed"
+                    and lat_fallback.get("reason") == "datum_gate_failed"
+                    and isinstance(lat_fallback.get("basis"), str) and lat_fallback["basis"].strip()
+                    and isinstance(lat_fallback.get("otc_finding"), str) and lat_fallback["otc_finding"].strip()):
+                computed_approximate_sets.add(cs["set_id"])
             domains = {m.get("GAUGE TYPE") for m in own}
             key = ("mllw" if station.get("country") == "USA" and domains in ({"River"}, {"Lake"})
                    else "msl" if cs.get("source_record_id") in exclusions else None)
@@ -209,8 +222,11 @@ def derive_chart_datums(release: dict) -> dict:
             datum = cs["datum"]
             if datum.get("chart_datum") is not None:
                 continue
-            approximate = cs["set_id"] in approximate_keys
-            kind = "observed" if key == "mllw" or approximate else "computed"
+            observed_approximate = cs["set_id"] in approximate_keys
+            computed_approximate = (key == "lat" and cs["set_id"] in computed_approximate_sets
+                                    and not convention and not excluded)
+            approximate = observed_approximate or computed_approximate
+            kind = "observed" if key == "mllw" or observed_approximate else "computed"
             value = datum["named"][key]
             if (isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value)
                     or datum.get("basis", {}).get(key, {}).get("kind") != kind):
@@ -227,10 +243,14 @@ def derive_chart_datums(release: dict) -> dict:
                 label = "approximate chart-reference stand-in"
                 fallback = datum["basis"][key]["fallback"]
                 if label not in fallback["basis"]:
-                    fallback["basis"] += f"; {label}: existing observed {key.upper()}"
+                    fallback["basis"] += f"; {label}: existing {kind} {key.upper()}"
+                    if computed_approximate:
+                        fallback["basis"] += " (nonofficial)"
                 if label not in fallback["otc_finding"]:
-                    fallback["otc_finding"] += (
-                        f"; {label}; agency chart-datum equivalence and vertical tie are not established")
+                    finding = ("agency chart-datum convention, equivalence and vertical tie are not established"
+                               if computed_approximate else
+                               "agency chart-datum equivalence and vertical tie are not established")
+                    fallback["otc_finding"] += f"; {label}; {finding}"
                 datum["chart_datum"] = key
                 changed += 1
                 approximate_changed += 1

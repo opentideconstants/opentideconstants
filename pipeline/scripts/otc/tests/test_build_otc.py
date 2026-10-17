@@ -18,6 +18,32 @@ from otc_pipeline.observed_datums import produce as observed_produce
 from otc_pipeline.release_writer import pinned_schema
 from test_datums import native_observed_chart_cases as native_observed_chart_cases
 from test_datums import native_approximate_chart_cases as native_approximate_chart_cases
+from test_datums import native_computed_chart_cases as native_computed_chart_cases
+
+
+@pytest.mark.parametrize("combined", [False, True])
+def test_native_computed_chart_publication(native_computed_chart_cases, tmp_path, combined):
+    release = {"stations": [copy.deepcopy(station) for station, _ in native_computed_chart_cases]}
+    before = copy.deepcopy(release)
+    empty = tmp_path / "no-new-computed-drafts.jsonl"
+    empty.write_text("")
+    sha = hashlib.sha256(empty.read_bytes()).hexdigest()
+    staged = build_otc.stage_official_datums(release, empty, sha)
+    assert release == before and "chart_datum_derivation" not in staged
+    if combined:
+        receipt, _ = build_otc.apply_datum_drafts(release, official=(empty, sha), publish_official=True)
+    else:
+        receipt = build_otc.apply_official_datum_fallbacks(release, empty, sha)
+    assert receipt["computed_basis_fallback_count"] == 0
+    assert receipt["normal_datum_gate_accepted"] is False
+    assert receipt["chart_datum_derivation"]["approximate_changed_sets"] == 3
+    for station, (_, set_id) in zip(release["stations"], native_computed_chart_cases, strict=True):
+        cs = next(c for c in station["constant_sets"] if c["set_id"] == set_id)
+        print(f"REAL COMPUTED PRODUCER {set_id}: chart={cs['datum'].get('chart_datum')!r}; combined={combined}")
+        assert cs["datum"].pop("chart_datum") == "lat"
+        old = next(c for s in before["stations"] for c in s["constant_sets"] if c["set_id"] == set_id)
+        cs["datum"]["basis"]["lat"]["fallback"] = old["datum"]["basis"]["lat"]["fallback"]
+    assert release == before
 
 
 @pytest.fixture
