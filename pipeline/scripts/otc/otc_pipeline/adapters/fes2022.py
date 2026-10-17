@@ -331,7 +331,7 @@ def attach(release: dict, fetched: FetchResult, *, build_commit: str, table_id: 
             candidates = [_candidate(c, licences[c["licence_id"]]["commercial_use"])
                           for c in station["constant_sets"]]
             old_win = next((c for c in candidates if c.cs["set_id"] == station.get("recommended_set_id")), None)
-            win = old_win if old_win and not old_win.cs.get("fallback") else recommend(candidates)[0]
+            win = old_win if old_win is not None else recommend(candidates)[0]
             station["constant_sets"] = [candidate.cs for candidate in set_order(win, candidates)]
             reconcile_recommendation(station, win)
         else:

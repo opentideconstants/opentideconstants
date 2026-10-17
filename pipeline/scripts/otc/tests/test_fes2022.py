@@ -1,4 +1,5 @@
 """FES private-cache validation and bounded station-point extraction."""
+import copy
 import json
 import math
 import os
@@ -135,6 +136,41 @@ def test_actual_m2_attachment_has_valid_release_contract(native_m2_attachment):
         from otc_pipeline.release_writer import write_release
         write_release(release, Path(output), datestamp=release["release"]["datestamp"],
                       app_export=None, congen_run=None)
+
+
+def test_actual_fes_preserves_existing_fallback_recommendations():
+    from otc_pipeline.adapters.fes2022 import attach, station_roster
+    from otc_pipeline.canary import canary
+    station_path = os.environ.get("OTC_FES_PRESERVATION_STATIONS")
+    cache = os.environ.get("OTC_FES_COMPLETE_CACHE")
+    if not station_path or not cache:
+        pytest.skip("requires actual affected baseline stations and complete FES ocean cache")
+    stations = json.loads(Path(station_path).read_text())
+    metadata = json.loads((Path(station_path).parent / "native-release-meta.json").read_text())
+    release = {**metadata, "stations": copy.deepcopy(stations)}
+    adapter = Fes2022Adapter(stations=station_roster(release),
+                            speeds=TableSpeeds.from_tcd_dump(Path(os.environ["OTC_FES_TCD"])),
+                            manifest_sha256=os.environ["OTC_FES_MANIFEST_SHA256"])
+    fetched = adapter.fetch(Path(cache))
+    result = canary("fes2022", list(adapter.sets(fetched)), [])
+    attach(release, fetched, build_commit="abcdef0", table_id=release["astro_tables"][0]["astro_table_id"],
+           canary_result=result, adapter=adapter)
+    outcomes = []
+    for before, after in zip(stations, release["stations"]):
+        old_sets = {cs["set_id"]: cs for cs in before["constant_sets"]}
+        retained = {cs["set_id"]: cs for cs in after["constant_sets"] if cs["source"] != "fes2022"}
+        model = next(cs for cs in after["constant_sets"] if cs["source"] == "fes2022")
+        expected = before["recommended_set_id"] or model["set_id"]
+        outcomes.append({"station_id": before["station_id"], "before": before["recommended_set_id"],
+                         "after": after["recommended_set_id"], "expected": expected,
+                         "old_values_unchanged": retained == old_sets,
+                         "model_coefficients": len(model["constituents"]),
+                         "model_fallback": model["fallback"]["reason"]})
+        assert after["recommended_is_fallback"] is True
+    print(json.dumps(outcomes, sort_keys=True))
+    assert all(row["old_values_unchanged"] and row["model_coefficients"] > 0
+               and row["model_fallback"] == "reliability_withheld" for row in outcomes)
+    assert all(row["after"] == row["expected"] for row in outcomes)
 
 
 def test_complete_native_cache_contract_and_all_point_results(tmp_path):
