@@ -20,6 +20,8 @@ from test_datums import native_observed_chart_cases as native_observed_chart_cas
 from test_datums import native_approximate_chart_cases as native_approximate_chart_cases
 from test_datums import native_computed_chart_cases as native_computed_chart_cases
 from test_datums import native_nld_computed_chart_cases as native_nld_computed_chart_cases
+from test_datums import native_uhslc_fd_chart_cases as native_uhslc_fd_chart_cases
+from test_datums import native_uhslc_fd_chart_evidence as native_uhslc_fd_chart_evidence
 
 
 def _expected_computed_reference_basis(original):
@@ -32,8 +34,9 @@ def _expected_computed_reference_basis(original):
 
 @pytest.fixture
 def native_computed_chart_composition(native_computed_chart_cases, tmp_path, request):
-    if getattr(request, "param", None) == "nld":
-        ids = {set_id for _, set_id in request.getfixturevalue("native_nld_computed_chart_cases")}
+    if getattr(request, "param", None) in ("nld", "uhslc_fd"):
+        fixture = "native_nld_computed_chart_cases" if request.param == "nld" else "native_uhslc_fd_chart_cases"
+        ids = {set_id for _, set_id in request.getfixturevalue(fixture)}
     else:
         ids = {set_id for _, set_id in native_computed_chart_cases}
         ids.add("OTC-2ecb58d9/gesla-fit/aranmore_island_leabgarrow-ara-irl-mi_c")
@@ -133,7 +136,7 @@ def test_native_computed_chart_composition(native_computed_chart_composition, tm
     assert release == expected
 
 
-@pytest.mark.parametrize("case_fixture", ["native_computed_chart_cases", "native_nld_computed_chart_cases"])
+@pytest.mark.parametrize("case_fixture", ["native_computed_chart_cases", "native_nld_computed_chart_cases", "native_uhslc_fd_chart_cases"])
 @pytest.mark.parametrize("combined", [False, True])
 def test_native_computed_chart_publication(request, case_fixture, tmp_path, combined):
     native_computed_chart_cases = request.getfixturevalue(case_fixture)
@@ -169,7 +172,7 @@ def test_native_computed_chart_publication(request, case_fixture, tmp_path, comb
     assert release == before
 
 
-@pytest.mark.parametrize("native_computed_chart_composition", ["nld"], indirect=True)
+@pytest.mark.parametrize("native_computed_chart_composition", ["nld", "uhslc_fd"], indirect=True)
 def test_native_nld_computed_chart_composition(native_computed_chart_composition):
     release, postcomputed, official, observed, inputs, ids = native_computed_chart_composition
     before = copy.deepcopy(release)
@@ -198,7 +201,7 @@ def test_native_nld_computed_chart_composition(native_computed_chart_composition
                     continue
                 old = next(c for s in baseline["stations"] for c in s["constant_sets"]
                            if c["set_id"] == cs["set_id"])
-                print(f"REAL NLD COMPOSITION {cs['set_id']}: lat={cs['datum']['named']['lat']!r}; "
+                print(f"REAL COMPUTED SOURCE COMPOSITION {cs['set_id']}: lat={cs['datum']['named']['lat']!r}; "
                       f"chart={cs['datum'].get('chart_datum')!r}; observed={'msl' in cs['datum']['named']}")
                 assert cs["datum"].pop("chart_datum") == "lat"
                 fallback = cs["datum"]["basis"]["lat"]["fallback"]
@@ -209,7 +212,7 @@ def test_native_nld_computed_chart_composition(native_computed_chart_composition
     assert before != postcomputed  # Exact native pre-computed input was authenticated.
 
 
-@pytest.mark.parametrize("native_computed_chart_composition", ["nld"], indirect=True)
+@pytest.mark.parametrize("native_computed_chart_composition", ["nld", "uhslc_fd"], indirect=True)
 @pytest.mark.parametrize("defect", ["number", "provenance", "fallback_basis", "fallback_finding", "pointer", "metadata"])
 def test_native_nld_finalized_chart_rejects_tampered_binding(native_computed_chart_composition, defect):
     release, _, official, observed, inputs, ids = native_computed_chart_composition

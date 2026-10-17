@@ -139,8 +139,9 @@ def derive_chart_datums(release: dict, *, include_computed_approximate: bool = T
         for cs in sets:
             if cs.get("source") != "gesla-fit":
                 continue
-            own = [r.get("original_metadata", {}) for r in station.get("source_records", [])
-                   if r.get("source") == "gesla" and r.get("source_record_id") == cs.get("source_record_id")]
+            own_records = [r for r in station.get("source_records", [])
+                           if r.get("source") == "gesla" and r.get("source_record_id") == cs.get("source_record_id")]
+            own = [r.get("original_metadata", {}) for r in own_records]
             if not own or not all(m.get("COUNTRY") == station.get("country") for m in own):
                 continue
             lat_basis = cs.get("datum", {}).get("basis", {}).get("lat", {})
@@ -152,7 +153,18 @@ def derive_chart_datums(release: dict, *, include_computed_approximate: bool = T
             own_nld_msl = all(m.get("COUNTRY") == "NLD" and m.get("CONTRIBUTOR (ABBREVIATED)") == "CMEMS"
                               and m.get("DATUM INFORMATION") == "MSL"
                               and m.get("FILE NAME") == cs.get("source_record_id") for m in own)
-            if ((own_malin or own_nld_msl) and lat_basis.get("kind") == "computed"
+            country = station.get("country")
+            mean = cs.get("datum", {}).get("msl_offset_m")
+            own_uhslc_fd = (isinstance(country, str) and len(country) == 3 and country.isascii()
+                            and country.isalpha() and country not in ("XXX", "UNK")
+                            and isinstance(cs.get("source_record_id"), str) and cs["source_record_id"]
+                            and not isinstance(mean, bool) and isinstance(mean, (int, float)) and math.isfinite(mean)
+                            and all(m.get("CONTRIBUTOR (ABBREVIATED)") == "UHSLC_FD"
+                                    and m.get("DATUM INFORMATION") == "Unspecified"
+                                    and m.get("FILE NAME") == cs.get("source_record_id") for m in own)
+                            and all(isinstance(r.get("published_set_ids"), list)
+                                    and cs["set_id"] in r["published_set_ids"] for r in own_records))
+            if ((own_malin or own_nld_msl or own_uhslc_fd) and lat_basis.get("kind") == "computed"
                     and lat_fallback.get("reason") == "datum_gate_failed"
                     and isinstance(lat_fallback.get("basis"), str) and lat_fallback["basis"].strip()
                     and isinstance(lat_fallback.get("otc_finding"), str) and lat_fallback["otc_finding"].strip()):

@@ -15,6 +15,94 @@ from otc_pipeline.gesla_sets import _published_stated_zero
 
 
 @pytest.fixture(scope="module")
+def native_uhslc_fd_chart_evidence():
+    root = os.environ.get("OTC_UHSLC_FD_CHART_PROOF")
+    if not root:
+        pytest.skip("requires the pinned UHSLC_FD computed chart evidence")
+    path = Path(root) / "receipt.json"
+    assert hashlib.sha256(path.read_bytes()).hexdigest() == "dd7aa95cb1ed19bc60e2bb1f47eba851e0b352f104e5d2ac2da94f1dffa0491e"
+    facts = json.loads(path.read_text())
+    source = Path(facts["input_pins"]["candidate"]["path"])
+    with source.open("rb") as stream:
+        assert hashlib.file_digest(stream, "sha256").hexdigest() == facts["input_pins"]["candidate"]["sha256"]
+    targets = facts["three_real_targets"]
+    holdouts = [row for row in facts["frozen_family_records_at_current_missing_stations"] if row["cached_guard_failures"]]
+    assert len(holdouts) == 19
+    wanted = {row["line"]: row for row in targets + holdouts}
+    stations = {}
+    with source.open("rb") as stream:
+        for number, line in enumerate(stream, 1):
+            if number not in wanted:
+                continue
+            row = wanted[number]
+            assert hashlib.sha256(line).hexdigest() == row["line_sha256"]
+            station = json.loads(line)
+            assert station["station_id"] == row["station_id"]
+            stations[row["set_id"]] = station
+            if number == max(wanted):
+                break
+    assert len(stations) == len(wanted)
+    for row in targets:
+        cs = next(c for c in stations[row["set_id"]]["constant_sets"] if c["set_id"] == row["set_id"])
+        assert cs["datum"]["named"]["lat"] == row["lat_m"]
+        assert cs["datum"]["msl_offset_m"] == row["msl_offset_m"]
+        assert cs["datum"]["basis"]["lat"] == row["lat_basis"]
+        assert "chart_datum" not in cs["datum"]
+        assert "zero" not in cs["datum"] and "zero_name" not in cs["datum"]
+    return facts, stations
+
+
+@pytest.fixture(scope="module")
+def native_uhslc_fd_chart_cases(native_uhslc_fd_chart_evidence):
+    facts, stations = native_uhslc_fd_chart_evidence
+    return [(stations[row["set_id"]], row["set_id"]) for row in facts["three_real_targets"]]
+
+
+def test_native_uhslc_fd_holdouts_preserve_payload(native_uhslc_fd_chart_evidence):
+    facts, stations = native_uhslc_fd_chart_evidence
+    rows = [r for r in facts["frozen_family_records_at_current_missing_stations"] if r["cached_guard_failures"]]
+    for row in rows:
+        station = copy.deepcopy(stations[row["set_id"]])
+        assert datums.derive_chart_datums({"stations": [station]})["changed_sets"] == 0
+        assert station == stations[row["set_id"]]
+        print(f"REAL UHSLC_FD HOLDOUT {row['set_id']}: unchanged; guards={row['cached_guard_failures']}")
+
+
+@pytest.mark.parametrize("defect", ["rq", "known_frame", "missing_mean", "boolean_mean", "nonfinite_mean",
+    "missing_link", "foreign_link", "string_link", "missing_identity", "incomplete_country", "unknown_country"])
+def test_native_uhslc_fd_source_guards(native_uhslc_fd_chart_cases, defect):
+    original, set_id = native_uhslc_fd_chart_cases[0]
+    station = copy.deepcopy(original)
+    cs = next(c for c in station["constant_sets"] if c["set_id"] == set_id)
+    own = next(r for r in station["source_records"] if r["source"] == "gesla"
+               and r["source_record_id"] == cs["source_record_id"])
+    if defect == "rq":
+        own["original_metadata"]["CONTRIBUTOR (ABBREVIATED)"] = "UHSLC_RQ"
+    elif defect == "known_frame":
+        own["original_metadata"]["DATUM INFORMATION"] = "MSL"
+    elif defect == "missing_mean":
+        del cs["datum"]["msl_offset_m"]
+    elif defect in ("boolean_mean", "nonfinite_mean"):
+        cs["datum"]["msl_offset_m"] = True if defect == "boolean_mean" else float("inf")
+    elif defect == "missing_link":
+        del own["published_set_ids"]
+    elif defect == "foreign_link":
+        own["published_set_ids"] = ["different-set"]
+    elif defect == "string_link":
+        own["published_set_ids"] = set_id
+    elif defect == "missing_identity":
+        cs["source_record_id"] = own["source_record_id"] = own["original_metadata"]["FILE NAME"] = None
+    else:
+        country = "XXX" if defect == "unknown_country" else None
+        station["country"] = country
+        for row in station["source_records"]:
+            row.setdefault("original_metadata", {})["COUNTRY"] = country
+    before = copy.deepcopy(station)
+    assert datums.derive_chart_datums({"stations": [station]})["changed_sets"] == 0
+    assert station == before
+
+
+@pytest.fixture(scope="module")
 def native_nld_computed_chart_cases():
     root = os.environ.get("OTC_NLD_CHART_PROOF")
     if not root:
@@ -82,7 +170,7 @@ def native_computed_chart_cases():
     return cases
 
 
-@pytest.mark.parametrize("case_fixture", ["native_computed_chart_cases", "native_nld_computed_chart_cases"])
+@pytest.mark.parametrize("case_fixture", ["native_computed_chart_cases", "native_nld_computed_chart_cases", "native_uhslc_fd_chart_cases"])
 @pytest.mark.parametrize("index", range(3))
 def test_native_computed_approximate_chart(request, case_fixture, index):
     original, set_id = request.getfixturevalue(case_fixture)[index]
@@ -110,7 +198,7 @@ def test_native_computed_approximate_chart(request, case_fixture, index):
     "published_subordinate", "existing_pointer", "flatline", "truncated_lows", "nonfinite", "boolean",
     "wrong_basis", "missing_fallback", "wrong_fallback", "missing_fallback_text", "blank_fallback_text",
     "unknown_country", "other_contributor", "other_frame", "conflicting_filename"])
-@pytest.mark.parametrize("case_fixture", ["native_computed_chart_cases", "native_nld_computed_chart_cases"])
+@pytest.mark.parametrize("case_fixture", ["native_computed_chart_cases", "native_nld_computed_chart_cases", "native_uhslc_fd_chart_cases"])
 def test_native_computed_chart_controls_preserve_payload(request, case_fixture, defect):
     original, set_id = request.getfixturevalue(case_fixture)[0]
     station = copy.deepcopy(original)
@@ -129,7 +217,7 @@ def test_native_computed_chart_controls_preserve_payload(request, case_fixture, 
     elif defect in ("other_contributor", "other_frame", "conflicting_filename"):
         field = {"other_contributor": "CONTRIBUTOR (ABBREVIATED)", "other_frame": "DATUM INFORMATION",
                  "conflicting_filename": "FILE NAME"}[defect]
-        own["original_metadata"][field] = "Unspecified"
+        own["original_metadata"][field] = "MSL" if own["original_metadata"].get(field) == "Unspecified" else "Unspecified"
     elif defect in ("published_other", "published_subordinate"):
         agency = {"named": {"cd": 0.0}, "basis": {"cd": published("CD")}, "chart_datum": "cd"}
         if defect == "published_other":
