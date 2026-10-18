@@ -77,11 +77,43 @@ RSpec.describe 'the qualified native Slackwater file export' do
         expect(entry.fetch('native').fetch('fallback').fetch('reason')).to eq('reliability_withheld')
     end
 
-    it 'keeps the actual untied subordinate ratio record excluded' do
-        entry = report.fetch('records').find { |item| item['station_id'] == 'OTC-01333ad1' }
-        expect(entry.fetch('status')).to eq('unrepresentable')
-        expect(entry.fetch('reason')).to eq('native MSL/chart datum values unavailable')
-        expect(File.exist?(File.join(@directory, 'OTC_20261011-stations/OTC-01333ad1.json'))).to be(false)
+    it 'uses the actual published reference frame for untied subordinates and preserves the local metadata' do
+        %w[OTC-0013852b OTC-0031a9c4 OTC-00605f6b OTC-01333ad1].each do |id|
+            row = @rows.find { |item| item['station_id'] == id }
+            offsets = row.fetch('subordinate_offsets')
+            reference = @rows.find { |item| item['station_id'] == offsets.fetch('reference_station_id') }
+            native = reference.fetch('constant_sets').find { |item| item['set_id'] == reference['recommended_set_id'] }
+            entry = report.fetch('records').find { |item| item['station_id'] == id }
+            expect(entry.fetch('status')).to eq('exported')
+            station = JSON.parse(File.read(File.join(@directory, 'OTC_20261011-stations', "#{id}.json")))
+            ref_station = JSON.parse(File.read(File.join(@directory, 'OTC_20261011-stations', "#{reference.fetch('station_id')}.json")))
+            expect(station.fetch('datums')).to eq(ref_station.fetch('datums'))
+            expect(station.fetch('chart_datum')).to eq(ref_station.fetch('chart_datum'))
+            expect(station.fetch('harmonic_constituents')).to eq([])
+            expect(station.fetch('offsets')).to eq('reference' => reference.fetch('station_id'),
+                'height' => {'type' => offsets.fetch('height_adjusted_type') == 'R' ? 'ratio' : 'fixed', 'high' => offsets.fetch('height_offset_high'), 'low' => offsets.fetch('height_offset_low')},
+                'time' => {'high' => offsets.fetch('time_offset_high_min'), 'low' => offsets.fetch('time_offset_low_min')})
+            details = station.fetch('source').fetch('otc')
+            expect(details.fetch('datum')).to eq(offsets['datum'])
+            expect(details.fetch('datum_fallback')).to include('reason' => 'subordinate_local_datum_unavailable',
+                'reference' => 'reference_station_chart_relative', 'reference_station_id' => reference.fetch('station_id'),
+                'reference_set_id' => native.fetch('set_id'), 'chart_datum' => native.fetch('datum').fetch('chart_datum').upcase)
+            expect(details.fetch('datum_fallback')).to eq(entry.fetch('datum_fallback'))
+            expect(station.fetch('disclaimers')).to include('Subordinate local vertical tie is unavailable.')
+            expect(station.fetch('source').fetch('published_harmonics')).to be(false)
+        end
+    end
+
+    it 'preserves the existing local frame for every fully tied subordinate' do
+        @rows.select { |row| row['type'] == 'subordinate' && row['subordinate_offsets'] }.each do |row|
+            datum = row.fetch('subordinate_offsets')['datum']
+            next unless datum && datum['chart_datum'] && datum.fetch('named', {}).key?(datum['chart_datum']) && (datum.fetch('named', {}).key?('msl') || datum.key?('msl_offset_m'))
+            path = File.join(@directory, 'OTC_20261011-stations', "#{row.fetch('station_id')}.json")
+            next unless File.exist?(path)
+            station = JSON.parse(File.read(path))
+            expect(station.dig('source', 'otc', 'datum_fallback')).to be_nil
+            expect(station.dig('source', 'otc', 'datum')).to eq(datum)
+        end
     end
 
     it 'exports real signed major-axis current bins and the exact subordinate reference' do
