@@ -83,4 +83,24 @@ RSpec.describe 'the qualified native Slackwater file export' do
         expect(entry.fetch('reason')).to eq('native MSL/chart datum values unavailable')
         expect(File.exist?(File.join(@directory, 'OTC_20261011-stations/OTC-01333ad1.json'))).to be(false)
     end
+
+    it 'exports real signed major-axis current bins and the exact subordinate reference' do
+        %w[OTC-00bdf4b5 OTC-017aa91a].each do |id|
+            row = @rows.find { |item| item['station_id'] == id }
+            native = row.fetch('constant_sets').find { |set| set['set_id'] == row['recommended_set_id'] }
+            bin = native.fetch('current_bins').find { |item| item['bin'] == row.fetch('default_current_bin') }
+            station = JSON.parse(File.read(File.join(@directory, 'OTC_20261011-stations', "#{id}.json")))
+            sigma = Math.cos((bin.fetch('azimuth_deg') - bin.fetch('mean_flood_dir_deg')) * Math::PI / 180) < 0 ? -1 : 1
+            expect(station.fetch('kind')).to eq('current')
+            expect(station.fetch('current')).to include('mean_flow' => sigma * bin.fetch('mean_major_ms') / 0.5144444444444445,
+                                                        'flood_direction' => bin.fetch('mean_flood_dir_deg'), 'ebb_direction' => bin.fetch('mean_ebb_dir_deg'))
+            expect(station.fetch('harmonic_constituents')).to eq(bin.fetch('constituents').map { |term| {'name' => term.fetch('name'), 'amplitude' => term.fetch('major_amplitude_ms') / 0.5144444444444445, 'phase' => (term.fetch('major_phase_deg') + (sigma < 0 ? 180 : 0)) % 360} })
+            expect(station.fetch('disclaimers')).to include('signed_major_axis')
+        end
+        station = JSON.parse(File.read(File.join(@directory, 'OTC_20261011-stations/OTC-0034ae14.json')))
+        expect(station.fetch('current').fetch('offsets')).to include('reference' => 'OTC-0cfcf1db', 'flood_time' => -135, 'ebb_time' => -162,
+                                                                   'flood_speed_ratio' => 0.4, 'ebb_speed_ratio' => 0.3,
+                                                                   'slack_before_flood' => -94, 'slack_before_ebb' => -65)
+        expect(station.fetch('harmonic_constituents')).to eq([])
+    end
 end
