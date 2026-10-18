@@ -122,3 +122,52 @@ The advisory concerns Arrow C++ `RecordBatchFileReader::PreBufferMetadata` and
 states that Python bindings do not expose this operation and are not vulnerable.
 The exception applies only to the OTC Python audit containing PyArrow 21.0.0.
 It does not exempt other packages, advisories or the GESLA lock.
+
+### Slackwater station JSON and TCDB file swaps
+
+Run the exporter from `pipeline` with Ruby 3.2 or later and the existing bundle:
+
+```text
+bundle exec ruby scripts/otc/export_slackwater.rb --input /absolute/OTC_20261011.jsonl --release /absolute/OTC_20261011.meta.json --output-dir /absolute/output --date 20261011 --station-schema /absolute/station.schema.json --database-schema /absolute/database.fbs --country-codes /absolute/country-codes.csv --flatc /absolute/flatc
+```
+
+Supply the external `schemas/station.schema.json` and `schemas/database.fbs` from
+`openwatersio/slackwater-database` revision `e046e800c40b0033b675d7f985ecfc62534d1b16`.
+Their SHA256 hashes must be `cf24a8947fd1d159741aef1de74a0281a0a281d6c05ccfb40cf20db42fcac9f4`
+and `5e0cc616baf47aa8bf8ce2baa679a81881aff7e2ed90027487009145a19496ea`, respectively.
+Use standard FlatBuffers `flatc` version **25.9.23**. These reference files and
+consumer implementations are not included in OTC or its exported files.
+
+The country CSV uses `datasets/country-codes`, revision
+`2d84034a0cae19ea5444b78c2131304a5c7f4bb9`, file `data/country-codes.csv`
+(SHA256 `bb199ebc9636b9872705e8216f1f849359f136a7668ebfa23a3c58048462ab92`).
+Its ISO3, ISO2, English country name and continent columns provide the required
+format fields. The exporter records the supplied CSV hash and preserves the
+native country code. It does not resolve missing countries from coordinates.
+
+Outputs are `OTC_<date>-stations/`, `OTC_<date>.tcdb`, and
+`OTC_<date>-swap-report.json`. Each reference station uses its native
+`recommended_set_id`; the exporter does not rank or combine sets. Alternatives
+are listed as omitted in the report. Subordinate tides retain their native
+reference and offsets only when that reference is exported. Currents and
+records without representable native chart/MSL datum values are reported as
+omissions. No chart datum or scientific value is derived. Native datum basis,
+fallback findings, provenance and licence notices accompany exported records.
+The report includes the native selected records and licence registry.
+
+Exit **0** means all records and sets were represented; **2** means partial
+output, including omitted alternatives or records without predictions; **1**
+means an input/tool error. Read the report before using partial output. A rerun
+replaces this release's station directory to remove stale omitted records.
+TCDB stores amplitudes, phases and datums as float32; JSON retains native
+precision. Standard flatc does not promise the reference builder's preferred
+physical layout or scan performance. No Slackwater quality score is inferred.
+
+Compatibility proof uses unchanged engine revision `97ef33e30572` for JSON
+predictions and unchanged Swift reader revision `e046e800c40b0033b675d7f985ecfc62534d1b16`
+for TCDB decoding. Swift-decoded values are then predicted by that same engine;
+the Swift reader itself has no prediction API. Three tested station examples
+do not establish prediction accuracy or acceptance for every exported station.
+Run `spec/otc/export_slackwater_spec.rb` with `OTC_SWAP_INPUT`, `OTC_SWAP_RELEASE`,
+`OTC_SWAP_DATABASE_SCHEMA`, `OTC_SWAP_STATION_SCHEMA`, `OTC_SWAP_COUNTRY_CODES`
+and `OTC_SWAP_FLATC` set to the real release and external dependencies.
