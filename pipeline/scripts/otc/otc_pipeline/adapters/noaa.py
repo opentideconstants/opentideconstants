@@ -76,6 +76,10 @@ PHASE_FIELDS = ("phase_GMT", "phase_local")
 STATION_FIELDS = ("id", "name", "lat", "lng", "type", "reference_id", "state", "timezonecorr", "timemeridian")
 FT_TO_M = 0.3048
 HEIGHT_TYPES = {"R": "R", "F": "A"}   # NOAA heightAdjustedType -> schema height_adjusted_type
+# Acquired ordinary US state/DC codes only; territories are outside this carry.
+NOAA_REGION_CODES = {state: f"US-{state}" for state in (
+    "AK", "AL", "CA", "CT", "DC", "DE", "FL", "GA", "HI", "LA", "MA", "MD", "ME", "MS",
+    "NC", "NH", "NJ", "NY", "OR", "PA", "RI", "SC", "TX", "VA", "WA")}
 # NOAA datum name -> OTC key (datums spec rule 10: canonical where NOAA's definition is the
 # canonical one, otherwise NOAA's name in lower case).
 TIDAL_DATUMS = {"MHHW": "mhhw", "MHW": "mhw", "DTL": "dtl", "MTL": "mtl", "MSL": "msl", "MLW": "mlw",
@@ -367,8 +371,12 @@ class NoaaAdapter:
     def _hint(self, st: dict, kind: str) -> dict:
         lat, lon = float(st["lat"]), float(st["lng"])
         country, zone = place(st["id"], lat, lon)
-        return {"name": st["name"].strip(), "country": country, "lat": lat, "lon": lon, "type": kind,
+        hint = {"name": st["name"].strip(), "country": country, "lat": lat, "lon": lon, "type": kind,
                 "timezone": zone, "aliases": {"noaa": st["id"]}}
+        state = st.get("state")
+        if country == "USA" and isinstance(state, str) and state in NOAA_REGION_CODES:
+            hint["region_code"] = NOAA_REGION_CODES[state]
+        return hint
 
     def _constituent(self, sid: str, c: dict) -> dict | None:
         """The constituent with its astro row's speed (NOAA's own within 1e-4 deg/h, else SpeedDeviation),

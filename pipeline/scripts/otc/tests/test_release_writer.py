@@ -20,6 +20,7 @@ import pytest
 from jsonschema import Draft202012Validator
 
 import otc_pipeline.release_writer as rw
+from otc_pipeline import combine
 from otc_pipeline.astro_tables import load_congen_run
 from otc_pipeline.release_writer import (
     CSV_COLUMNS,
@@ -55,6 +56,96 @@ def write(release, out_dir, datestamp=D, **kw):
 
 def test_example_is_valid(release):
     assert validate_release(release) == []
+
+
+def test_optional_region_code_roundtrips_native_outputs(release, tmp_path):
+    release["stations"][0]["region_code"] = "US-MA"
+    assert validate_release(release) == []
+    write(release, tmp_path, datestamp=release["release"]["datestamp"], parquet=True)
+    stem = "OTC_" + release["release"]["datestamp"]
+    for suffix in (".json", ".jsonl"):
+        text = (tmp_path / (stem + suffix)).read_text()
+        stations = json.loads(text)["stations"] if suffix == ".json" else list(map(json.loads, text.splitlines()))
+        assert stations[0]["region_code"] == "US-MA"
+    with (tmp_path / (stem + ".csv")).open() as stream:
+        station = next(s for s in csv.DictReader(stream) if s["record_type"] == "station")
+        assert station["region_code"] == "US-MA"
+    table = pq.read_table(tmp_path / (stem + ".parquet")).to_pylist()
+    assert next(s for s in table if s["record_type"] == "station")["region_code"] == "US-MA"
+
+
+def test_noaa_region_real_cached_release():
+    """Opt-in integration proof: the real cached producer and accepted native release."""
+    root = os.environ.get("OTC_REGION_PROOF_ROOT")
+    if not root:
+        pytest.skip("requires frozen NOAA cache and accepted native release")
+    root = Path(root)
+    inputs = json.loads((root / "inputs.json").read_text())
+    candidate = Path(inputs["candidate"])
+    assert hashlib.sha256(candidate.read_bytes()).hexdigest() == inputs["candidate_sha256"]
+    cache = Path(inputs["cache"])
+    source = cache / "noaa/stations.json"
+    assert hashlib.sha256(source.read_bytes()).hexdigest() == inputs["source_sha256"]
+    doc = json.loads(candidate.with_suffix(".meta.json").read_text())
+    doc["stations"] = [json.loads(line) for line in candidate.open()]
+    before = {s["station_id"]: hashlib.sha256(rw._json_bytes(s)).hexdigest() for s in doc["stations"]}
+    sources = combine.load_agency(cache, sources=("noaa",), jma_year=2026,
+                                  tcd_path=Path(inputs["tcd"]))
+    hints = [ss.station_hint for ss in sources["noaa"].sets]
+    (root / "hints.json").write_text(json.dumps(hints, sort_keys=True))
+    operation = getattr(combine, "carry_noaa_region_codes", None)
+    result = operation(doc["stations"], hints) if operation else {"changed": [], "conflicts": []}
+    print("shared_operation_present", operation is not None, flush=True)
+    output = root / os.environ["OTC_REGION_PHASE"]
+    stem = "OTC_" + doc["release"]["datestamp"]
+    if (output / (stem + ".sha256")).exists():
+        assert os.environ["OTC_REGION_PHASE"] == "red", "GREEN requires fresh writer output"
+        assert check_release_dir(output) == []
+        print("reusing completed hash-verified writer output", output, flush=True)
+    else:
+        output.mkdir(exist_ok=True)
+        assert validate_release(doc) == []
+        write_release(doc, output, datestamp=doc["release"]["datestamp"], app_export=None,
+                      congen_run=load_congen_run(Path(inputs["congen"])), parquet=True)
+    cells = {"OTC-ee4593cd": ("9414290", "CA", "US-CA"),
+             "OTC-bb22c37b": ("9447130", "WA", "US-WA"),
+             "OTC-e813b80c": ("8443970", "MA", "US-MA")}
+    actual = {s["station_id"]: s for s in doc["stations"]}
+    persisted = {s["station_id"]: s for s in map(json.loads, (output / (stem + ".jsonl")).open())
+                 if s["station_id"] in cells}
+    csv.field_size_limit(100_000_000)
+    with (output / (stem + ".csv")).open() as stream:
+        csv_cells = {s["station_id"]: s for s in csv.DictReader(stream)
+                     if s["record_type"] == "station" and s["station_id"] in cells}
+    parquet_cells = {s["station_id"]: s for s in pq.read_table(output / (stem + ".parquet"),
+                     filters=[("record_type", "=", "station"), ("station_id", "in", list(cells))]).to_pylist()}
+    failures = []
+    raw = {s["id"]: s for s in json.loads(source.read_text())["stations"]}
+    for sid, (noaa_id, state, expected) in cells.items():
+        assert raw[noaa_id]["state"] == state
+        observed = persisted[sid].get("region_code")
+        hint = next(h for h in hints if h["aliases"]["noaa"] == noaa_id)
+        print(f"CELL {sid} NOAA={noaa_id} state={state} hint={hint.get('region_code')!r} "
+              f"persisted={observed!r} expected={expected}", flush=True)
+        if observed != expected:
+            failures.append(sid)
+        else:
+            assert csv_cells[sid]["region_code"] == expected
+            assert parquet_cells[sid]["region_code"] == expected
+    for station in doc["stations"]:
+        old_hash = before[station["station_id"]]
+        clean = {k: v for k, v in station.items() if k != "region_code"}
+        assert hashlib.sha256(rw._json_bytes(clean)).hexdigest() == old_hash
+    (root / (os.environ["OTC_REGION_PHASE"] + "-receipt.json")).write_text(json.dumps({
+        "operation": result, "station_count": len(doc["stations"]),
+        "complete_station_payloads_preserved_excluding_region_code": True,
+        "source_sha256": inputs["source_sha256"], "candidate_sha256": inputs["candidate_sha256"],
+    }, sort_keys=True, indent=2))
+    if failures:
+        actual["OTC-ee4593cd"]["region_code"] = "US-CA"
+        rejected = validate_release(doc)
+        print("SCHEMA_RED", next(e for e in rejected if "region_code" in e), flush=True)
+    assert not failures, f"persisted actual cells lack exact NOAA region codes: {failures}"
 
 
 @pytest.mark.parametrize("real_env,sid,set_id,policy_id", [

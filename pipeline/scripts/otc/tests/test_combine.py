@@ -124,6 +124,46 @@ def test_official_merge_clears_the_previous_fallback_marker():
 PASS = {"status": "pass", "gauges": 5}
 
 
+def test_region_code_shared_carry_is_used_for_joined_and_new_stations(monkeypatch):
+    joined, new = ref("8443970", 42.355, -71.05), ref("9414290", 37.8, -122.5)
+    joined.station_hint["region_code"] = "US-MA"
+    new.station_hint["region_code"] = "US-CA"
+    calls = []
+    operation = getattr(combine, "carry_noaa_region_codes", None)
+    assert operation is not None
+
+    def observed(stations, hints):
+        calls.append(True)
+        return operation(stations, hints)
+
+    monkeypatch.setattr(combine, "carry_noaa_region_codes", observed)
+    result, _ = combine.merge(gesla_release(), {"noaa": agency(joined, new)},
+        station_ids={"noaa:8443970": "OTC-aaaaaaaa", "noaa:9414290": "OTC-dddddddd"},
+        build_commit="abcdef0", table_id=TABLE, canaries={"noaa": PASS})
+    stations = {s["station_id"]: s for s in result["stations"]}
+    assert calls == [True]
+    assert stations["OTC-aaaaaaaa"]["region_code"] == "US-MA"
+    assert stations["OTC-dddddddd"]["region_code"] == "US-CA"
+
+
+def test_region_code_carry_preserves_conflicting_identity_and_existing_metadata():
+    station = {"station_id": "OTC-aaaaaaaa", "status": "active", "country": "USA",
+               "aliases": {"noaa": "8443970"}}
+    hint = {"country": "USA", "aliases": {"noaa": "8443970"}, "region_code": "US-MA"}
+    operation = getattr(combine, "carry_noaa_region_codes", None)
+    assert operation is not None
+    for variants, existing in [([hint, {**hint, "region_code": "US-CA"}], None),
+                                ([hint], "US-CA")]:
+        actual = copy.deepcopy(station)
+        if existing is not None:
+            actual["region_code"] = existing
+        before = copy.deepcopy(actual)
+        result = operation([actual], variants)
+        assert actual == before
+        assert result["changed"] == []
+        assert result["conflicts"] == [station["station_id"]]
+
+
 # --- the join rule ----------------------------------------------------------------------------------
 
 PLACES = [Place("OTC-aaaaaaaa", 42.355, -71.05, m2c(1.0, 100.0)),
