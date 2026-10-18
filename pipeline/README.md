@@ -150,8 +150,16 @@ Outputs are `OTC_<date>-stations/`, `OTC_<date>.tcdb`, and
 `recommended_set_id`; the exporter does not rank or combine sets. Alternatives
 are listed as omitted in the report. Subordinate tides retain their native
 reference and offsets only when that reference is exported. Currents and
-records without representable native chart/MSL datum values are reported as
-omissions. No chart datum or scientific value is derived. Native datum basis,
+subordinates without representable native chart/MSL datum values are reported as
+omissions. Reference harmonics without a usable native chart/MSL tie use an empty
+`chart_datum` and an export-only `datum_fallback` label in source metadata and
+the report. Predictions then remain relative to the harmonic mean. No absolute
+or chart-datum height is established. Missing datum objects produce empty
+`datums`; missing chart keys or values retain all available native named values
+and the existing MSL offset mapping. No numeric datum or chart tie is invented.
+The complete native datum path takes precedence; native selection and quality
+remain unchanged. Subordinate ratio offsets still require their native chart tie.
+No chart datum or scientific value is derived. Native datum basis,
 fallback findings, provenance and licence notices accompany exported records.
 The report includes the native selected records and licence registry.
 

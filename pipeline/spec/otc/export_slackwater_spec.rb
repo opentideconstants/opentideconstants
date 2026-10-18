@@ -51,11 +51,36 @@ RSpec.describe 'the qualified native Slackwater file export' do
         end
     end
 
-    it 'reports datum-null FES records as unrepresentable and preserves their fallback evidence' do
+    it 'exports actual untied references as labelled harmonic mean-relative predictions without inventing datums' do
+        %w[OTC-0012a4f2 OTC-00196c3e OTC-000180a3 OTC-000cb5d3 OTC-00252765 OTC-00b6ed94].each do |id|
+            row = @rows.find { |item| item['station_id'] == id }
+            native = row.fetch('constant_sets').find { |item| item['set_id'] == row['recommended_set_id'] }
+            entry = report.fetch('records').find { |item| item['station_id'] == id }
+            expect(entry.fetch('status')).to eq('exported')
+            station = JSON.parse(File.read(File.join(@directory, 'OTC_20261011-stations', "#{id}.json")))
+            datum = native.fetch('datum', {})
+            expected = datum.fetch('named', {}).transform_keys(&:upcase)
+            expected['MSL'] = datum['msl_offset_m'] if !expected.key?('MSL') && datum.key?('msl_offset_m')
+            expect(station.fetch('datums')).to eq(expected)
+            expect(station.fetch('chart_datum')).to eq('')
+            expect(station.fetch('source').fetch('name')).to eq(native.fetch('source'))
+            expect(station.fetch('source').fetch('id')).to eq(native.fetch('source_record_id'))
+            details = station.fetch('source').fetch('otc')
+            expect(details.fetch('datum')).to eq(native['datum'])
+            expect(details.fetch('fallback')).to eq(native['fallback'])
+            expect(details.fetch('datum_fallback')).to eq(entry.fetch('datum_fallback'))
+            expect(details.fetch('datum_fallback')).to include('reason' => 'chart_datum_unavailable', 'reference' => 'harmonic_mean_relative')
+            expect(station.fetch('disclaimers')).to include('No absolute or chart-datum height is established; predictions are relative to the harmonic mean.')
+            expect(station.fetch('harmonic_constituents')).to eq(native.fetch('constituents').map { |term| {'name' => term.fetch('name'), 'amplitude' => term.fetch('amplitude_m'), 'phase' => term.fetch('phase_deg')} })
+        end
         entry = report.fetch('records').find { |item| item['station_id'] == 'OTC-0012a4f2' }
-        expect(entry.fetch('status')).to eq('unrepresentable')
-        expect(entry.fetch('reason')).to include('datum')
         expect(entry.fetch('native').fetch('fallback').fetch('reason')).to eq('reliability_withheld')
-        expect(File.exist?(File.join(@directory, 'OTC_20261011-stations/OTC-0012a4f2.json'))).to be(false)
+    end
+
+    it 'keeps the actual untied subordinate ratio record excluded' do
+        entry = report.fetch('records').find { |item| item['station_id'] == 'OTC-01333ad1' }
+        expect(entry.fetch('status')).to eq('unrepresentable')
+        expect(entry.fetch('reason')).to eq('native MSL/chart datum values unavailable')
+        expect(File.exist?(File.join(@directory, 'OTC_20261011-stations/OTC-01333ad1.json'))).to be(false)
     end
 end

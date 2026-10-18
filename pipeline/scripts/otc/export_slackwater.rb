@@ -66,6 +66,8 @@ module OTCExportSlackwater
                     @report.fetch('records') << entry
                     begin
                         station = project(row, native)
+                        datum_fallback = station.fetch('source').fetch('otc')['datum_fallback']
+                        entry['datum_fallback'] = datum_fallback if datum_fallback
                         entry['status'] = 'exported'
                         station
                     rescue ArgumentError, KeyError => error
@@ -105,27 +107,47 @@ module OTCExportSlackwater
             selected = subordinate ? row['subordinate_offsets'] : native
             raise ArgumentError, 'no native prediction record' unless selected
             raise ArgumentError, 'current records are outside scalar tide format' if selected['quantity'] == 'current' || row['type'] == 'current'
-            datum = selected.fetch('datum') { raise ArgumentError, 'native datum/chart tie unavailable' }
-            chart = datum.fetch('chart_datum') { raise ArgumentError, 'native chart datum unavailable' }.upcase
-            datums = datum.fetch('named', {}).transform_keys(&:upcase)
-            datums['MSL'] = datum['msl_offset_m'] if !datums.key?('MSL') && datum.key?('msl_offset_m')
-            raise ArgumentError, 'native MSL/chart datum values unavailable' unless datums.key?('MSL') && datums.key?(chart)
+            datum = selected['datum']
+            chart = datum && datum['chart_datum']&.upcase
+            datums = (datum || {}).fetch('named', {}).transform_keys(&:upcase)
+            datums['MSL'] = datum['msl_offset_m'] if !datums.key?('MSL') && datum&.key?('msl_offset_m')
+            tied = chart && datums.key?('MSL') && datums.key?(chart)
+            if subordinate
+                raise ArgumentError, 'native datum/chart tie unavailable' unless datum
+                raise ArgumentError, 'native chart datum unavailable' unless chart
+                raise ArgumentError, 'native MSL/chart datum values unavailable' unless tied
+            end
+            unless tied
+                unavailable = if !datum
+                    ['datum']
+                elsif !chart
+                    ['chart_datum']
+                else
+                    ['MSL', chart].uniq.reject { |name| datums.key?(name) }.map { |name| "datums.#{name}" }
+                end
+                datum_fallback = {'reason' => 'chart_datum_unavailable', 'reference' => 'harmonic_mean_relative',
+                                  'unavailable_fields' => unavailable,
+                                  'finding' => 'No absolute or chart-datum height is established; predictions are relative to the harmonic mean.'}
+                chart = ''
+            end
             country = @countries.fetch(row.fetch('country')) { raise ArgumentError, 'country has no ISO mapping' }
             continent = CONTINENTS.fetch(country.fetch('Continent')) { raise ArgumentError, 'country has no continent mapping' }
             licence = @licences.fetch(selected.fetch('licence_id'))
             source_name = native && !subordinate ? native.fetch('source') : 'noaa'
+            source_url_name = {'gesla-fit' => 'gesla', 'ticon-4' => 'ticon'}.fetch(source_name, source_name)
             source_id = native && !subordinate ? native.fetch('source_record_id') : Array(row.fetch('aliases').fetch('noaa')).first
             details = {'set_id' => subordinate ? nil : native.fetch('set_id'), 'datum' => datum,
                        'fallback' => selected['fallback'], 'qc_status' => selected['qc_status'], 'qc_flags' => selected['qc_flags'],
                        'provenance' => selected['provenance'], 'source_version' => selected['source_version'],
                        'recommended_is_fallback' => row['recommended_is_fallback'], 'native_country' => row['country'],
                        'units' => 'meters', 'phase' => 'Greenwich degrees'}
+            details['datum_fallback'] = datum_fallback if datum_fallback
             notice = JSON.generate(details)
             attribution = licence.fetch('attribution')
             station = {'id' => row.fetch('station_id'), 'name' => row.fetch('name'), 'type' => subordinate ? 'subordinate' : 'reference',
                        'latitude' => row.fetch('lat'), 'longitude' => row.fetch('lon'), 'timezone' => row.fetch('timezone'),
                        'continent' => continent, 'country' => country.fetch('official_name_en'),
-                       'source' => {'name' => source_name, 'id' => source_id, 'url' => SOURCE_URLS.fetch(source_name == 'gesla-fit' ? 'gesla' : source_name),
+                       'source' => {'name' => source_name, 'id' => source_id, 'url' => SOURCE_URLS.fetch(source_url_name),
                                     'published_harmonics' => !subordinate && native['source_type'] == 'official', 'otc' => details},
                        'license' => {'type' => licence.fetch('spdx'), 'url' => licence['url'] || licence.fetch('terms_url'),
                                      'commercial_use' => licence.fetch('commercial_use'), 'notes' => [attribution, licence['restriction'], licence['citation']].compact.join("\n")},
