@@ -17,7 +17,7 @@ GEM
       rspec-support (~> 3.13.0)
     rspec-support (3.13.6)
     rubyzip (3.4.1)
-    tcd (1.0.2)
+    tcd (1.1.0)
     tzinfo (2.0.6)
       concurrent-ruby (~> 1.0)
 
@@ -29,7 +29,7 @@ PLATFORMS
 DEPENDENCIES
   rspec (= 3.13.2)
   rubyzip (= 3.4.1)
-  tcd (= 1.0.2)
+  tcd (= 1.1.0)
   tzinfo (= 2.0.6)
 
 RUBY VERSION
