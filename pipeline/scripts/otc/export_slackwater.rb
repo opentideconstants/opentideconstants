@@ -134,11 +134,6 @@ module OTCExportSlackwater
             datums = (datum || {}).fetch('named', {}).transform_keys(&:upcase)
             datums['MSL'] = datum['msl_offset_m'] if !datums.key?('MSL') && datum&.key?('msl_offset_m')
             tied = chart && datums.key?('MSL') && datums.key?(chart)
-            if subordinate
-                raise ArgumentError, 'native datum/chart tie unavailable' unless datum
-                raise ArgumentError, 'native chart datum unavailable' unless chart
-                raise ArgumentError, 'native MSL/chart datum values unavailable' unless tied
-            end
             unless tied
                 unavailable = if !datum
                     ['datum']
@@ -147,10 +142,29 @@ module OTCExportSlackwater
                 else
                     ['MSL', chart].uniq.reject { |name| datums.key?(name) }.map { |name| "datums.#{name}" }
                 end
-                datum_fallback = {'reason' => 'chart_datum_unavailable', 'reference' => 'harmonic_mean_relative',
-                                  'unavailable_fields' => unavailable,
-                                  'finding' => 'No absolute or chart-datum height is established; predictions are relative to the harmonic mean.'}
-                chart = ''
+                if subordinate
+                    reference = @rows.find { |item| item['station_id'] == selected.fetch('reference_station_id') }
+                    raise ArgumentError, 'subordinate reference station unavailable' unless reference && reference['type'] != 'subordinate'
+                    reference_set = reference.fetch('constant_sets').find { |set| set['set_id'] == reference['recommended_set_id'] }
+                    reference_datum = reference_set && reference_set['datum']
+                    reference_chart = reference_datum && reference_datum['chart_datum']
+                    unless reference_set && reference_set['quantity'] == 'water_level' && reference_chart &&
+                           reference_datum.dig('basis', reference_chart, 'kind') == 'published' && reference_datum.key?('msl_offset_m')
+                        raise ArgumentError, 'subordinate reference published chart tie unavailable'
+                    end
+                    frame = project(reference, reference_set)
+                    raise ArgumentError, 'subordinate reference MSL/chart values unavailable' if frame['chart_datum'].empty?
+                    chart, datums = frame.values_at('chart_datum', 'datums')
+                    datum_fallback = {'reason' => 'subordinate_local_datum_unavailable', 'reference' => 'reference_station_chart_relative',
+                                      'reference_station_id' => reference.fetch('station_id'), 'reference_set_id' => reference_set.fetch('set_id'),
+                                      'unavailable_fields' => unavailable, 'chart_datum' => chart,
+                                      'finding' => 'Subordinate local vertical tie is unavailable. These offsets use the reference station chart coordinate; this labelled approximation does not establish an absolute local chart datum.'}
+                else
+                    datum_fallback = {'reason' => 'chart_datum_unavailable', 'reference' => 'harmonic_mean_relative',
+                                      'unavailable_fields' => unavailable,
+                                      'finding' => 'No absolute or chart-datum height is established; predictions are relative to the harmonic mean.'}
+                    chart = ''
+                end
             end
             country = @countries.fetch(row.fetch('country')) { raise ArgumentError, 'country has no ISO mapping' }
             continent = CONTINENTS.fetch(country.fetch('Continent')) { raise ArgumentError, 'country has no continent mapping' }

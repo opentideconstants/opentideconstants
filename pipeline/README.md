@@ -150,15 +150,32 @@ Outputs are `OTC_<date>-stations/`, `OTC_<date>.tcdb`, and
 `recommended_set_id`; the exporter does not rank or combine sets. Alternatives
 are listed as omitted in the report. Subordinate tides retain their native
 reference and offsets only when that reference is exported. Tide
-subordinates without representable native chart/MSL datum values are reported as
-omissions. Reference harmonics without a usable native chart/MSL tie use an empty
+subordinates without a local chart/MSL tie can use their selected reference's
+published chart coordinate. This is a labelled reference-relative approximation;
+the subordinate's local vertical tie remains unknown. The exporter copies the
+reference's existing datum values and chart key, records its exact station/set
+identity, and retains the original local datum metadata separately in `source.otc`.
+The visible disclaimer and TCDB attribution describe this limitation. Fully tied
+local subordinates keep their existing local frame. Missing or untied references
+remain explicit omissions. Reference harmonics without a usable native chart/MSL tie use an empty
 `chart_datum` and an export-only `datum_fallback` label in source metadata and
 the report. Predictions then remain relative to the harmonic mean. No absolute
 or chart-datum height is established. Missing datum objects produce empty
 `datums`; missing chart keys or values retain all available native named values
 and the existing MSL offset mapping. No numeric datum or chart tie is invented.
 The complete native datum path takes precedence; native selection and quality
-remain unchanged. Subordinate ratio offsets still require their native chart tie.
+remain unchanged. Ratio offsets multiply heights in the reference chart frame.
+For JSON prediction, resolve `station.offsets.reference` from the same export and
+pass its `harmonic_constituents` with the subordinate's other fields to `useStation`:
+
+```javascript
+const reference = stations.find(item => item.id === station.offsets.reference);
+const predictor = useStation({...station, harmonic_constituents: reference.harmonic_constituents});
+const events = predictor.getExtremesPrediction({start, end});
+```
+
+The TCDB reader resolves that reference automatically. These extrema preserve
+native ratios, additions and time offsets; they do not certify a local chart datum.
 No chart datum or scientific value is derived. Native datum basis,
 fallback findings, provenance and licence notices accompany exported records.
 The report includes the native selected records and licence registry.
