@@ -116,13 +116,20 @@ module OTCExportTCD
             attribution = licence.fetch('attribution')
             raise ArgumentError, 'licence attribution is empty' if attribution.empty?
             datum = native.fetch('datum', {})
+            datum_note = if native.key?('reference_station_id')
+                             'Subordinate heights use native reference offsets; see native datum metadata.'
+                         elsif datum.key?('msl_offset_m')
+                             'Native zero retained; no derived chart datum.'
+                         else
+                             'Mean-level-relative harmonics; absolute chart datum is unavailable.'
+                         end
             details = {
                 station_id: row.fetch('station_id'), name: row.fetch('name'), identity: identity,
                 source: native['source'], source_version: native['source_version'], source_record_id: native['source_record_id'],
                 licence: licence, provenance: native['provenance'], qc_status: native['qc_status'],
                 qc_flags: native['qc_flags'], time_base: native['time_base'], fallback: native['fallback'],
                 datum: datum.slice('zero', 'zero_name', 'chart_datum', 'msl_offset_m'),
-                datum_note: datum.key?('msl_offset_m') ? 'Native zero retained; no derived chart datum.' : 'Mean-level-relative harmonics; absolute chart datum is unavailable.'
+                datum_note: datum_note
             }
             {
                 name: display_name(row, suffix), latitude: row.fetch('lat'), longitude: row.fetch('lon'),

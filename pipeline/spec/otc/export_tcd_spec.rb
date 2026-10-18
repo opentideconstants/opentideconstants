@@ -94,6 +94,20 @@ RSpec.describe 'the real native release TCD export' do
         expect(extra.fetch('name')).to include('fallback:reliability_withheld:')
     end
 
+    it 'retains the explicit subordinate datum note while preserving the datum-less harmonic warning' do
+        entries = report.fetch('outputs').fetch('complete').fetch('records')
+        read_output('complete') do |db|
+            subordinate = entries.find { |entry| entry['identity'] == 'OTC-0012535c/subordinate' }
+            notes = JSON.parse(db.stations[subordinate.fetch('record_index')].notes)
+            expect(notes.fetch('datum')).to include('zero' => 'chart_datum', 'zero_name' => 'MLLW', 'chart_datum' => 'mllw')
+            expect(notes.fetch('datum_note')).to eq('Subordinate heights use native reference offsets; see native datum metadata.')
+
+            harmonic = entries.find { |entry| entry['set_id'] == 'OTC-0012535c/fes2022' }
+            notes = JSON.parse(db.stations[harmonic.fetch('record_index')].notes)
+            expect(notes.fetch('datum_note')).to eq('Mean-level-relative harmonics; absolute chart datum is unavailable.')
+        end
+    end
+
     it 'keeps valid subordinate references and reports 2D current limitations without invented scalar data' do
         entries = report.fetch('outputs').fetch('complete').fetch('records')
         read_output('complete') do |db|
