@@ -39,6 +39,8 @@ from otc_pipeline import gesla_sets as gs
 from otc_pipeline import station_map as sm
 from otc_pipeline import original_sources
 from otc_pipeline import noaa_historical
+from otc_pipeline.adapters import fes2022
+from otc_pipeline.constituent_speeds import TableSpeeds
 from otc_pipeline.chs_identities import load_chs_identities
 from otc_pipeline.astro_tables import TABLE_ID
 from otc_pipeline.canary import CANARY_CONSTITUENTS, canary
@@ -487,6 +489,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--noaa-historical-inputs-sha256")
     ap.add_argument("--noaa-historical-comparison", type=Path)
     ap.add_argument("--noaa-historical-comparison-sha256")
+    ap.add_argument("--fes-cache", type=Path, help="private, complete FES2022b ocean input cache")
+    ap.add_argument("--fes-manifest-sha256", help=f"SHA-256 of that cache's {fes2022.OCEAN_MANIFEST_NAME}")
     ap.add_argument("--official-datum-drafts", type=Path,
                     help="stage pinned official computed drafts in DATUM_STAGE.json; release values stay unchanged")
     ap.add_argument("--official-datum-drafts-sha256")
@@ -503,6 +507,10 @@ def main(argv: list[str] | None = None) -> int:
     gb.inventory_arguments(ap)
     argv = sys.argv[1:] if argv is None else list(argv)
     a = ap.parse_args(argv)
+    if (a.fes_cache is None) != (a.fes_manifest_sha256 is None):
+        raise ValueError("--fes-cache and --fes-manifest-sha256 must be supplied together")
+    if a.fes_cache is not None and _sha256(a.fes_cache / fes2022.OCEAN_MANIFEST_NAME) != a.fes_manifest_sha256:
+        raise ValueError("FES manifest SHA-256 mismatch")
     observed_inputs = (a.observed_datum_drafts, a.observed_datum_drafts_sha256,
                        a.observed_datum_source_release, a.observed_datum_source_release_sha256)
     if any(value is not None for value in observed_inputs) and any(value is None for value in observed_inputs):
@@ -562,15 +570,20 @@ def main(argv: list[str] | None = None) -> int:
     commit = gb.head_commit()
     log(f"build_commit {commit}")
     tcd = a.tcd or dump_path()
+    model_adapter = fes2022.Fes2022Adapter(speeds=TableSpeeds.from_tcd_dump(tcd),
+        manifest_sha256=a.fes_manifest_sha256) if a.fes_cache is not None else None
     agency = combine.load_agency(a.agency_cache, jma_year=int(a.datestamp[:4]), tcd_path=tcd)
     log("agency sets: " + ", ".join(f"{s} {len(x.sets)}" for s, x in agency.items()))
     parts = gb.build_parts(fit_run=a.fit_run, audit_dir=a.audit_dir, verdicts_dir=a.verdicts_dir,
                            calibration_dir=a.calibration, overlay_run=a.overlay_run, ticon_csv=a.ticon_csv,
                            ticon_refs=a.ticon_refs, congen_run=a.congen_run, datestamp=a.datestamp,
                            created=a.created, build_commit=commit, tcd_path=tcd,
-                           extra_names=combine.agency_names(agency), inventory=inventory, log=log)
+                           extra_names=combine.agency_names(agency) | (model_adapter.supported_names() if model_adapter else set()),
+                           inventory=inventory, log=log)
     log(f"gesla build_release: {parts.report.summary()}")
     check_one_table(agency, parts)
+    if model_adapter and model_adapter.speeds.dump_sha256 != parts.provenance["tcd"]["sha256"]:
+        raise ValueError("FES adapter and build must use the same TCD dump")
     log(f"one TCD dump: {parts.provenance['tcd']['sha256'][:12]} (fits, astro table and every agency source)")
     comparators = gesla_comparators(parts)
     log(f"canary comparators (GESLA fits): {len(comparators)}")
@@ -619,6 +632,23 @@ def main(argv: list[str] | None = None) -> int:
         log(f"official datums: {datum_stage['staged_set_count']} sets; public_admission={datum_stage['public_admission']}")
     if observed_stage is not None:
         log(f"observed datums: {observed_stage['staged_set_count']} sets; public_admission={observed_stage['public_admission']}")
+    model_report = None
+    if model_adapter is not None:
+        model_adapter.stations = fes2022.station_roster(release)
+        log(f"FES2022b extraction: {len(model_adapter.stations)} existing station points")
+        model_fetched = model_adapter.fetch(a.fes_cache)
+        model_sets = list(model_adapter.sets(model_fetched))
+        # Frozen actual gauge cohort, including explicitly unavailable point outcomes.
+        native_ids = {"8443970", "9447130", "9414290", "9410170", "8724580"}
+        cohort = [ss for ss in model_sets if ss.station_hint["aliases"].get("noaa") in native_ids]
+        model_canary = canary("fes2022", cohort, comparators)
+        model_report = fes2022.attach(release, model_fetched, build_commit=commit, table_id=TABLE_ID,
+                                     canary_result=model_canary, adapter=model_adapter)
+        model_report["manifest_sha256"] = a.fes_manifest_sha256
+        model_report["tcd_dump_sha256"] = model_adapter.speeds.dump_sha256
+        model_report["excluded_station_count"] = len(release["stations"]) - len(model_adapter.stations)
+        log(f"FES2022b: {model_report['sets_added']} additive model sets, "
+            f"{len(model_report['unavailable'])} unavailable point records; canary={model_canary.passed}")
     errs = validate_release(release)
     log(f"validate_release: {len(errs)} errors")
     for e in errs[:20]:
@@ -648,6 +678,7 @@ def main(argv: list[str] | None = None) -> int:
                     "original_source_retention": original_retention, "source_quality_findings": quality_findings,
                     "original_derived_inputs": derived_inputs, "country_resolutions": country_resolutions,
                     "noaa_historical_augmentation": historical_augmentation,
+                    **({"fes2022": model_report} if model_report is not None else {}),
                     **({"official_datum_stage": {key: value for key, value in datum_stage.items() if key != "drafts"}}
                        if datum_stage is not None else {}),
                     **({"observed_datum_stage": {key: value for key, value in observed_stage.items()

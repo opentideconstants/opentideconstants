@@ -12,6 +12,7 @@ dependencies = [
     "gesla @ {root:parent:uri}/gesla",
     "timezonefinder==9.0.0",
     "tzdata==2026.5",
+    "netcdf4==1.7.4",
 ]
 
 [project.optional-dependencies]

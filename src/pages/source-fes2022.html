@@ -1,6 +1,6 @@
 ---
 title: FES2022 global ocean tide model
-description: FES2022 global ocean tide model, not included yet: what it is, what OpenTideConstants takes from it once added, its licence and attribution, how it is watched, its coverage and how it ranks.
+description: FES2022b global ocean tide model: access confirmed, public release pending, model constants, quality limitations, licence and attribution.
 layout: docs
 docs: Sources
 order: 17
@@ -8,24 +8,28 @@ docs-label: FES2022
 sidebar: hidden
 ---
 <h1>FES2022 global ocean tide model</h1>
-<div class="note"><p><strong>Not included yet.</strong> AVISO+ licence registration pending; added once the registration is granted. See <a href="/sources/#not-used">Considered, not added</a>. The rest of this page records the source as checked.</p></div>
+<div class="note"><p><strong>Access confirmed. Public release pending.</strong> OTC acquired the FES2022b ocean elevation grids and implemented station-point processing. Release validation is in progress. The data release is not public yet.</p></div>
 <dl>
   <dt>What it is</dt>
   <dd>A global ocean tide model with 34 constituents at 1/30° resolution.</dd>
   <dt>Publisher</dt>
   <dd>CNES, LEGOS, Noveltis and CLS, distributed through AVISO+.</dd>
   <dt>What OTC takes</dt>
-  <dd><strong>Model constants</strong>: elevation amplitude and phase interpolated from the grids to station points. Every such set is labelled as model constants. OTC never re-hosts the grids and does not use the FES2022 currents.</dd>
+  <dd><strong>Model constants</strong>: elevation amplitude and phase interpolated from the ocean grids to station points. Every such set is labelled as model constants. OTC never re-hosts the grids and does not use the FES2022 currents.</dd>
+  <dt>Prediction limitations</dt>
+  <dd>Predictions use 32 supported ocean constituents. The original MSQM and MTM coefficients are retained with their provenance but are unsupported for predictions. Masked points remain explicitly unavailable. These constants establish neither an absolute mean sea level nor a chart-datum tie.</dd>
+  <dt>Quality</dt>
+  <dd>Model sets carry the <code>reliability_withheld</code> fallback label. The gauge comparison found a median absolute phase difference of 3.624°. This exceeds the unchanged 2° limit. OTC retains the coefficients and records this failed check. This comparison does not establish calibrated station accuracy.</dd>
   <dt>Licence</dt>
   <dd>The <a href="https://www.aviso.altimetry.fr/fileadmin/documents/data/License_Aviso.pdf">AVISO License Agreement (Issue 20)</a>, based on CC BY 4.0. It allows derived products, such as constants at station points, but not the onward distribution of the original grids without written authorization from CNES. The FES currents are for non-commercial use only.</dd>
   <dt>Attribution line OTC uses</dt>
   <dd>“Contains model constants derived from FES2022 (Cnes/Legos/Noveltis/CLS), doi:10.24400/527896/a01-2024.004.”</dd>
   <dt>Access and watching</dt>
-  <dd>Download with free AVISO+ account credentials (about 2.2 GB of elevation grids). The release is static.</dd>
+  <dd>AVISO+ access is confirmed. OTC acquired the ocean elevation grids. Additional loading-grid acquisition is in progress. The raw grids stay private. The model release is static.</dd>
   <dt>Coverage</dt>
   <dd>The global ocean.</dd>
   <dt>Rank</dt>
-  <dd>Model constants: used only where no official constants, gauge fit or third-party analysis exist for the location.</dd>
+  <dd>Model constants rank below official constants, gauge fits and third-party analyses. Existing preferred sets remain preferred.</dd>
 </dl>
 
 <p><a href="/sources/">All sources and how they rank</a></p>

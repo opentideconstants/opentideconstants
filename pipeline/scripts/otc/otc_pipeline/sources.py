@@ -13,6 +13,7 @@ from typing import Literal
 
 from otc_pipeline.adapters.dmi import DmiAdapter
 from otc_pipeline.adapters.fmi import FmiAdapter
+from otc_pipeline.adapters.fes2022 import Fes2022Adapter
 from otc_pipeline.adapters.jma import JmaAdapter
 from otc_pipeline.adapters.kartverket import KartverketAdapter
 from otc_pipeline.adapters.linz import LinzAdapter
@@ -59,6 +60,7 @@ EXPECTED: dict[str, SourceSpec] = {
 # One line per adapter, added in its own slot, e.g.
 #     "noaa": NoaaAdapter,
 SOURCES: dict[str, type] = {
+    "fes2022": Fes2022Adapter,
     "noaa": NoaaAdapter,
     "noaa-currents": NoaaCurrentsAdapter,
     "kartverket": KartverketAdapter,
