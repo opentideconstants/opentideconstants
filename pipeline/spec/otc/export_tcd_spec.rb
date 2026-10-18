@@ -42,10 +42,22 @@ RSpec.describe 'the real native release TCD export' do
         expect(document.fetch('stations').map { |row| row.fetch('station_id') }).to match_array(@rows.map { |row| row.fetch('station_id') })
         expected = @rows.flat_map { |row| row.fetch('constant_sets').map { |set| set.fetch('set_id') } }
         actual = document.fetch('outputs').fetch('complete').fetch('records').filter_map { |row| row['set_id'] }
-        expect(actual).to match_array(expected)
+        expect(actual.uniq).to match_array(expected)
         %w[recommended complete].each do |mode|
             entries = document.fetch('outputs').fetch(mode).fetch('records')
             read_output(mode) { |db| expect(db.station_count).to eq(entries.count { |entry| entry['status'] == 'exported' }) }
+        end
+    end
+
+    it 'retains stable native IDs for default current bins and distinct IDs for every additional bin' do
+        entries = report.fetch('outputs').fetch('complete').fetch('records')
+        read_output('complete') do |db|
+            entries.select { |entry| entry['status'] == 'exported' && (entry['bin'] || entry['kind'] == 'current_offset') }.each do |entry|
+                row = @rows.find { |item| item['station_id'] == entry.fetch('station_id') }
+                number = entry['bin'] || entry.fetch('native_metadata').fetch('bin')
+                expected = number == row.fetch('default_current_bin') ? row.fetch('station_id') : "#{row.fetch('station_id')}_bin_#{number}"
+                expect(db.stations[entry.fetch('record_index')].station_id).to eq(expected)
+            end
         end
     end
 
@@ -57,6 +69,7 @@ RSpec.describe 'the real native release TCD export' do
             entries.select { |entry| entry['status'] == 'exported' && entry['set_id'] }.each do |entry|
                 station = db.stations[entry.fetch('record_index')]
                 native = sets.fetch(entry.fetch('set_id'))
+                next if native['quantity'] == 'current'
                 expect(station.zone_offset).to eq(0)
                 expect(station.datum_offset).to be_within(0.000051).of(native.fetch('datum', {}).fetch('msl_offset_m', 0))
                 datum = native.fetch('datum', {})
@@ -108,7 +121,7 @@ RSpec.describe 'the real native release TCD export' do
         end
     end
 
-    it 'keeps valid subordinate references and reports 2D current limitations without invented scalar data' do
+    it 'keeps valid subordinate references and exports real currents with explicit scalar limitations' do
         entries = report.fetch('outputs').fetch('complete').fetch('records')
         read_output('complete') do |db|
             subordinate = entries.select { |entry| entry['kind'] == 'subordinate' && entry['status'] == 'exported' }
@@ -121,10 +134,27 @@ RSpec.describe 'the real native release TCD export' do
         end
         currents = @rows.flat_map { |row| row.fetch('constant_sets') }.select { |set| set['quantity'] == 'current' }
         expect(currents).not_to be_empty
-        currents.each do |set|
-            entry = entries.find { |item| item['set_id'] == set['set_id'] }
-            expect(entry.fetch('status')).to eq('unrepresentable')
-            expect(entry.fetch('error')).to include('2D')
+        read_output('recommended') do |db|
+            %w[OTC-00bdf4b5 OTC-017aa91a].each do |id|
+                row = @rows.find { |item| item['station_id'] == id }
+                native = row.fetch('constant_sets').find { |set| set['set_id'] == row['recommended_set_id'] }
+                bin = native.fetch('current_bins').find { |item| item['bin'] == row.fetch('default_current_bin') }
+                entry = report.fetch('outputs').fetch('recommended').fetch('records').find { |item| item['station_id'] == id && item['status'] == 'exported' }
+                expect(entry).not_to be_nil
+                station = db.stations[entry.fetch('record_index')]
+                expect(station.level_units).to eq('knots')
+                expect(station.max_direction).to eq(bin.fetch('mean_flood_dir_deg'))
+                expect(station.min_direction).to eq(bin.fetch('mean_ebb_dir_deg'))
+                expect(station.datum_offset).to be_within(0.000051).of(bin.fetch('mean_major_ms') / 0.5144444444444445)
+                expect(station.notes).to include('signed_major_axis')
+            end
+            entry = report.fetch('outputs').fetch('recommended').fetch('records').find { |item| item['station_id'] == 'OTC-0034ae14' && item['status'] == 'exported' }
+            expect(entry).not_to be_nil
+            station = db.stations[entry.fetch('record_index')]
+            expect(station.subordinate?).to be(true)
+            expect(db.stations[station.reference_station].name).to include('OTC-0cfcf1db')
+            expect(station.max_level_multiply).to be_within(0.0001).of(0.4)
+            expect(station.min_level_multiply).to be_within(0.0001).of(0.3)
         end
         expect(@status.exitstatus).to eq(2)
     end

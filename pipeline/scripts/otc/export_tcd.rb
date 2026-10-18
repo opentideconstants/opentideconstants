@@ -131,6 +131,10 @@ module OTCExportTCD
                 datum: datum.slice('zero', 'zero_name', 'chart_datum', 'msl_offset_m'),
                 datum_note: datum_note
             }
+            if native['current_projection']
+                details[:current_projection] = native.fetch('current_projection')
+                details[:datum_note] = 'Signed major-axis current mean in knots; no vertical datum. Minor-axis motion and vector speed/direction are omitted.'
+            end
             {
                 name: display_name(row, suffix), latitude: row.fetch('lat'), longitude: row.fetch('lon'),
                 tzfile: bounded(row.fetch('timezone'), 'timezone', 88), country: bounded(row.fetch('country'), 'country', 49),
@@ -142,8 +146,8 @@ module OTCExportTCD
             }
         end
 
-        def harmonic(row, native, ordinal)
-            raise ArgumentError, 'TCD scalar currents cannot preserve native 2D multi-bin ellipses' if native['quantity'] == 'current'
+        def harmonic(row, native, ordinal, bin = nil)
+            return current_harmonic(row, native, ordinal, bin) if native['quantity'] == 'current'
             raise ArgumentError, 'not a water-level constant set' unless native['quantity'] == 'water_level'
             convention = @conventions.fetch(native.fetch('convention_id'))
             unless CONVENTIONS.include?(convention.fetch('convention_id')) && convention['astro_table_id'] == @table.fetch('astro_table_id') &&
@@ -176,6 +180,46 @@ module OTCExportTCD
             datum_name = datum['zero_name'] || (datum.key?('msl_offset_m') ? 'Native zero (unspecified)' : 'Mean level (relative only)')
             record.merge(record_type: 1, amplitudes: amplitudes, epochs: epochs, zone_offset: 0,
                          datum: bounded(datum_name, 'datum', 89), datum_offset: datum.fetch('msl_offset_m', 0))
+        end
+
+        def current_harmonic(row, native, ordinal, bin)
+            raise ArgumentError, 'current bin unavailable' unless bin
+            azimuth, flood, ebb, mean = bin.values_at('azimuth_deg', 'mean_flood_dir_deg', 'mean_ebb_dir_deg', 'mean_major_ms')
+            raise ArgumentError, 'current axis/mean/orientation unavailable' if [azimuth, flood, ebb, mean].any?(&:nil?)
+            sigma = Math.cos((azimuth - flood) * Math::PI / 180) < 0 ? -1 : 1
+            projected = native.merge('quantity' => 'water_level', 'datum' => {'zero_name' => 'Unknown', 'msl_offset_m' => sigma * mean / 0.5144444444444445},
+                                     'current_projection' => {'quantity' => 'signed_major_axis', 'native_station_id' => row.fetch('station_id'), 'bin' => bin, 'sigma' => sigma,
+                                                              'meters_per_second_per_knot' => 0.5144444444444445},
+                                     'constituents' => bin.fetch('constituents').map do |term|
+                                         {'name' => term.fetch('name'), 'amplitude_m' => term.fetch('major_amplitude_ms') / 0.5144444444444445,
+                                          'phase_deg' => (term.fetch('major_phase_deg') + (sigma < 0 ? 180 : 0)) % 360}
+                                     end)
+            export_row = current_row(row, bin.fetch('bin'))
+            record = harmonic(export_row, projected, ordinal)
+            suffix = " [signed_major_axis bin:#{bin.fetch('bin')}]"
+            suffix += " [alt:#{ordinal}]" if native['set_id'] != row['recommended_set_id']
+            record.merge(name: display_name(export_row, suffix), level_units: 'knots', direction_units: 'degrees true', min_direction: ebb, max_direction: flood)
+        end
+
+        def current_row(row, number)
+            return row if number == row.fetch('default_current_bin')
+
+            row.merge('station_id' => "#{row.fetch('station_id')}_bin_#{number}")
+        end
+
+        def current_subordinate(row, native, references)
+            key = [native.fetch('reference_station_id'), native.fetch('reference_bin')]
+            reference = references.fetch(key) { raise ArgumentError, "current reference bin #{key.inspect} has no exported harmonic record" }
+            flood, ebb = native.values_at('mean_flood_dir_deg', 'mean_ebb_dir_deg')
+            raise ArgumentError, 'current flood/ebb orientation unavailable' if flood.nil? || ebb.nil?
+            metadata = native.merge('source' => 'noaa-currents', 'current_projection' => {'quantity' => 'signed_major_axis', 'native_station_id' => row.fetch('station_id'), 'bin' => native})
+            record = common(current_row(row, native.fetch('bin')), metadata, " [signed_major_axis bin:#{native.fetch('bin')}]", "#{row.fetch('station_id')}/current-offset/#{native.fetch('bin')}")
+            record.merge(record_type: 2, reference_station: reference, level_units: 'knots', direction_units: 'degrees true',
+                         min_direction: ebb, max_direction: flood,
+                         min_time_add: native.fetch('time_adj_max_ebb_min'), max_time_add: native.fetch('time_adj_max_flood_min'),
+                         min_level_add: 0, max_level_add: 0,
+                         min_level_multiply: native.fetch('ebb_amp_ratio'), max_level_multiply: native.fetch('flood_amp_ratio'),
+                         flood_begins: native['time_adj_slack_before_flood_min'], ebb_begins: native['time_adj_slack_before_ebb_min'])
         end
 
         def subordinate(row, native, references, alternative)
@@ -213,11 +257,29 @@ module OTCExportTCD
 
         def export(mode, directory)
             database = writer
-            entries, references, offsets = [], {}, []
+            entries, references, offsets, current_offsets = [], {}, [], []
+            required_bins = @rows.flat_map do |row|
+                row.fetch('current_offsets', []).select { |offset| mode == 'complete' || offset['bin'] == row['default_current_bin'] }
+            end.map { |offset| [offset.fetch('reference_station_id'), offset.fetch('reference_bin')] }
             @rows.sort_by { |row| row.fetch('station_id') }.each do |row|
                 sets = row.fetch('constant_sets').sort_by { |native| native.fetch('set_id') }
                 selected = mode == 'complete' ? sets : sets.select { |native| native['set_id'] == row['recommended_set_id'] }
                 selected.each do |native|
+                    if native['quantity'] == 'current'
+                        bins = native.fetch('current_bins').select do |bin|
+                            mode == 'complete' || bin['bin'] == row['default_current_bin'] || required_bins.include?([row.fetch('station_id'), bin['bin']])
+                        end
+                        bins.each do |bin|
+                            identity = "#{native.fetch('set_id')}/bin/#{bin.fetch('bin')}"
+                            record = attempt(entries, database, row, native, 'harmonic', identity) { harmonic(row, native, sets.index(native) + 1, bin) }
+                            entries.last['set_id'] = native.fetch('set_id')
+                            entries.last['bin'] = bin.fetch('bin')
+                            if record && native['set_id'] == row['recommended_set_id']
+                                references[[row.fetch('station_id'), bin.fetch('bin')]] = database.stations.size - 1
+                            end
+                        end
+                        next
+                    end
                     record = attempt(entries, database, row, native, 'harmonic', native.fetch('set_id')) do
                         harmonic(row, native, sets.index(native) + 1)
                     end
@@ -228,9 +290,7 @@ module OTCExportTCD
                 end
                 if row['current_offsets'] && (mode == 'complete' || row['recommended_set_id'].nil?)
                     row.fetch('current_offsets').each do |offset|
-                        entries << { 'station_id' => row.fetch('station_id'), 'identity' => "#{row.fetch('station_id')}/current-offset/#{offset.fetch('bin')}",
-                                     'kind' => 'current_offset', 'status' => 'unrepresentable', 'native_metadata' => offset,
-                                     'error' => 'Native 2D current reference bins have no lossless TCD scalar representation' }
+                        current_offsets << [row, offset] if mode == 'complete' || offset['bin'] == row['default_current_bin']
                     end
                 end
                 if selected.empty? && !row['subordinate_offsets'] && !row['current_offsets']
@@ -241,6 +301,11 @@ module OTCExportTCD
             offsets.each do |row|
                 attempt(entries, database, row, row.fetch('subordinate_offsets'), 'subordinate', "#{row.fetch('station_id')}/subordinate") do
                     subordinate(row, row.fetch('subordinate_offsets'), references, !row['recommended_set_id'].nil?)
+                end
+            end
+            current_offsets.each do |row, offset|
+                attempt(entries, database, row, offset, 'current_offset', "#{row.fetch('station_id')}/current-offset/#{offset.fetch('bin')}") do
+                    current_subordinate(row, offset, references)
                 end
             end
             suffix = mode == 'complete' ? '-complete' : ''
@@ -257,6 +322,12 @@ module OTCExportTCD
                 'unrepresentable' => entries.count { |entry| entry['status'] == 'unrepresentable' },
                 'no_prediction' => entries.count { |entry| entry['status'] == 'no_prediction' }, 'records' => entries
             }
+            currents = entries.select { |entry| entry['kind'] == 'current_offset' || entry.dig('native_metadata', 'quantity') == 'current' }
+            exported = currents.select { |entry| entry['status'] == 'exported' }
+            default_places = exported.select { |entry| entry['bin'] == @stations.fetch(entry.fetch('station_id'))['default_current_bin'] ||
+                                                        entry.dig('native_metadata', 'bin') == @stations.fetch(entry.fetch('station_id'))['default_current_bin'] }.map { |entry| entry.fetch('station_id') }.uniq
+            @report.fetch('outputs')[mode].merge!('current_places' => default_places.size, 'current_records' => exported.size,
+                                                 'current_additional_records' => exported.size - default_places.size)
         end
     end
 

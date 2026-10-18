@@ -84,9 +84,9 @@ no claim to an absolute chart datum.
 and writer version, and accounts for all native station identities and selected
 records. It includes full set metadata and identifies exported record indices
 or precise conversion errors. Native two-dimensional multi-bin current
-ellipses and their subordinate current paths cannot be represented losslessly
-by TCD's scalar current records; they are listed as unrepresentable, not
-converted to invented tide/scalar data. Identity-only stations have no
+ellipses cannot be represented losslessly by TCD's scalar current records.
+Current records export the stored signed major-axis harmonics and native
+subordinate offsets, with the limitations described below. Identity-only stations have no
 prediction record. Missing references, fields or oversized required notes are
 reported by identity. Usable tide records still export.
 
@@ -149,7 +149,7 @@ Outputs are `OTC_<date>-stations/`, `OTC_<date>.tcdb`, and
 `OTC_<date>-swap-report.json`. Each reference station uses its native
 `recommended_set_id`; the exporter does not rank or combine sets. Alternatives
 are listed as omitted in the report. Subordinate tides retain their native
-reference and offsets only when that reference is exported. Currents and
+reference and offsets only when that reference is exported. Tide
 subordinates without representable native chart/MSL datum values are reported as
 omissions. Reference harmonics without a usable native chart/MSL tie use an empty
 `chart_datum` and an export-only `datum_fallback` label in source metadata and
@@ -179,3 +179,58 @@ do not establish prediction accuracy or acceptance for every exported station.
 Run `spec/otc/export_slackwater_spec.rb` with `OTC_SWAP_INPUT`, `OTC_SWAP_RELEASE`,
 `OTC_SWAP_DATABASE_SCHEMA`, `OTC_SWAP_STATION_SCHEMA`, `OTC_SWAP_COUNTRY_CODES`
 and `OTC_SWAP_FLATC` set to the real release and external dependencies.
+
+### Scalar current contract (all three formats)
+
+Current records predict **signed major-axis velocity**, in knots. Positive means
+flood and negative means ebb. These records do not predict the full vector speed
+or direction: minor-axis motion, the ellipse and other depths remain in the
+native release and export reports. Each record carries a `signed_major_axis`
+notice. Read the native data for a different bin or vector prediction.
+
+The recommended output selects the native recommended set and
+`default_current_bin`. A subordinate uses its exact `reference_bin`; a required
+non-default reference bin has the stable swap identity `<station_id>_bin_<bin>`.
+The native station ID identifies its default bin. TCD complete output includes
+all supported sets, bins and subordinate paths. Reports count current places
+separately from additional bin records. Additional records are not new places.
+
+Exporters divide stored m/s values by `0.5144444444444445` to obtain knots.
+They use the native SDK flood convention: when the cosine of axis azimuth minus
+flood bearing is negative, each major phase gains 180 degrees modulo 360 and
+the stored mean changes sign. Amplitudes stay positive. No ellipse is fitted.
+Missing axis, mean or bearings produce a reported omission. Flood and ebb
+bearings retain their actual, possibly non-antipodal values.
+
+JSON currents follow the pinned engine's published `CurrentStation` type and
+`useCurrentStation`, not its tide-only station JSON schema. TCDB uses
+`Kind.Current` and `Current`/`CurrentOffsets`, including missing-value flags.
+Missing subordinate values remain absent. The unchanged current engine supplies
+its documented defaults for absent offsets. Native event coverage remains the
+authority for which subordinate events have source offsets.
+
+TCD current references use `knots`, `degrees true` and an Unknown vertical datum.
+Their datum-offset slot contains the actual signed current mean, not a water
+height. Subordinates preserve flood/ebb ratios, minute offsets and available
+slack offsets through the writer API. Zero additive terms are mathematical
+identities. A missing slack offset uses the writer's NULL sentinel. TCD rounds
+current amplitudes and means to 0.0001 knot, and phases to 0.01 degree.
+
+For JSON or a station decoded by the unchanged Swift `StationDatabase` reader,
+call the existing current engine directly. Resolve subordinate references by ID:
+
+```ts
+const predictor = useCurrentStation(station, { reference });
+const options = {
+    start: new Date("2026-10-11T00:00:00Z"),
+    end: new Date("2026-10-13T00:00:00Z"),
+};
+const events = predictor.getEventsPrediction(options);
+const timeline = predictor.getTimelinePrediction({ ...options, timeFidelity: 600 });
+```
+
+`timeFidelity` is seconds. The native SDK exposes subordinate events; the swap
+engine's interpolated subordinate timeline is not a native vector curve.
+TCD files load through XTide's ordinary `HFILE_PATH` and location selection.
+Cross-engine numeric differences must be measured; format compatibility alone
+does not establish scientific equivalence or navigation suitability.

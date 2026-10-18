@@ -18,6 +18,7 @@ module OTCExportSlackwater
                   'NA' => 'North America', 'OC' => 'Oceania', 'SA' => 'South America'}.freeze
     SOURCE_URLS = {
         'noaa' => 'https://tidesandcurrents.noaa.gov/', 'linz' => 'https://www.linz.govt.nz/',
+        'noaa-currents' => 'https://tidesandcurrents.noaa.gov/',
         'kartverket' => 'https://vannstand.kartverket.no/', 'jma' => 'https://www.data.jma.go.jp/kaiyou/db/tide/suisan/',
         'gesla' => 'https://gesla787883612.wordpress.com/', 'ticon' => 'https://doi.org/10.17882/109129',
         'fes2022' => 'https://doi.org/10.24400/527896/a01-2024.004'
@@ -71,15 +72,33 @@ module OTCExportSlackwater
                         entry['status'] = 'exported'
                         station
                     rescue ArgumentError, KeyError => error
-                        entry['status'] = native || row['subordinate_offsets'] ? 'unrepresentable' : 'no_prediction'
+                        entry['status'] = native || row['subordinate_offsets'] || row['current_offsets'] ? 'unrepresentable' : 'no_prediction'
                         entry['reason'] = error.message
                         nil
+                    end
+                end
+                @report['support_records'] = []
+                stations.select { |station| station.dig('current', 'offsets') }.each do |station|
+                    id = station.fetch('current').fetch('offsets').fetch('reference')
+                    next if stations.any? { |item| item['id'] == id }
+                    detail = station.fetch('source').fetch('otc')
+                    row = @rows.find { |item| item['station_id'] == detail.fetch('reference_station_id') }
+                    next unless row
+                    native = row.fetch('constant_sets').find { |set| set['set_id'] == row['recommended_set_id'] }
+                    begin
+                        support = project_current(row, native, detail.fetch('reference_bin'))
+                        stations << support
+                        @report['support_records'] << {'station_id' => row.fetch('station_id'), 'export_id' => id,
+                                                       'bin' => detail.fetch('reference_bin'), 'status' => 'exported'}
+                    rescue ArgumentError, KeyError => error
+                        @report['support_records'] << {'export_id' => id, 'status' => 'unrepresentable', 'reason' => error.message}
                     end
                 end
                 # References must resolve to an actually exported reference, never an omitted record.
                 references = stations.select { |station| station['type'] == 'reference' }.map { |station| station.fetch('id') }
                 stations.reject! do |station|
-                    next false unless station['type'] == 'subordinate' && !references.include?(station.fetch('offsets').fetch('reference'))
+                    reference = station.dig('current', 'offsets', 'reference') || station.dig('offsets', 'reference')
+                    next false unless station['type'] == 'subordinate' && !references.include?(reference)
                     entry = @report.fetch('records').find { |record| record['station_id'] == station['id'] }
                     entry.merge!('status' => 'unrepresentable', 'reason' => 'subordinate reference is not exported')
                     true
@@ -89,6 +108,9 @@ module OTCExportSlackwater
                 stations.each { |station| File.write(File.join(station_directory, "#{station.fetch('id')}.json"), JSON.generate(station) + "\n") }
                 write_database(stations, temporary)
                 @report['exported'] = stations.size
+                current = stations.select { |station| station['kind'] == 'current' }
+                @report['current_places'] = current.count { |station| station['id'] == station.dig('source', 'otc', 'native_station_id') }
+                @report['current_support_records'] = current.size - @report['current_places']
                 @report['status'] = @report.fetch('records').any? { |record| record['status'] != 'exported' || !record.fetch('omitted_alternative_set_ids').empty? } ? 'partial' : 'complete'
                 File.write(File.join(temporary, "OTC_#{@date}-swap-report.json"), JSON.generate(@report) + "\n")
                 # Replace this release's station directory so failed/omitted records cannot survive a rerun.
@@ -105,8 +127,8 @@ module OTCExportSlackwater
             raise ArgumentError, 'unsafe station identity' unless /\A[A-Za-z0-9_-]+\z/.match?(row.fetch('station_id'))
             subordinate = row['type'] == 'subordinate'
             selected = subordinate ? row['subordinate_offsets'] : native
+            return project_current(row, native) if native&.fetch('quantity') == 'current' || row['current_offsets']
             raise ArgumentError, 'no native prediction record' unless selected
-            raise ArgumentError, 'current records are outside scalar tide format' if selected['quantity'] == 'current' || row['type'] == 'current'
             datum = selected['datum']
             chart = datum && datum['chart_datum']&.upcase
             datums = (datum || {}).fetch('named', {}).transform_keys(&:upcase)
@@ -170,6 +192,62 @@ module OTCExportSlackwater
             station
         end
 
+        def current_identity(row, bin)
+            row.fetch('default_current_bin') == bin ? row.fetch('station_id') : "#{row.fetch('station_id')}_bin_#{bin}"
+        end
+
+        def project_current(row, native, requested_bin = nil)
+            number = requested_bin || row.fetch('default_current_bin')
+            subordinate = native.nil?
+            selected = if subordinate
+                row.fetch('current_offsets').find { |bin| bin['bin'] == number }
+            else
+                raise ArgumentError, 'unsupported current phase convention' unless native.fetch('convention_id') == 'noaa-currents-harcon-gmt'
+                native.fetch('current_bins').find { |bin| bin['bin'] == number }
+            end
+            raise ArgumentError, "current bin #{number} unavailable" unless selected
+            country = @countries.fetch(row.fetch('country'))
+            licence = @licences.fetch((native || selected).fetch('licence_id'))
+            detail = {'native_station_id' => row.fetch('station_id'), 'set_id' => native && native.fetch('set_id'),
+                      'bin' => selected, 'units' => 'knots', 'phase' => 'Greenwich degrees', 'quantity' => 'signed_major_axis',
+                      'limitation' => 'Scalar signed major-axis current; minor-axis motion and vector speed/direction are omitted.',
+                      'native_country' => row.fetch('country'), 'native_set_metadata' => native && native.reject { |key, _| key == 'current_bins' }}
+            current = {'flood_direction' => selected.fetch('mean_flood_dir_deg'), 'ebb_direction' => selected.fetch('mean_ebb_dir_deg')}
+            raise ArgumentError, 'current flood/ebb orientation unavailable' if current.values.any?(&:nil?)
+            terms = []
+            if subordinate
+                reference = @rows.find { |item| item['station_id'] == selected.fetch('reference_station_id') }
+                raise ArgumentError, 'current reference station unavailable' unless reference
+                detail.merge!(selected.slice('reference_station_id', 'reference_bin'))
+                current['offsets'] = {'reference' => current_identity(reference, selected.fetch('reference_bin'))}
+                {'slack_before_flood' => 'time_adj_slack_before_flood_min', 'slack_before_ebb' => 'time_adj_slack_before_ebb_min',
+                 'flood_time' => 'time_adj_max_flood_min', 'ebb_time' => 'time_adj_max_ebb_min',
+                 'flood_speed_ratio' => 'flood_amp_ratio', 'ebb_speed_ratio' => 'ebb_amp_ratio'}.each do |target, source|
+                    current['offsets'][target] = selected[source] unless selected[source].nil?
+                end
+            else
+                azimuth, mean = selected.values_at('azimuth_deg', 'mean_major_ms')
+                raise ArgumentError, 'current axis/mean unavailable' if azimuth.nil? || mean.nil?
+                sigma = Math.cos((azimuth - current.fetch('flood_direction')) * Math::PI / 180) < 0 ? -1 : 1
+                current['mean_flow'] = sigma * mean / 0.5144444444444445
+                detail['conversion'] = {'sigma' => sigma, 'meters_per_second_per_knot' => 0.5144444444444445}
+                terms = selected.fetch('constituents').map do |term|
+                    {'name' => term.fetch('name'), 'amplitude' => term.fetch('major_amplitude_ms') / 0.5144444444444445,
+                     'phase' => (term.fetch('major_phase_deg') + (sigma < 0 ? 180 : 0)) % 360}
+                end
+                raise ArgumentError, 'no current harmonic constituents' if terms.empty?
+            end
+            attribution = [licence.fetch('attribution'), licence['restriction'], licence['citation']].compact.join("\n")
+            {'id' => current_identity(row, number), 'name' => row.fetch('name'), 'kind' => 'current',
+             'type' => subordinate ? 'subordinate' : 'reference', 'latitude' => row.fetch('lat'), 'longitude' => row.fetch('lon'),
+             'timezone' => row.fetch('timezone'), 'country' => country.fetch('official_name_en'), 'continent' => CONTINENTS.fetch(country.fetch('Continent')),
+             'source' => {'name' => native ? native.fetch('source') : 'noaa-currents', 'id' => native ? native.fetch('source_record_id') : row.fetch('aliases').fetch('noaa'),
+                          'url' => SOURCE_URLS.fetch('noaa-currents'), 'published_harmonics' => !subordinate && native['source_type'] == 'official', 'otc' => detail},
+             'license' => {'type' => licence.fetch('spdx'), 'url' => licence['url'] || licence.fetch('terms_url'), 'commercial_use' => licence.fetch('commercial_use'), 'notes' => attribution},
+             'disclaimers' => attribution + "\nOTC signed_major_axis current: " + JSON.generate(detail),
+             'chart_datum' => '', 'datums' => {}, 'harmonic_constituents' => terms, 'current' => current}
+        end
+
         def write_database(stations, temporary)
             names = stations.flat_map { |station| station.fetch('harmonic_constituents').map { |term| term.fetch('name') } }.uniq.sort
             datums = stations.flat_map { |station| station.fetch('datums').keys }.uniq.sort
@@ -177,6 +255,20 @@ module OTCExportSlackwater
                 record = station.slice('id', 'name', 'latitude', 'longitude', 'timezone', 'country', 'continent', 'chart_datum', 'license', 'disclaimers')
                 record['country_code'] = @countries.fetch(station.fetch('source').fetch('otc').fetch('native_country')).fetch('ISO3166-1-Alpha-2')
                 record['type'] = station.fetch('type') == 'reference' ? 'Reference' : 'Subordinate'
+                if station['kind'] == 'current'
+                    record['kind'] = 'Current'
+                    record['current'] = station.fetch('current').dup
+                    %w[flood_direction ebb_direction mean_flow].each do |key|
+                        record['current']["#{key}_missing"] = !record['current'].key?(key)
+                    end
+                    if record['current']['offsets']
+                        offsets = record['current']['offsets'].dup
+                        %w[slack_before_flood slack_before_ebb flood_time ebb_time flood_speed_ratio ebb_speed_ratio].each do |key|
+                            offsets["#{key}_missing"] = !offsets.key?(key)
+                        end
+                        record['current']['offsets'] = offsets
+                    end
+                end
                 record['source'] = station.fetch('source').reject { |key, _| key == 'otc' }
                 record['attribution'] = station.fetch('disclaimers') + "\n" + station.fetch('license').fetch('notes')
                 record['constituents'] = station.fetch('harmonic_constituents').map { |term| term.merge('name' => names.index(term.fetch('name'))) }
