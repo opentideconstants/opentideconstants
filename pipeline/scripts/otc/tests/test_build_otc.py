@@ -4,6 +4,7 @@ import hashlib
 import importlib
 import json
 import os
+import subprocess
 from pathlib import Path
 from statistics import stdev
 import sys
@@ -1429,3 +1430,95 @@ def test_native_missing_official_fallbacks_add107_usable_places():
         assert len(final) == 1365
     from otc_pipeline.release_writer import validate_release
     assert validate_release(release) == []
+@pytest.mark.skipif("OTC_SUBORDINATE_ADMISSION" not in os.environ, reason="explicit three actual missing-level witnesses")
+def test_native_subordinate_fallback_admission():
+    from otc_pipeline.lat_hat_subordinate import compute_raw, datum_draft, strict_request
+
+    root = Path(os.environ["OTC_SUBORDINATE_ADMISSION"])
+    release = json.loads((root / "native.json").read_text())
+    original = copy.deepcopy(release)
+    rows = []
+    for station_id in ("OTC-0013852b", "OTC-0031a9c4", "OTC-00605f6b"):
+        payload = json.loads((root / f"{station_id}.json").read_text())
+        path = root / f"{station_id}-raw.json"
+        request_hash = hashlib.sha256(json.dumps(strict_request(payload), sort_keys=True, allow_nan=False).encode()).hexdigest()
+        if path.exists():
+            raw = json.loads(path.read_text())
+            assert raw["request_sha256"] == request_hash
+        else:
+            raw = compute_raw(payload, ruby="/usr/local/rbenv/versions/3.2.2/bin/ruby")
+            path.write_text(json.dumps(raw) + "\n")
+        rows.append({"station_id": station_id, "raw": raw, "draft_datum": datum_draft(payload, raw)})
+    drafts = root / "witness-drafts.jsonl"
+    drafts.write_text("".join(json.dumps(row) + "\n" for row in rows))
+    calibration = root.parent / "current-method/t5s-summary.json"
+    arguments = (drafts, hashlib.sha256(drafts.read_bytes()).hexdigest())
+    kwargs = {"calibration": calibration, "calibration_sha256": hashlib.sha256(calibration.read_bytes()).hexdigest()}
+    staged = build_otc.stage_subordinate_datums(release, *arguments, **kwargs)
+    assert release == original
+    assert staged["staged_level_count"] == 6
+    stale = copy.deepcopy(release)
+    target = next(s for s in stale["stations"] if s["station_id"] == rows[0]["station_id"])
+    target["subordinate_offsets"]["time_offset_high_min"] += 1
+    with pytest.raises(ValueError, match="computation input mismatch"):
+        build_otc.stage_subordinate_datums(stale, *arguments, **kwargs)
+    result = build_otc.apply_subordinate_datum_fallbacks(release, *arguments, **kwargs)
+    assert result["normal_datum_gate_accepted"] is False
+    assert result["accepted"] is False
+    assert result["computed_basis_fallback_count"] == 6
+    for before, after in zip(original["stations"], release["stations"], strict=True):
+        restored = copy.deepcopy(after)
+        if after["station_id"] not in {row["station_id"] for row in rows}:
+            assert after == before
+            continue
+        schema = pinned_schema()
+        Draft202012Validator({"$ref": "#/$defs/subordinate_offsets", "$defs": schema["$defs"]}).validate(after["subordinate_offsets"])
+        for level in ("lat", "hat"):
+            basis = after["subordinate_offsets"]["datum"]["basis"][level]
+            assert basis["method"] == "subordinate_offsets"
+            assert basis["uncertainty_basis"] == "calibrated"
+            assert basis["fallback"]["reason"] == "datum_gate_failed"
+            assert "UNRELIABLE" in basis["fallback"]["otc_finding"]
+            assert "n=6" in basis["fallback"]["otc_finding"]
+            restored["subordinate_offsets"]["datum"]["named"].pop(level)
+            restored["subordinate_offsets"]["datum"]["basis"].pop(level)
+        if "datum" not in before["subordinate_offsets"]:
+            restored["subordinate_offsets"].pop("datum")
+        assert restored == before
+    (root / "admitted.json").write_text(json.dumps(release) + "\n")
+    (root / "stage.json").write_text(json.dumps(result) + "\n")
+
+
+@pytest.mark.skipif("OTC_SUBORDINATE_ADMISSION" not in os.environ, reason="explicit actual cached subordinate CLI witnesses")
+def test_native_cached_subordinate_cli():
+    root = Path(os.environ["OTC_SUBORDINATE_ADMISSION"])
+    original = json.loads((root / "native.json").read_text())
+    source = root / "cached-witness-source.jsonl"
+    source.write_text("".join(json.dumps(station) + "\n" for station in original["stations"]))
+    meta = source.with_suffix(".meta.json")
+    meta.write_text(json.dumps({key: value for key, value in original.items() if key != "stations"}) + "\n")
+    drafts = root / "witness-drafts.jsonl"
+    tuning = root.parent / "current-method/t5s-summary.json"
+    output = root / "cached-witness-output"
+    if output.exists():
+        pytest.skip("cached writer proof output already exists; retain original one-pass evidence")
+    command = [sys.executable, "-m", "otc_pipeline.build_otc", "--cached-subordinate",
+               "--native", str(source), "--native-sha256", hashlib.sha256(source.read_bytes()).hexdigest(),
+               "--native-meta-sha256", hashlib.sha256(meta.read_bytes()).hexdigest(),
+               "--subordinate-drafts", str(drafts), "--subordinate-drafts-sha256", hashlib.sha256(drafts.read_bytes()).hexdigest(),
+               "--tuning", str(tuning), "--tuning-sha256", hashlib.sha256(tuning.read_bytes()).hexdigest(),
+               "--congen-run", "/Users/jpr5/.local/share/copilotkit/cr/otc-impl/FIX-CONST/astro/otc-tcd-20251228-ma2mb2-r2",
+               "--out", str(output)]
+    completed = subprocess.run(command, text=True, capture_output=True)
+    (root / "cached-witness-command.json").write_text(json.dumps(command) + "\n")
+    (root / "cached-witness-cli.stdout").write_text(completed.stdout)
+    (root / "cached-witness-cli.stderr").write_text(completed.stderr)
+    assert completed.returncode == 0, completed.stderr
+    actual = json.loads((output / "OTC_20261011.json").read_text())
+    assert {key: value for key, value in actual.items() if key != "stations"} == {key: value for key, value in original.items() if key != "stations"}
+    for before, after in zip(original["stations"], actual["stations"], strict=True):
+        restored = copy.deepcopy(after)
+        if before["station_id"] in {"OTC-0013852b", "OTC-0031a9c4", "OTC-00605f6b"}:
+            assert restored["subordinate_offsets"]["datum"]["basis"]["lat"]["fallback"]["reason"] == "datum_gate_failed"
+            restored["subordinate_offsets"].pop("datum")
+        assert restored == before

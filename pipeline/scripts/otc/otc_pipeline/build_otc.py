@@ -211,6 +211,92 @@ def apply_official_datum_fallbacks(release: dict, path: Path, sha256: str) -> di
     return _publish_official_datum_stage(release, staged)
 
 
+def stage_subordinate_datums(release: dict, path: Path, sha256: str, *,
+                             calibration: Path, calibration_sha256: str) -> dict:
+    """Authenticate NOAA offset drafts; label failed T5s empirical spread explicitly."""
+    from otc_pipeline.lat_hat import EPOCH, START, END, _finite
+    from otc_pipeline.lat_hat_subordinate import datum_draft, resolve_reference, strict_request
+
+    if _sha256(path) != sha256 or _sha256(calibration) != calibration_sha256:
+        raise ValueError("subordinate datum draft/calibration SHA-256 mismatch")
+    tuning = json.loads(calibration.read_text())
+    if tuning.get("passed") is not False or tuning.get("accepted") is not False:
+        raise ValueError("subordinate fallback requires the explicit failed T5s receipt")
+    for level in ("lat", "hat"):
+        stats = tuning["levels"][level]
+        if stats.get("count") != 6 or stats.get("passed") is not False:
+            raise ValueError("subordinate fallback requires all six tuning comparisons")
+        if _finite(stats.get("sample_sd_m"), "tuning spread") <= 0:
+            raise ValueError("subordinate empirical spread must be positive")
+        for field in ("signed_bias_m", "median_abs_m", "max_abs_m"):
+            _finite(stats.get(field), field)
+        if stats["median_abs_m"] <= .03 and stats["max_abs_m"] <= .08:
+            raise ValueError("subordinate failed gate receipt disagrees with fixed thresholds")
+    stations = {s["station_id"]: s for s in release["stations"]}
+    conventions = {c["convention_id"]: c for c in release.get("conventions", [])}
+    tables = {t["astro_table_id"]: t for t in release.get("astro_tables", [])}
+    staged, seen = [], set()
+    wrapper = Path(__file__).with_name("lat_hat_strict.rb")
+    for line in path.read_text().splitlines():
+        row = json.loads(line)
+        sid = row["station_id"]
+        if sid in seen:
+            raise ValueError(f"duplicate subordinate datum draft: {sid}")
+        seen.add(sid)
+        station = stations[sid]
+        if station.get("status") != "active" or station.get("type") != "subordinate" or not station.get("aliases", {}).get("noaa"):
+            raise ValueError(f"active NOAA subordinate required: {sid}")
+        offsets = station["subordinate_offsets"]
+        reference_station = stations.get(offsets["reference_station_id"], {})
+        payload = {"station": station, "reference_station": reference_station}
+        reference = resolve_reference(payload)
+        table = tables.get(conventions.get(reference.get("convention_id"), {}).get("astro_table_id"))
+        if table is None:
+            raise ValueError(f"subordinate reference table unavailable: {sid}")
+        payload["astro_table"] = table
+        request = strict_request(payload)
+        fingerprint = hashlib.sha256(json.dumps(request, sort_keys=True, allow_nan=False).encode()).hexdigest()
+        raw = row["raw"]
+        if (raw.get("request_sha256") != fingerprint or raw.get("reference_set_id") != reference["set_id"]
+                or raw.get("tables_sha256") != table["tables_sha256"] or raw.get("wrapper_sha256") != _sha256(wrapper)
+                or (raw.get("start"), raw.get("end")) != (START, END) or raw.get("accepted") is not False):
+            raise ValueError(f"subordinate computation input mismatch: {sid}")
+        draft = datum_draft(payload, raw)
+        if row["draft_datum"] != draft:
+            raise ValueError(f"subordinate draft changed metadata, agency levels or frozen extrema: {sid}")
+        old = offsets.get("datum", {})
+        keys = []
+        for level in ("lat", "hat"):
+            key = f"otc_{level}" if old.get("basis", {}).get(level, {}).get("kind") == "published" else level
+            if key in old.get("named", {}):
+                raise ValueError(f"subordinate computed level already exists: {sid}:{key}")
+            _finite(raw.get(f"{level}_m"), level)
+            stats = tuning["levels"][level]
+            draft["basis"][key] = {"kind": "computed", "method": "subordinate_offsets", "epoch": dict(EPOCH),
+                "uncertainty_m": stats["sample_sd_m"], "uncertainty_basis": "calibrated",
+                "fallback": {"reason": "datum_gate_failed",
+                    "basis": "NOAA offsets on the published reference chart origin; empirical six-case tuning spread only",
+                    "otc_finding": f"UNRELIABLE approximate derived-from-offsets {level.upper()}. T5s FAILED: median/max absolute residual {stats['median_abs_m']}/{stats['max_abs_m']} m exceed fixed 0.03/0.08 m limits. Empirical tuning sample SD {stats['sample_sd_m']} m, signed bias {stats['signed_bias_m']} m, n=6. Not independently validated station accuracy or a confidence bound. Normal datum gate not accepted."}}
+            keys.append(key)
+        staged.append({"station_id": sid, "datum": draft, "computed_keys": keys})
+    return {"public_admission": False, "release_unchanged": True, "accepted": False,
+            "normal_datum_gate_accepted": False, "input_path": str(path), "input_sha256": sha256,
+            "calibration_path": str(calibration), "calibration_sha256": calibration_sha256,
+            "tuning": tuning, "staged_station_count": len(staged), "staged_level_count": 2 * len(staged),
+            "drafts": staged}
+
+
+def apply_subordinate_datum_fallbacks(release: dict, path: Path, sha256: str, **inputs) -> dict:
+    """Publish only authenticated subordinate levels, preserving all native payloads."""
+    staged = stage_subordinate_datums(release, path, sha256, **inputs)
+    stations = {s["station_id"]: s for s in release["stations"]}
+    for entry in staged["drafts"]:
+        stations[entry["station_id"]]["subordinate_offsets"]["datum"] = copy.deepcopy(entry["datum"])
+    return {**staged, "public_admission": True, "release_unchanged": False,
+            "computed_basis_fallback_count": staged["staged_level_count"],
+            "admission": "UNRELIABLE approximate subordinate datum fallback only"}
+
+
 def _publish_official_datum_stage(release: dict, staged: dict, *, finalize_chart: bool = True) -> dict:
     from otc_pipeline.datums import derive_chart_datums
     from otc_pipeline.lat_hat import COMPUTED_FALLBACK
@@ -465,7 +551,48 @@ def apply_datum_drafts(release: dict, *, official: tuple | None = None, observed
     return official_stage, observed_stage
 
 
+def cached_subordinate_main(argv: list[str]) -> int:
+    """Publish authenticated subordinate additions to an existing native release."""
+    from otc_pipeline.astro_tables import load_congen_run
+
+    parser = argparse.ArgumentParser(prog="otc_pipeline.build_otc --cached-subordinate", allow_abbrev=False)
+    for name in ("native", "subordinate-drafts", "tuning", "congen-run", "out"):
+        parser.add_argument(f"--{name}", type=Path, required=True)
+    for name in ("native-sha256", "native-meta-sha256", "subordinate-drafts-sha256", "tuning-sha256"):
+        parser.add_argument(f"--{name}", required=True)
+    args = parser.parse_args(argv)
+    if args.out.exists() and any(args.out.iterdir()):
+        raise ValueError("cached subordinate output must be empty")
+    meta_path = args.native.with_suffix(".meta.json")
+    if _sha256(args.native) != args.native_sha256 or _sha256(meta_path) != args.native_meta_sha256:
+        raise ValueError("cached native release SHA-256 mismatch")
+    release = json.loads(meta_path.read_text())
+    with args.native.open() as source:
+        release["stations"] = [json.loads(line) for line in source]
+    station_count = len(release["stations"])
+    source_record_count = sum(len(station.get("source_records", [])) for station in release["stations"])
+    staged = apply_subordinate_datum_fallbacks(release, args.subordinate_drafts, args.subordinate_drafts_sha256,
+        calibration=args.tuning, calibration_sha256=args.tuning_sha256)
+    if _sha256(args.native) != args.native_sha256 or _sha256(meta_path) != args.native_meta_sha256:
+        raise ValueError("cached native release changed during staging")
+    congen = load_congen_run(args.congen_run)
+    files = write_release(release, args.out, datestamp=release["release"]["datestamp"],
+                          app_export=None, congen_run=congen)
+    (args.out / "SUBORDINATE_DATUM_STAGE.json").write_text(json.dumps(staged, allow_nan=False, sort_keys=True) + "\n")
+    report = {"mode": "cached_subordinate_only", "native": str(args.native), "native_sha256": args.native_sha256,
+              "native_meta_sha256": args.native_meta_sha256, "stations_preserved": station_count,
+              "source_records_preserved": source_record_count, "normal_datum_gate_accepted": False,
+              "accepted": False, "computed_basis_fallback_count": staged["computed_basis_fallback_count"],
+              "files": [str(path) for path in files]}
+    (args.out / "CACHED_SUBORDINATE_REPORT.json").write_text(json.dumps(report, allow_nan=False, sort_keys=True) + "\n")
+    print(json.dumps(report, allow_nan=False, sort_keys=True))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else list(argv)
+    if argv and argv[0] == "--cached-subordinate":
+        return cached_subordinate_main(argv[1:])
     ap = argparse.ArgumentParser(prog="otc_pipeline.build_otc", description=(__doc__ or "").split("\n")[0],
                                  allow_abbrev=False)
     for name in ("fit-run", "audit-dir", "verdicts-dir", "calibration", "ticon-csv", "ticon-refs", "congen-run",
