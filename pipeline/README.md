@@ -191,8 +191,12 @@ For ordinary tide references, TCDB `accepted` preserves native default admission
 of the selected exported set: `qc_status == "ok"` and no set-level `fallback`.
 This does not assert prediction accuracy or derive a score. Datum-level fallback
 does not change that native QC predicate. Existing licence and export validation
-still apply; no commercial-only filter is introduced. Current and subordinate
-acceptance policies are unchanged. Station JSON retains its existing native QC
+still apply; no commercial-only filter is introduced. Subordinate acceptance
+policies are unchanged. Ordinary default-bin current
+references use the same predicate from their selected parent set, retained at
+`source.otc.native_set_metadata`, after the existing bin and conversion checks.
+Additional support-bin records retain their existing acceptance behavior.
+Station JSON retains its existing native QC
 labels under `source.otc`; the pinned schema has no top-level `accepted` field.
 
 Compatibility proof uses unchanged engine revision `97ef33e30572` for JSON
