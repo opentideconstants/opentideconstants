@@ -187,6 +187,13 @@ replaces this release's station directory to remove stale omitted records.
 TCDB stores amplitudes, phases and datums as float32; JSON retains native
 precision. Standard flatc does not promise the reference builder's preferred
 physical layout or scan performance. No Slackwater quality score is inferred.
+For ordinary tide references, TCDB `accepted` preserves native default admission
+of the selected exported set: `qc_status == "ok"` and no set-level `fallback`.
+This does not assert prediction accuracy or derive a score. Datum-level fallback
+does not change that native QC predicate. Existing licence and export validation
+still apply; no commercial-only filter is introduced. Current and subordinate
+acceptance policies are unchanged. Station JSON retains its existing native QC
+labels under `source.otc`; the pinned schema has no top-level `accepted` field.
 
 Compatibility proof uses unchanged engine revision `97ef33e30572` for JSON
 predictions and unchanged Swift reader revision `e046e800c40b0033b675d7f985ecfc62534d1b16`
