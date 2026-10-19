@@ -55,7 +55,7 @@ from otc_pipeline.release_writer import pinned_schema
 
 __all__ = ["AGENCY_SOURCES", "JOIN_RADIUS_KM", "AgencySource", "CombineError", "Place", "agency_speeds",
            "apply_corrections", "gesla_places", "join", "load_agency", "load_corrections", "merge", "mint_agency",
-           "record_id"]
+           "record_id", "carry_noaa_region_codes"]
 
 AGENCY_SOURCES = ("kartverket", "linz", "jma", "noaa", "noaa-currents")
 JOIN_RADIUS_KM = 1.0
@@ -432,6 +432,42 @@ def agency_names(agency: Mapping[str, AgencySource]) -> set[str]:
     return {n for a in agency.values() for ss in a.sets if ss.constant_set for n in _set_names(ss.constant_set)}
 
 
+def carry_noaa_region_codes(stations: Iterable[dict], hints: Iterable[dict]) -> dict[str, list[str]]:
+    """Carry exact NOAA state metadata independently of the winning constant set.
+
+    Only missing metadata is added. Conflicting hints or existing values remain untouched.
+    The returned identities let a caller enumerate actual changes and unresolved conflicts.
+    """
+    from otc_pipeline.adapters.noaa import NOAA_REGION_CODES
+
+    admitted = frozenset(NOAA_REGION_CODES.values())
+    by_noaa = defaultdict(list)
+    for hint in hints:
+        alias = (hint.get("aliases") or {}).get("noaa")
+        if isinstance(alias, str):
+            by_noaa[alias].append(hint)
+    changed, conflicts = [], []
+    for station in stations:
+        alias = (station.get("aliases") or {}).get("noaa")
+        if station.get("status") != "active" or station.get("country") != "USA" or not isinstance(alias, str):
+            continue
+        matches = by_noaa.get(alias, [])
+        codes = [h.get("region_code") for h in matches]
+        valid = [h.get("country") == "USA" and isinstance(code, str) and code in admitted
+                 for h, code in zip(matches, codes)]
+        if not any(valid):
+            continue
+        sid = station["station_id"]
+        if not all(valid) or len(set(codes)) != 1:
+            conflicts.append(sid)
+        elif "region_code" not in station:
+            station["region_code"] = codes[0]
+            changed.append(sid)
+        elif station["region_code"] != codes[0]:
+            conflicts.append(sid)
+    return {"changed": changed, "conflicts": conflicts}
+
+
 def merge(release: dict, agency: Mapping[str, AgencySource], *, station_ids: Mapping[str, str], build_commit: str,
           table_id: str, canaries: Mapping[str, dict]) -> tuple[dict, AgencyReport]:
     """The release with the agency sets merged in (module text), and the agency report. `release` (the GESLA
@@ -581,6 +617,8 @@ def merge(release: dict, agency: Mapping[str, AgencySource], *, station_ids: Map
     active = [st for st in out["stations"] if st["status"] == "active"] + new_stations
     tombs = [st for st in out["stations"] if st["status"] != "active"]
     out["stations"] = sorted(active, key=lambda s: s["station_id"]) + tombs
+    carry_noaa_region_codes(out["stations"],
+                            (ss.station_hint for a in agency.values() if a.source == "noaa" for ss in a.sets))
     # release level: conventions (with the build's astro table and the canary), licences, versions, constituents
     used = {cs["licence_id"] for st in active for cs in st["constant_sets"]}
     used |= {st["subordinate_offsets"]["licence_id"] for st in active if "licence_id" in st.get("subordinate_offsets", {})}

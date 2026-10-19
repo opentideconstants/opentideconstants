@@ -70,7 +70,7 @@ CSV_COLUMNS = [
     # the licence's commercial_use (true/false), on every row that has a licence_id (L-NC)
     "commercial_use",
     # station
-    "country", "lat", "lon", "timezone", "type", "aliases", "recommended_set_id", "recommended_is_fallback",
+    "country", "region_code", "lat", "lon", "timezone", "type", "aliases", "recommended_set_id", "recommended_is_fallback",
     "default_current_bin",
     # tombstone
     "removed_in", "removed_reason", "merged_into", "detail",
@@ -126,7 +126,7 @@ INT_COLUMNS = {"good_samples", "missed_events", "extra_events", "default_current
 # Keys of each record that map one-to-one onto a column of the same name.
 # Keys handled specially (children, split objects) are listed in _CHILD_KEYS.
 _ROW_KEYS = {
-    "station": ["station_id", "status", "name", "country", "lat", "lon", "timezone", "type",
+    "station": ["station_id", "status", "name", "country", "region_code", "lat", "lon", "timezone", "type",
                 "aliases", "recommended_set_id", "recommended_is_fallback", "default_current_bin", "source_records"],
     "tombstone": ["station_id", "status", "name", "removed_in", "removed_reason", "merged_into", "detail"],
     "offset": ["reference_station_id", "time_offset_high_min", "time_offset_low_min",
@@ -166,7 +166,7 @@ FORMAT_VERSION = "1.0"
 SCHEMA_NAME = f"otc-{FORMAT_VERSION}.schema.json"
 # SHA-256 of the site's src/schema/otc-1.0.schema.json at the commit sync_schema.sh pins
 # (e2ae45a, approved source identities, original rows and restricted TICON policies). sync_schema.sh holds the same value; a test keeps the two equal.
-SCHEMA_SHA256 = "9e12738d3f3e54019ddf7863084273ec5526d16ff29c21ad3f40cf207d8013a8"
+SCHEMA_SHA256 = "51281a6b438fe41fd0c9eee7863a32b238b3aee17a4dd1b820be0073d9e54f62"
 _MISSING = object()  # "key not present"; never equal to a value read from JSON
 _UNSUPPORTED_TICON_NAMES = {"3L2", "3N2", "MSQM", "MTM", "R3", "T3"}
 

@@ -77,6 +77,19 @@ def test_station_list_counts():
     assert (len(stations), kinds.count("R"), kinds.count("S")) == (3502, 1260, 2242)
 
 
+@pytest.mark.parametrize("state,country,expected", [("CA", "USA", "US-CA"),
+    ("WA", "USA", "US-WA"), ("MA", "USA", "US-MA"), ("DC", "USA", "US-DC"),
+    ("", "USA", None), ("PR", "USA", None), ("VI", "USA", None), ("GU", "USA", None),
+    ("CA", "CAN", None)])
+def test_hint_carries_only_acquired_us_state_codes(monkeypatch, state, country, expected):
+    monkeypatch.setattr(noaa, "place", lambda *_: (country, "America/New_York"))
+    hint = adapter()._hint({"id": "8443970", "name": "Boston", "lat": 42.35,
+                            "lng": -71.05, "state": state}, "reference")
+    assert hint.get("region_code") == expected
+    if expected is None:
+        assert "region_code" not in hint
+
+
 def test_registered():
     assert SOURCES["noaa"] is NoaaAdapter
     assert registry_errors() == []
@@ -114,7 +127,7 @@ def test_station_hints(fetched):
     sets = by_id(adapter().sets(fetched))
     assert sets["8443970"].station_hint == {
         "name": "BOSTON", "country": "USA", "lat": 42.35388888888889, "lon": -71.05027777777778, "type": "reference",
-        "timezone": "America/New_York", "aliases": {"noaa": "8443970"}}
+        "timezone": "America/New_York", "aliases": {"noaa": "8443970"}, "region_code": "US-MA"}
     assert sets["9447130"].station_hint["timezone"] == "America/Los_Angeles"
 
 
