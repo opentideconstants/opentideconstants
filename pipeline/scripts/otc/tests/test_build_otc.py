@@ -21,6 +21,40 @@ from test_datums import native_observed_chart_cases as native_observed_chart_cas
 from test_datums import native_approximate_chart_cases as native_approximate_chart_cases
 
 
+@pytest.mark.skipif("OTC_TICON_CHART_PROOF" not in os.environ, reason="actual cached TICON chart witnesses")
+def test_native_ticon_cited_lat_chart_designation():
+    root = Path(os.environ["OTC_TICON_CHART_PROOF"])
+    release = json.loads((root / "native.json").read_text())
+    original = copy.deepcopy(release)
+    path = root / "drafts.jsonl"
+    rows = [json.loads(line) for line in path.read_text().splitlines()]
+    expected = {row["set_id"]: row["draft_datum"] for row in rows}
+    result = build_otc.apply_ticon_harmonic_mean_fallbacks(release, path, hashlib.sha256(path.read_bytes()).hexdigest())
+    (root / "candidate.json").write_text(json.dumps(release) + "\n")
+    assert result["normal_datum_gate_accepted"] is False
+    missing = []
+    for before, after in zip(original["stations"], release["stations"], strict=True):
+        restored = copy.deepcopy(after)
+        for old_set, new_set in zip(before["constant_sets"], restored["constant_sets"], strict=True):
+            if new_set["set_id"] not in expected:
+                continue
+            datum = new_set["datum"]
+            print(json.dumps({"station_id": after["station_id"], "set_id": new_set["set_id"],
+                              "chart_datum": datum.get("chart_datum"), "named": datum["named"]}))
+            if datum.get("chart_datum") != "lat":
+                missing.append(new_set["set_id"])
+            unchanged = copy.deepcopy(datum)
+            unchanged.pop("chart_datum", None)
+            assert unchanged == expected[new_set["set_id"]]
+            Draft202012Validator({"$ref": "#/$defs/datum", "$defs": pinned_schema()["$defs"]}).validate(datum)
+            if "datum" in old_set:
+                new_set["datum"] = old_set["datum"]
+            else:
+                new_set.pop("datum")
+        assert restored == before
+    assert not missing, f"missing cited LAT chart designation: {missing}"
+
+
 @pytest.mark.skipif("OTC_TICON_PRODUCER_PROOF" not in os.environ, reason="actual source-bound TICON pilot outputs")
 def test_native_ticon_publish_computed_fallback():
     root = Path(os.environ["OTC_TICON_PRODUCER_PROOF"])

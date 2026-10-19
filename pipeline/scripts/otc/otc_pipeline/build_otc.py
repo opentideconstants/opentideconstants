@@ -237,13 +237,23 @@ def apply_official_datum_fallbacks(release: dict, path: Path, sha256: str) -> di
 
 
 def apply_ticon_harmonic_mean_fallbacks(release: dict, path: Path, sha256: str) -> dict:
-    """Attach only authenticated same-set relative levels, without chart designation."""
+    """Attach relative levels and designate LAT only under existing cited conventions."""
+    from otc_pipeline.datums import derive_chart_datums
+
     staged = stage_official_datums(release, path, sha256)
     if any(row["source"] != "ticon-4" or row["datum"].get("zero") != "harmonic_mean" for row in staged["drafts"]):
         raise ValueError("harmonic_mean publication requires retained TICON drafts only")
     native = {cs["set_id"]: cs for station in release["stations"] for cs in station.get("constant_sets", [])}
     for row in staged["drafts"]:
         native[row["set_id"]]["datum"] = copy.deepcopy(row["datum"])
+    preview = copy.deepcopy(release)
+    derive_chart_datums(preview, include_computed_approximate=False)
+    designated = {cs["set_id"]: cs.get("datum", {}).get("chart_datum")
+                  for station in preview["stations"] for cs in station.get("constant_sets", [])}
+    for row in staged["drafts"]:
+        if designated[row["set_id"]] is not None:
+            row["datum"]["chart_datum"] = designated[row["set_id"]]
+            native[row["set_id"]]["datum"]["chart_datum"] = designated[row["set_id"]]
     return {**staged, "public_admission": True, "release_unchanged": not bool(staged["drafts"]),
             "normal_datum_gate_accepted": False, "accepted": False,
             "computed_basis_fallback_count": staged["staged_level_count"],
