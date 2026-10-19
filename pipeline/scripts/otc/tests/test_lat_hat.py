@@ -18,6 +18,19 @@ from otc_pipeline.datum_partition import load
 from otc_pipeline import lat_hat
 
 PARTITION_DATA = Path(__file__).resolve().parents[3] / "data/datums"
+
+
+@pytest.mark.skipif("OTC_TICON_PRODUCER_PROOF" not in os.environ, reason="explicit source-bound native TICON witnesses")
+@pytest.mark.parametrize("station_id", ("OTC-666303b1", "OTC-215da48c", "OTC-52fc4ff5"))
+def test_native_ticon_admit_harmonic_mean_extrema(station_id):
+    path = Path(os.environ["OTC_TICON_PRODUCER_PROOF"]) / f"{station_id}.json"
+    original = json.loads(path.read_text())
+    admitted = lat_hat.read_production_input(path)
+    assert admitted["datum_frame"] == "harmonic_mean"
+    assert admitted["constant_set"] == original["constant_set"]
+    assert "msl_offset_m" not in admitted["constant_set"].get("datum", {})
+    print(json.dumps({"behavior": "admit_harmonic_mean_extrema", "set_id": admitted["constant_set"]["set_id"],
+                      "native_sha256": admitted["native_json_sha256"], "source_binding": admitted["source_binding"]}))
 EXTERNAL_ENGINE = pytest.mark.skipif("OTC_ENGINE_WORKTREE" not in os.environ,
                                      reason="strict reference integration requires OTC_ENGINE_WORKTREE")
 

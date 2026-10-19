@@ -15,7 +15,13 @@ def compute_extrema(request, astro)
     stop = Time.iso8601(request.fetch('end')).utc
     raise ArgumentError, 'start must precede end' unless start < stop
     constituents = request.fetch('constituents')
-    offset = request.fetch('msl_offset_m')
+    offset = if request['datum_frame'] == 'harmonic_mean'
+                 raise ArgumentError, 'harmonic_mean has no MSL offset' if request.key?('msl_offset_m')
+                 raise ArgumentError, 'harmonic_mean datum term must be zero' unless request.fetch('datum_term') == 0
+                 request.fetch('datum_term')
+             else
+                 request.fetch('msl_offset_m')
+             end
     counts = { 'low' => 0, 'high' => 0 }
     selected = {}
     cursor = start
