@@ -1780,8 +1780,8 @@
       "properties": {
         "msl_offset_m": { "description": "The mean level (Z0) above the zero, in metres.", "type": "number" },
         "zero": {
-          "description": "What the zero is. chart_datum: the source's chart datum (e.g. NOAA's MLLW, JMA's tide-table datum); gauge_zero: the gauge's own zero (GESLA fits, PEGELONLINE's PNP); vertical_datum: a national or survey height system such as NAP, RH 2000, N2000, DVR90, NN2000 or OD Malin; msl: mean sea level; unknown: the source does not say.",
-          "enum": ["chart_datum", "gauge_zero", "vertical_datum", "msl", "unknown"]
+          "description": "What the zero is. chart_datum: the source's chart datum (e.g. NOAA's MLLW, JMA's tide-table datum); gauge_zero: the gauge's own zero (GESLA fits, PEGELONLINE's PNP); vertical_datum: a national or survey height system such as NAP, RH 2000, N2000, DVR90, NN2000 or OD Malin; msl: mean sea level; harmonic_mean: the same set's explicit harmonic computational origin, not surveyed MSL, a gauge zero or an agency chart-datum tie; unknown: the source does not say. harmonic_mean has no msl_offset_m or publisher zero_name; a named height is the harmonic sum minus that named level.",
+          "enum": ["chart_datum", "gauge_zero", "vertical_datum", "msl", "harmonic_mean", "unknown"]
         },
         "zero_name": {
           "description": "The source's name for the zero, e.g. MLLW, STND, PNP, NAP, RH 2000, OD Malin.",
@@ -1807,6 +1807,10 @@
         }
       },
       "allOf": [
+        {
+          "if": { "required": ["zero"], "properties": { "zero": { "const": "harmonic_mean" } } },
+          "then": { "not": { "anyOf": [{ "required": ["msl_offset_m"] }, { "required": ["zero_name"] }] } }
+        },
         {
           "description": "An otc_ key is OTC's own value next to a published one, so it is never kind published. sampling_assumed is never on msl, mtl, dtl or their otc_ forms: they are means of heights. When low waters are cut off (truncated_lows, by the direct method or a first reduction), only high-water levels are given: a level by the direct method or with truncated_lows is mhw or mhhw (or otc_mhw, otc_mhhw). Keys reach this pattern only after datum_key has accepted them, so its $ needs no newline guard.",
           "properties": {
@@ -1886,7 +1890,7 @@
       "properties": {
         "kind": { "enum": ["published", "computed", "observed"] },
         "fallback": {
-          "description": "A finding on this computed or observed level only; the constant set and its published levels keep their own status. A labelled observed datum_gate_failed level may omit unknown total uncertainty and its basis together; tuning diagnostics are not a calibrated station uncertainty.",
+          "description": "A finding on this computed or observed level only; the constant set and its published levels keep their own status. A labelled computed or observed datum_gate_failed level may omit unknown total uncertainty and its basis together; its finding states that uncertainty is unestablished and normal acceptance is false. Tuning diagnostics are not a calibrated station uncertainty.",
           "allOf": [
             { "$ref": "#/$defs/fallback" },
             { "properties": { "reason": { "const": "datum_gate_failed" } } }
@@ -1948,7 +1952,12 @@
         {
           "if": { "properties": { "kind": { "const": "computed" } } },
           "then": {
-            "required": ["epoch", "uncertainty_m"],
+            "required": ["epoch"],
+            "if": {
+              "required": ["fallback"],
+              "properties": { "fallback": { "required": ["reason"], "properties": { "reason": { "const": "datum_gate_failed" } } } }
+            },
+            "else": { "required": ["uncertainty_m"] },
             "properties": {
               "method": { "enum": ["harmonic_extremes", "subordinate_offsets"] },
               "uncertainty_basis": { "enum": ["calibrated", "propagated"] },
