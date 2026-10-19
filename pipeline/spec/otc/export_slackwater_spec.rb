@@ -28,6 +28,28 @@ RSpec.describe 'the qualified native Slackwater file export' do
         JSON.parse(File.read(File.join(@directory, 'OTC_20261011-swap-report.json')))
     end
 
+    it 'preserves native default admission for the actual selected ordinary references without inventing scores' do
+        log, status = Open3.capture2e(@flatc, '--json', '--strict-json', '--defaults-json', '-o', @directory,
+                                     @database_schema, '--', File.join(@directory, 'OTC_20261011.tcdb'))
+        expect(status.success?).to be(true), log
+        database = JSON.parse(File.read(File.join(@directory, 'OTC_20261011.json')))
+        %w[OTC-000d594d OTC-00af59c3 OTC-00b96c29].each do |id|
+            row = @rows.find { |item| item['station_id'] == id }
+            native = row.fetch('constant_sets').find { |item| item['set_id'] == row['recommended_set_id'] }
+            expect(native.fetch('qc_status')).to eq('ok')
+            expect(native['fallback']).to be_nil
+            decoded = database.fetch('stations').find { |item| item['id'] == id }
+            expect(decoded.fetch('accepted')).to be(true)
+            expect(decoded.fetch('score')).to eq(0)
+            station = JSON.parse(File.read(File.join(@directory, 'OTC_20261011-stations', "#{id}.json")))
+            expect(station).not_to have_key('accepted')
+            expect(station.fetch('source').fetch('otc').fetch('qc_status')).to eq(native.fetch('qc_status'))
+        end
+        flagged = database.fetch('stations').find { |item| item['id'] == 'OTC-0012a4f2' }
+        expect(flagged.fetch('accepted')).to be(false)
+        expect(flagged.fetch('score')).to eq(0)
+    end
+
     it 'accounts for every native station and alternative without claiming partial output complete' do
         document = report
         expect(document.fetch('input_sha256')).to eq(Digest::SHA256.file(@input).hexdigest)

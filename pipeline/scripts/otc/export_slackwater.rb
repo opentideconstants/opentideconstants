@@ -269,6 +269,10 @@ module OTCExportSlackwater
                 record = station.slice('id', 'name', 'latitude', 'longitude', 'timezone', 'country', 'continent', 'chart_datum', 'license', 'disclaimers')
                 record['country_code'] = @countries.fetch(station.fetch('source').fetch('otc').fetch('native_country')).fetch('ISO3166-1-Alpha-2')
                 record['type'] = station.fetch('type') == 'reference' ? 'Reference' : 'Subordinate'
+                if station['type'] == 'reference' && station['kind'] != 'current'
+                    selected = station.fetch('source').fetch('otc')
+                    record['accepted'] = selected['qc_status'] == 'ok' && selected['fallback'].nil?
+                end
                 if station['kind'] == 'current'
                     record['kind'] = 'Current'
                     record['current'] = station.fetch('current').dup
