@@ -1498,10 +1498,10 @@ R_KEY = _D + r"properties/(named|basis)/propertyNames/(pattern|not)"
 R_NAMED_NUMBER = _D + r"properties/named/additionalProperties/type"
 R_DATUM_EXTRA = _D + r"additionalProperties"
 R_MSL_OFFSET = _D + r"properties/msl_offset_m/type"
-R_OTC = _D + r"allOf/0/properties/basis/patternProperties/\^otc_/"
-R_HIGH_ONLY = _D + r"allOf/0/properties/basis/patternProperties/\^\(\?!"
-R_MSL_SAMPLING = _D + r"allOf/0/properties/basis/patternProperties/\^\(otc_\)\?\(msl\|mtl\|dtl\)\$/"
-R_TRUNCATED_DATUM = _D + r"allOf/1/then/"
+R_OTC = _D + r"allOf/1/properties/basis/patternProperties/\^otc_/"
+R_HIGH_ONLY = _D + r"allOf/1/properties/basis/patternProperties/\^\(\?!"
+R_MSL_SAMPLING = _D + r"allOf/1/properties/basis/patternProperties/\^\(otc_\)\?\(msl\|mtl\|dtl\)\$/"
+R_TRUNCATED_DATUM = _D + r"allOf/2/then/"
 R_PUBLISHED = basis_rule(r"allOf/0/then/")
 R_COMPUTED = basis_rule(r"allOf/1/then/")
 R_OBSERVED = basis_rule(r"allOf/2/then/")
@@ -1906,9 +1906,9 @@ datum_must_fail("a labelled observed datum with another fallback reason",
 datum_must_fail("a labelled observed datum without its finding",
                 edit(labelled_observed(), "msl", lambda b: b["fallback"].pop("otc_finding")),
                 basis_rule(r"properties/fallback/"))
-datum_must_fail("a computed datum fallback without total uncertainty",
+datum_must_pass("a computed datum fallback without total uncertainty",
                 edit(noaa_on_first, "otc_lat", lambda b: [b.__setitem__("fallback", copy.deepcopy(DATUM_FALLBACK)),
-                                                         b.pop("uncertainty_m"), b.pop("uncertainty_basis")]), R_COMPUTED)
+                                                         b.pop("uncertainty_m"), b.pop("uncertainty_basis")]))
 datum_must_fail("a computed datum fallback with another reason",
                 edit(noaa_on_first, "otc_lat", lambda b: b.__setitem__("fallback", dict(DATUM_FALLBACK, reason="time_base_unresolved"))),
                 basis_rule(r"properties/fallback/"))

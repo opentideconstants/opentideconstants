@@ -19,6 +19,76 @@ from otc_pipeline.observed_datums import produce as observed_produce
 from otc_pipeline.release_writer import pinned_schema
 from test_datums import native_observed_chart_cases as native_observed_chart_cases
 from test_datums import native_approximate_chart_cases as native_approximate_chart_cases
+
+
+@pytest.mark.skipif("OTC_TICON_PRODUCER_PROOF" not in os.environ, reason="actual source-bound TICON pilot outputs")
+def test_native_ticon_publish_computed_fallback():
+    root = Path(os.environ["OTC_TICON_PRODUCER_PROOF"])
+    release = json.loads((root / "OTC_20261011.json").read_text())
+    original = copy.deepcopy(release)
+    path = root / "three-pilot-drafts.jsonl"
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    staged = build_otc.stage_official_datums(release, path, digest)
+    assert release == original
+    assert staged["staged_level_count"] == 6
+    changed = copy.deepcopy(release)
+    target = next(cs for station in changed["stations"] for cs in station["constant_sets"]
+                  if cs["set_id"] == "OTC-52fc4ff5/ticon-4/aero_trading-9338-can-meds")
+    target["constituents"][0]["amplitude_m"] += .001
+    with pytest.raises(ValueError, match="computation/source binding mismatch"):
+        build_otc.stage_official_datums(changed, path, digest)
+    result = build_otc.apply_ticon_harmonic_mean_fallbacks(release, path, digest)
+    assert result["normal_datum_gate_accepted"] is False
+    wanted = {row["set_id"] for row in map(json.loads, path.read_text().splitlines())}
+    for before, after in zip(original["stations"], release["stations"], strict=True):
+        restored = copy.deepcopy(after)
+        for old_set, new_set in zip(before["constant_sets"], restored["constant_sets"], strict=True):
+            if new_set["set_id"] not in wanted:
+                continue
+            datum = new_set["datum"]
+            assert datum["zero"] == "harmonic_mean"
+            assert "msl_offset_m" not in datum and "zero_name" not in datum and "chart_datum" not in datum
+            for level in ("lat", "hat"):
+                basis = datum["basis"][level]
+                assert "uncertainty_m" not in basis and "uncertainty_basis" not in basis
+                assert basis["fallback"]["reason"] == "datum_gate_failed"
+                assert "harmonic-mean-relative" in basis["fallback"]["otc_finding"]
+            Draft202012Validator({"$ref": "#/$defs/datum", "$defs": pinned_schema()["$defs"]}).validate(datum)
+            if "datum" in old_set:
+                new_set["datum"] = old_set["datum"]
+            else:
+                new_set.pop("datum")
+        assert restored == before
+    candidate = root / "candidate"
+    candidate.mkdir(exist_ok=True)
+    (candidate / "OTC_20261011.json").write_text(json.dumps(release) + "\n")
+    (root / "three-pilot-stage.json").write_text(json.dumps(result) + "\n")
+
+
+@pytest.mark.skipif("OTC_TICON_PRODUCER_PROOF" not in os.environ, reason="actual source-bound TICON cached writer pilots")
+def test_native_ticon_cached_harmonic_mean_writer():
+    root = Path(os.environ["OTC_TICON_PRODUCER_PROOF"])
+    original = json.loads((root / "OTC_20261011.json").read_text())
+    native = root / "pilot-native.jsonl"
+    native.write_text("".join(json.dumps(station) + "\n" for station in original["stations"]))
+    meta = native.with_suffix(".meta.json")
+    meta.write_text(json.dumps({key: value for key, value in original.items() if key != "stations"}) + "\n")
+    drafts = root / "three-pilot-drafts.jsonl"
+    output = root / "written-pilots"
+    if not output.exists():
+        command = [sys.executable, "-m", "otc_pipeline.build_otc", "--cached-harmonic-mean",
+                   "--native", str(native), "--native-sha256", hashlib.sha256(native.read_bytes()).hexdigest(),
+                   "--native-meta-sha256", hashlib.sha256(meta.read_bytes()).hexdigest(),
+                   "--harmonic-mean-drafts", str(drafts), "--harmonic-mean-drafts-sha256", hashlib.sha256(drafts.read_bytes()).hexdigest(),
+                   "--congen-run", "/Users/jpr5/.local/share/copilotkit/cr/otc-impl/FIX-CONST/astro/otc-tcd-20251228-ma2mb2-r2",
+                   "--out", str(output)]
+        completed = subprocess.run(command, text=True, capture_output=True)
+        (root / "pilot-writer-command.json").write_text(json.dumps(command) + "\n")
+        (root / "pilot-writer.log").write_text(completed.stdout + completed.stderr)
+        assert completed.returncode == 0, completed.stderr
+    written = json.loads((output / "OTC_20261011.json").read_text())
+    expected = json.loads((root / "candidate/OTC_20261011.json").read_text())
+    assert written == expected
 from test_datums import native_computed_chart_cases as native_computed_chart_cases
 from test_datums import native_nld_computed_chart_cases as native_nld_computed_chart_cases
 from test_datums import native_uhslc_fd_chart_cases as native_uhslc_fd_chart_cases

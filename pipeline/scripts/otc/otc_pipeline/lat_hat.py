@@ -79,6 +79,11 @@ def read_tuning_input(path: Path, *, tier: str = "T5", data_dir: Path | None = N
 
 def _strict_request(payload: dict, start: str = START, end: str = END) -> dict:
     cs = payload["constant_set"]
+    if payload.get("datum_frame") == "harmonic_mean":
+        if cs.get("source") != "ticon-4" or "msl_offset_m" in (cs.get("datum") or {}):
+            raise ValueError("harmonic_mean requires untied TICON constants")
+        return {"astro_table": payload["astro_table"], "constituents": cs["constituents"],
+                "datum_frame": "harmonic_mean", "datum_term": 0.0, "start": start, "end": end}
     return {"astro_table": payload["astro_table"], "constituents": cs["constituents"],
             "msl_offset_m": _finite(cs["datum"].get("msl_offset_m"), "msl_offset_m"),
             "start": start, "end": end}
@@ -90,8 +95,11 @@ def computation_input_sha256(payload: dict) -> str:
     body = {"request": _strict_request(payload), "convention_id": cs.get("convention_id"),
             "source_version": cs.get("source_version"), "time_base": cs.get("time_base"),
             "record_issues": cs.get("record_issues", []),
-            "truncated_lows": sorted(k for k, b in cs["datum"].get("basis", {}).items()
+            "truncated_lows": sorted(k for k, b in (cs.get("datum") or {}).get("basis", {}).items()
                                      if "truncated_lows" in b.get("flags", []))}
+    if payload.get("datum_frame") == "harmonic_mean":
+        body["native_source_context"] = {"station_id": payload["station_id"], "constant_set": cs,
+                                         "source_records": payload["source_records"]}
     return hashlib.sha256(json.dumps(body, sort_keys=True, separators=(",", ":"),
                                      allow_nan=False).encode()).hexdigest()
 
@@ -113,6 +121,8 @@ def compute_raw(payload: dict, *, start: str = START, end: str = END,
     result = json.loads(completed.stdout)
     result["elapsed_s"] = time.perf_counter() - started
     result["child_maxrss_native_units"] = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
+    if payload.get("datum_frame") == "harmonic_mean":
+        result["datum_frame"] = "harmonic_mean"
     return result
 
 
@@ -124,12 +134,24 @@ def read_production_input(path: Path) -> dict:
         raise ValueError("production official inputs must not contain a comparator")
     official = cs.get("source") in ("noaa", "linz") and cs.get("source_type") == "official"
     gesla = cs.get("source") == "gesla-fit" and cs.get("source_type") == "gauge"
-    if not (official or gesla):
+    ticon = cs.get("source") == "ticon-4" and cs.get("source_type") == "analysis"
+    if not (official or gesla or ticon):
         raise ValueError("missing-level production requires official NOAA/LINZ or GESLA gauge constants")
     if cs.get("quantity") != "water_level" or cs.get("qc_status") not in ("ok", "flagged") or not cs.get("constituents"):
         raise ValueError("eligible water-level constants required")
-    _finite(cs.get("datum", {}).get("msl_offset_m"), "msl_offset_m")
-    if any(key in cs["datum"].get("named", {}) for key in ("lat", "otc_lat", "hat", "otc_hat")):
+    datum = cs.get("datum") or {}
+    if ticon:
+        if "msl_offset_m" in datum or "zero_name" in datum or datum.get("zero") not in (None, "unknown", "harmonic_mean"):
+            raise ValueError("TICON harmonic_mean cannot invent or replace an absolute tie")
+        if not any(record.get("source") == "ticon" and record.get("source_record_id") == cs.get("source_record_id")
+                   and cs["set_id"] in record.get("published_set_ids", []) for record in payload.get("source_records", [])):
+            raise ValueError("source-bound retained TICON record required")
+        if any(c["name"] not in payload["astro_table"]["constituents"] for c in cs["constituents"]):
+            raise ValueError("all carried TICON constituents require existing astro rows")
+        payload["datum_frame"] = "harmonic_mean"
+    else:
+        _finite(datum.get("msl_offset_m"), "msl_offset_m")
+    if any(key in datum.get("named", {}) for key in ("lat", "otc_lat", "hat", "otc_hat")):
         raise ValueError("production cohort must lack both LAT and HAT; reuse existing levels")
     return payload
 
@@ -144,7 +166,12 @@ def datum_draft(constant_set: dict, raw: dict, *, flatline: bool | None = None) 
     """Proof-only computed shape. Not calibrated, validated, or admitted to a release."""
     if (raw["start"], raw["end"]) != (START, END):
         raise ValueError("only the pinned 19-year window receives the OTC epoch")
-    datum = copy.deepcopy(constant_set["datum"])
+    datum = copy.deepcopy(constant_set.get("datum") or {})
+    harmonic_mean = constant_set.get("source") == "ticon-4"
+    if harmonic_mean:
+        if raw.get("datum_frame") != "harmonic_mean" or "msl_offset_m" in datum or "zero_name" in datum:
+            raise ValueError("explicit untied harmonic_mean extrema required")
+        datum["zero"] = "harmonic_mean"
     named, basis = datum.setdefault("named", {}), datum.setdefault("basis", {})
     suppress = low_water_suppressed(constant_set, flatline)
     unknown_fit_eligibility = flatline is None and constant_set.get("source_type") == "gauge" and not suppress
@@ -176,6 +203,10 @@ def datum_draft(constant_set: dict, raw: dict, *, flatline: bool | None = None) 
             basis[key]["fallback"] = {**COMPUTED_FALLBACK,
                                       "otc_finding": COMPUTED_FALLBACK["otc_finding"] +
                                       " This record's low-water eligibility is unknown; no clean-quality claim is made."}
+        if harmonic_mean:
+            basis[key]["fallback"] = {"reason": "datum_gate_failed",
+                "basis": "Same-set harmonic sum relative to its computational harmonic mean; all carried constituents, OTC LAT 2020-2038",
+                "otc_finding": f"Approximate harmonic-mean-relative astronomical {level.upper()}; no published MSL or absolute datum tie. Uncertainty is unestablished; normal datum acceptance false. Existing source findings and rights remain unchanged."}
     return datum
 
 
@@ -376,9 +407,30 @@ def main():
     parser.add_argument("--production-official-calibration", "--production-calibration", type=Path,
                         help="pinned source calibration for missing-level official/GESLA inputs")
     parser.add_argument("--production-official-calibration-sha256")
+    parser.add_argument("--production-harmonic-mean", action="store_true",
+                        help="retained source-bound TICON extrema relative to harmonic mean; unknown uncertainty")
     parser.add_argument("--without-seasonal", action="store_true",
                         help="tuning sensitivity only; fixed method retains present Sa/Ssa")
     args = parser.parse_args()
+    if args.production_harmonic_mean:
+        if args.production_official_calibration or args.calibrate_official_rosters or args.without_seasonal:
+            raise ValueError("harmonic_mean production uses no source calibration or sensitivity")
+        payloads = [read_production_input(path) for path in args.inputs]
+        if any(payload.get("datum_frame") != "harmonic_mean" for payload in payloads):
+            raise ValueError("harmonic_mean production requires retained TICON inputs")
+        with args.out.open("w") as stream:
+            for path, payload in zip(args.inputs, payloads, strict=True):
+                cs = payload["constant_set"]
+                raw = compute_raw(payload, ruby=args.ruby)
+                row = {"station_id": payload["station_id"], "set_id": cs["set_id"], "source_record_id": cs["source_record_id"],
+                       "datum_frame": "harmonic_mean", "raw": raw, "draft_datum": datum_draft(cs, raw),
+                       "computation_input_sha256": computation_input_sha256(payload),
+                       "input_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                       "native_json_sha256": payload.get("native_json_sha256"),
+                       "accepted": False, "normal_datum_gate_accepted": False}
+                stream.write(json.dumps(row, allow_nan=False, sort_keys=True) + "\n")
+                stream.flush()
+        return
     if (args.production_official_calibration is None) != (args.production_official_calibration_sha256 is None):
         raise ValueError("production source calibration path and SHA-256 must be supplied together")
     if args.production_official_calibration:
