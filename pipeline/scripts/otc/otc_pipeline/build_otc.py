@@ -141,12 +141,13 @@ def _sha256(path: Path) -> str:
 
 def stage_official_datums(release: dict, path: Path, sha256: str) -> dict:
     """Stage pinned official or diagnostic GESLA drafts without changing values."""
-    from otc_pipeline.lat_hat import EPOCH, START, END, _finite, computation_input_sha256, low_water_suppressed
+    from otc_pipeline.lat_hat import EPOCH, START, END, _finite, computation_input_sha256, datum_draft, low_water_suppressed
 
     if _sha256(path) != sha256:
         raise ValueError("official datum draft SHA-256 mismatch")
     native = {cs["set_id"]: (station["station_id"], cs) for station in release["stations"]
               for cs in station.get("constant_sets", [])}
+    stations = {station["station_id"]: station for station in release["stations"]}
     conventions = {c["convention_id"]: c for c in release.get("conventions", [])}
     tables = {t["astro_table_id"]: t for t in release.get("astro_tables", [])}
     staged, seen, count = [], set(), 0
@@ -161,6 +162,30 @@ def stage_official_datums(release: dict, path: Path, sha256: str) -> dict:
         station_id, cs = native[sid]
         convention = conventions.get(cs.get("convention_id"), {})
         table = tables.get(convention.get("astro_table_id"))
+        if row.get("datum_frame") == "harmonic_mean":
+            records = [record for record in stations[station_id].get("source_records", [])
+                       if record.get("source_record_id") == cs.get("source_record_id")]
+            payload = {"station_id": station_id, "constant_set": cs, "astro_table": table,
+                       "datum_frame": "harmonic_mean", "source_records": records}
+            raw = row["raw"]
+            if (cs.get("source") != "ticon-4" or cs.get("source_type") != "analysis"
+                    or cs.get("quantity") != "water_level" or cs.get("qc_status") not in ("ok", "flagged")
+                    or table is None or not any(record.get("source") == "ticon" and sid in record.get("published_set_ids", []) for record in records)
+                    or row.get("station_id") != station_id or row.get("accepted") is not False
+                    or row.get("normal_datum_gate_accepted") is not False
+                    or raw.get("datum_frame") != "harmonic_mean" or raw.get("accepted") is not False
+                    or (raw.get("start"), raw.get("end")) != (START, END)
+                    or row.get("computation_input_sha256") != computation_input_sha256(payload)):
+                raise ValueError(f"TICON harmonic_mean computation/source binding mismatch: {sid}")
+            if (cs.get("datum") or {}).get("named"):
+                raise ValueError(f"harmonic_mean cannot replace existing datum levels: {sid}")
+            draft = datum_draft(cs, raw)
+            if row.get("draft_datum") != draft:
+                raise ValueError(f"TICON draft changed frame, extrema or fallback metadata: {sid}")
+            staged.append({"station_id": station_id, "set_id": sid, "source": "ticon-4", "datum": draft,
+                           "input_sha256": sha256, "computed_keys": ["lat", "hat"]})
+            count += 2
+            continue
         if (table is None or not row.get("computation_input_sha256") or
                 row["computation_input_sha256"] != computation_input_sha256(
                     {"constant_set": cs, "astro_table": table}) or
@@ -209,6 +234,20 @@ def apply_official_datum_fallbacks(release: dict, path: Path, sha256: str) -> di
     """Attach labelled computed levels while preserving every existing set and recommendation."""
     staged = stage_official_datums(release, path, sha256)
     return _publish_official_datum_stage(release, staged)
+
+
+def apply_ticon_harmonic_mean_fallbacks(release: dict, path: Path, sha256: str) -> dict:
+    """Attach only authenticated same-set relative levels, without chart designation."""
+    staged = stage_official_datums(release, path, sha256)
+    if any(row["source"] != "ticon-4" or row["datum"].get("zero") != "harmonic_mean" for row in staged["drafts"]):
+        raise ValueError("harmonic_mean publication requires retained TICON drafts only")
+    native = {cs["set_id"]: cs for station in release["stations"] for cs in station.get("constant_sets", [])}
+    for row in staged["drafts"]:
+        native[row["set_id"]]["datum"] = copy.deepcopy(row["datum"])
+    return {**staged, "public_admission": True, "release_unchanged": not bool(staged["drafts"]),
+            "normal_datum_gate_accepted": False, "accepted": False,
+            "computed_basis_fallback_count": staged["staged_level_count"],
+            "admission": "same-set harmonic-mean-relative computed fallback; no absolute tie or validated uncertainty"}
 
 
 def stage_subordinate_datums(release: dict, path: Path, sha256: str, *,
@@ -305,7 +344,7 @@ def _publish_official_datum_stage(release: dict, staged: dict, *, finalize_chart
     for entry in staged["drafts"]:
         datum = entry["datum"]
         for key in entry["computed_keys"]:
-            if entry["source"] != "gesla-fit":
+            if entry["source"] not in ("gesla-fit", "ticon-4"):
                 datum["basis"][key]["fallback"] = dict(COMPUTED_FALLBACK)
             count += 1
         by_id[entry["set_id"]]["datum"] = datum
@@ -589,10 +628,42 @@ def cached_subordinate_main(argv: list[str]) -> int:
     return 0
 
 
+def cached_harmonic_mean_main(argv: list[str]) -> int:
+    """Write the existing native release with authenticated relative TICON additions."""
+    from otc_pipeline.astro_tables import load_congen_run
+
+    parser = argparse.ArgumentParser(prog="otc_pipeline.build_otc --cached-harmonic-mean", allow_abbrev=False)
+    for name in ("native", "harmonic-mean-drafts", "congen-run", "out"):
+        parser.add_argument(f"--{name}", type=Path, required=True)
+    for name in ("native-sha256", "native-meta-sha256", "harmonic-mean-drafts-sha256"):
+        parser.add_argument(f"--{name}", required=True)
+    args = parser.parse_args(argv)
+    if args.out.exists() and any(args.out.iterdir()):
+        raise ValueError("cached harmonic_mean output must be empty")
+    meta_path = args.native.with_suffix(".meta.json")
+    if _sha256(args.native) != args.native_sha256 or _sha256(meta_path) != args.native_meta_sha256:
+        raise ValueError("cached native release SHA-256 mismatch")
+    release = json.loads(meta_path.read_text())
+    with args.native.open() as source:
+        release["stations"] = [json.loads(line) for line in source]
+    staged = apply_ticon_harmonic_mean_fallbacks(release, args.harmonic_mean_drafts, args.harmonic_mean_drafts_sha256)
+    if _sha256(args.native) != args.native_sha256 or _sha256(meta_path) != args.native_meta_sha256:
+        raise ValueError("cached native release changed during staging")
+    files = write_release(release, args.out, datestamp=release["release"]["datestamp"], app_export=None,
+                          congen_run=load_congen_run(args.congen_run))
+    (args.out / "HARMONIC_MEAN_DATUM_STAGE.json").write_text(json.dumps(staged, allow_nan=False, sort_keys=True) + "\n")
+    print(json.dumps({"normal_datum_gate_accepted": False, "accepted": False,
+                      "staged_set_count": staged["staged_set_count"], "computed_basis_fallback_count": staged["computed_basis_fallback_count"],
+                      "native_sha256": args.native_sha256, "files": [str(path) for path in files]}, sort_keys=True))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else list(argv)
     if argv and argv[0] == "--cached-subordinate":
         return cached_subordinate_main(argv[1:])
+    if argv and argv[0] == "--cached-harmonic-mean":
+        return cached_harmonic_mean_main(argv[1:])
     ap = argparse.ArgumentParser(prog="otc_pipeline.build_otc", description=(__doc__ or "").split("\n")[0],
                                  allow_abbrev=False)
     for name in ("fit-run", "audit-dir", "verdicts-dir", "calibration", "ticon-csv", "ticon-refs", "congen-run",
