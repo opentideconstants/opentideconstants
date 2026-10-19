@@ -59,6 +59,30 @@ RSpec.describe 'the qualified native Slackwater file export' do
         expect(File.binread(File.join(@directory, 'OTC_20261011.tcdb'), 8)[4, 4]).to eq('TCDB')
     end
 
+    it 'preserves native parent-set admission for the three actual default current references' do
+        log, status = Open3.capture2e(@flatc, '--json', '--strict-json', '--defaults-json', '-o', @directory,
+                                     @database_schema, '--', File.join(@directory, 'OTC_20261011.tcdb'))
+        expect(status.success?).to be(true), log
+        database = JSON.parse(File.read(File.join(@directory, 'OTC_20261011.json')))
+        %w[OTC-00bdf4b5 OTC-017e71cb OTC-01c1394c].each do |id|
+            row = @rows.find { |item| item['station_id'] == id }
+            native = row.fetch('constant_sets').find { |item| item['set_id'] == row['recommended_set_id'] }
+            expect(native.fetch('qc_status')).to eq('ok')
+            expect(native['fallback']).to be_nil
+            decoded = database.fetch('stations').find { |item| item['id'] == id }
+            expect(decoded.fetch('accepted')).to be(true)
+            expect(decoded.fetch('score')).to eq(0)
+            station = JSON.parse(File.read(File.join(@directory, 'OTC_20261011-stations', "#{id}.json")))
+            detail = station.fetch('source').fetch('otc')
+            expect(detail.fetch('native_set_metadata')).to eq(native.reject { |key, _| key == 'current_bins' })
+            expect(detail.fetch('bin').fetch('bin')).to eq(row.fetch('default_current_bin'))
+            expect(station).not_to have_key('accepted')
+        end
+        database.fetch('stations').select { |station| station['type'] == 'Subordinate' || station['id'].include?('_bin_') }.each do |station|
+            expect(station.fetch('accepted')).to be(false)
+        end
+    end
+
     it 'preserves the three actual recommendations, coefficients, datum meaning and notices' do
         %w[OTC-000d594d OTC-00be05d2 OTC-06676dd2].each do |id|
             row = @rows.find { |item| item['station_id'] == id }

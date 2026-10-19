@@ -272,6 +272,9 @@ module OTCExportSlackwater
                 if station['type'] == 'reference' && station['kind'] != 'current'
                     selected = station.fetch('source').fetch('otc')
                     record['accepted'] = selected['qc_status'] == 'ok' && selected['fallback'].nil?
+                elsif station['type'] == 'reference' && station['id'] == station.fetch('source').fetch('otc')['native_station_id']
+                    selected = station.fetch('source').fetch('otc').fetch('native_set_metadata')
+                    record['accepted'] = selected['qc_status'] == 'ok' && selected['fallback'].nil?
                 end
                 if station['kind'] == 'current'
                     record['kind'] = 'Current'
