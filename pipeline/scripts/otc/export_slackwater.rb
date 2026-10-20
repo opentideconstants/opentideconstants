@@ -103,6 +103,7 @@ module OTCExportSlackwater
                     entry.merge!('status' => 'unrepresentable', 'reason' => 'subordinate reference is not exported')
                     true
                 end
+                annotate_inherited_acceptance(stations)
                 station_directory = File.join(temporary, "OTC_#{@date}-stations")
                 FileUtils.mkdir_p(station_directory)
                 stations.each { |station| File.write(File.join(station_directory, "#{station.fetch('id')}.json"), JSON.generate(station) + "\n") }
@@ -262,6 +263,39 @@ module OTCExportSlackwater
              'chart_datum' => '', 'datums' => {}, 'harmonic_constituents' => terms, 'current' => current}
         end
 
+        def reference_accepted?(station)
+            return false unless station['type'] == 'reference'
+            detail = station.fetch('source').fetch('otc')
+            if station['kind'] == 'current'
+                return false unless station['id'] == detail['native_station_id']
+                detail = detail.fetch('native_set_metadata')
+            end
+            detail['qc_status'] == 'ok' && detail['fallback'].nil?
+        end
+
+        def annotate_inherited_acceptance(stations)
+            references = stations.select { |station| station['type'] == 'reference' }.to_h { |station| [station.fetch('id'), station] }
+            stations.each do |station|
+                next unless station['type'] == 'subordinate'
+                reference_id = station.dig('current', 'offsets', 'reference') || station.dig('offsets', 'reference')
+                reference = references.fetch(reference_id)
+                reference_detail = reference.fetch('source').fetch('otc')
+                detail = station.fetch('source').fetch('otc')
+                acceptance = {
+                    'basis' => 'inherited', 'accepted' => reference_accepted?(reference),
+                    'reference_export_id' => reference_id,
+                    'reference_station_id' => reference_detail['native_station_id'] || reference.fetch('id'),
+                    'reference_set_id' => reference_detail.fetch('set_id'),
+                    'finding' => 'Admission inherited from the exported reference; independent subordinate accuracy is not established.'
+                }
+                acceptance['reference_bin'] = detail.fetch('reference_bin') if station['kind'] == 'current'
+                detail['acceptance'] = acceptance
+                station['disclaimers'] += "\nOTC acceptance: #{JSON.generate(acceptance)}"
+                entry = @report.fetch('records').find { |record| record['station_id'] == station.fetch('id') }
+                entry['acceptance'] = acceptance if entry
+            end
+        end
+
         def write_database(stations, temporary)
             names = stations.flat_map { |station| station.fetch('harmonic_constituents').map { |term| term.fetch('name') } }.uniq.sort
             datums = stations.flat_map { |station| station.fetch('datums').keys }.uniq.sort
@@ -269,12 +303,10 @@ module OTCExportSlackwater
                 record = station.slice('id', 'name', 'latitude', 'longitude', 'timezone', 'country', 'continent', 'chart_datum', 'license', 'disclaimers')
                 record['country_code'] = @countries.fetch(station.fetch('source').fetch('otc').fetch('native_country')).fetch('ISO3166-1-Alpha-2')
                 record['type'] = station.fetch('type') == 'reference' ? 'Reference' : 'Subordinate'
-                if station['type'] == 'reference' && station['kind'] != 'current'
-                    selected = station.fetch('source').fetch('otc')
-                    record['accepted'] = selected['qc_status'] == 'ok' && selected['fallback'].nil?
-                elsif station['type'] == 'reference' && station['id'] == station.fetch('source').fetch('otc')['native_station_id']
-                    selected = station.fetch('source').fetch('otc').fetch('native_set_metadata')
-                    record['accepted'] = selected['qc_status'] == 'ok' && selected['fallback'].nil?
+                record['accepted'] = if station['type'] == 'subordinate'
+                    station.fetch('source').fetch('otc').fetch('acceptance').fetch('accepted')
+                else
+                    reference_accepted?(station)
                 end
                 if station['kind'] == 'current'
                     record['kind'] = 'Current'
