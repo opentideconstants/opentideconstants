@@ -14,6 +14,90 @@ from otc_pipeline.datums import datum_build_errors, period, published
 from otc_pipeline.gesla_sets import _published_stated_zero
 
 
+@pytest.fixture
+def native_d4_chart_case():
+    root = os.environ.get("OTC_D4_CHART_PROOF")
+    if not root:
+        pytest.skip("requires actual source-bound D4 chart witnesses")
+    document = json.loads((Path(root) / "accepted.json").read_text())
+    station = document["stations"][0]
+    cs = next(cs for cs in station["constant_sets"] if cs["source"] == "ticon-4")
+    return station, cs
+
+
+def test_native_d4_approximate_chart_labels_and_idempotence(native_d4_chart_case):
+    station, cs = native_d4_chart_case
+    before = copy.deepcopy(cs["datum"])
+    release = {"stations": [station]}
+    ids = frozenset([cs["set_id"]])
+    assert datums.derive_chart_datums(release, ticon_approximate_set_ids=ids)["approximate_changed_sets"] == 1
+    assert cs["datum"]["chart_datum"] == "lat"
+    assert cs["datum"]["named"] == before["named"]
+    basis = cs["datum"]["basis"]["lat"]
+    assert "existing computed LAT (nonofficial)" in basis["fallback"]["basis"]
+    assert "Uncertainty is unestablished" in basis["fallback"]["otc_finding"]
+    assert "uncertainty_m" not in basis and "uncertainty_basis" not in basis
+    after = copy.deepcopy(release)
+    assert datums.derive_chart_datums(release, ticon_approximate_set_ids=ids)["changed_sets"] == 0
+    assert release == after
+
+
+@pytest.mark.parametrize("guard", ["unstaged", "pointer", "agency", "unknown", "mixed", "no_rows",
+    "low_water", "no_lat", "foreign_source", "missing_link", "wrong_type", "wrong_quantity",
+    "bad_qc", "wrong_frame", "wrong_method", "empty_finding", "empty_basis", "nonfinite", "country_conflict"])
+def test_native_d4_chart_guards(native_d4_chart_case, monkeypatch, guard):
+    station, cs = native_d4_chart_case
+    ids = frozenset([cs["set_id"]])
+    if guard == "unstaged":
+        ids = frozenset()
+    elif guard == "pointer":
+        cs["datum"]["chart_datum"] = "hat"
+    elif guard == "agency":
+        station["constant_sets"].append({"set_id": "agency-control", "datum": {
+            "chart_datum": "msl", "named": {"msl": 0}, "basis": {"msl": {"kind": "published"}}}})
+    elif guard in ("unknown", "mixed", "no_rows"):
+        table, digest = datums._chart_conventions()
+        table = copy.deepcopy(table)
+        rows = [r for r in table["rows"] if r["country_code"] == station["country"]]
+        assert rows
+        if guard == "no_rows":
+            table["rows"] = [r for r in table["rows"] if r not in rows]
+        elif guard == "mixed":
+            extra = copy.deepcopy(rows[0])
+            extra["LAT_evidence_status"] = "unknown"
+            table["rows"].append(extra)
+        else:
+            for row in rows:
+                row["LAT_evidence_status"] = "unknown"
+        monkeypatch.setattr(datums, "_chart_conventions", lambda: (table, digest))
+    elif guard == "low_water":
+        cs["record_issues"] = [{"issue": "flatline"}]
+    elif guard == "no_lat":
+        del cs["datum"]["named"]["lat"]
+    elif guard in ("foreign_source", "missing_link"):
+        own = next(r for r in station["source_records"] if r.get("source") == "ticon"
+                   and r.get("source_record_id") == cs["source_record_id"])
+        if guard == "foreign_source":
+            own["source_record_id"] = "other-record"
+        else:
+            own["published_set_ids"] = []
+    elif guard in ("wrong_type", "wrong_quantity", "bad_qc"):
+        cs[{"wrong_type": "source_type", "wrong_quantity": "quantity", "bad_qc": "qc_status"}[guard]] = "invalid"
+    elif guard == "wrong_frame":
+        cs["datum"]["zero"] = "stated"
+    elif guard == "wrong_method":
+        cs["datum"]["basis"]["lat"]["method"] = "observed"
+    elif guard in ("empty_finding", "empty_basis"):
+        cs["datum"]["basis"]["lat"]["fallback"]["otc_finding" if guard == "empty_finding" else "basis"] = " "
+    elif guard == "nonfinite":
+        cs["datum"]["named"]["lat"] = float("inf")
+    elif guard == "country_conflict":
+        station["source_records"][0].setdefault("original_metadata", {})["COUNTRY"] = "USA"
+    before = copy.deepcopy(station)
+    assert datums.derive_chart_datums({"stations": [station]}, ticon_approximate_set_ids=ids)["changed_sets"] == 0
+    assert station == before
+
+
 @pytest.fixture(scope="module")
 def native_uhslc_fd_chart_evidence():
     root = os.environ.get("OTC_UHSLC_FD_CHART_PROOF")

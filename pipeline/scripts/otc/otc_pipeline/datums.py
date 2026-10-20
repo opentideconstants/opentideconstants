@@ -115,7 +115,8 @@ def _chart_conventions() -> tuple[dict, str]:
     return json.loads(raw), hashlib.sha256(raw).hexdigest()
 
 
-def derive_chart_datums(release: dict, *, include_computed_approximate: bool = True) -> dict:
+def derive_chart_datums(release: dict, *, include_computed_approximate: bool = True,
+                        ticon_approximate_set_ids: frozenset[str] = frozenset()) -> dict:
     """Designate existing levels, with explicit labels for approximate stand-ins.
 
     Adds missing chart_datum pointers and appends stand-in findings where applicable.
@@ -134,9 +135,27 @@ def derive_chart_datums(release: dict, *, include_computed_approximate: bool = T
                "by_convention": {}, "citations": {}}
     for station in release.get("stations", []):
         sets = station.get("constant_sets", [])
+        country_rows = [r for r in table["rows"] if r["country_code"] == station.get("country")]
         approximate_keys = {}
         computed_approximate_sets = set()
         for cs in sets:
+            if cs.get("set_id") in ticon_approximate_set_ids and cs.get("source") == "ticon-4":
+                datum = cs.get("datum", {})
+                lat_basis = datum.get("basis", {}).get("lat", {})
+                fallback = lat_basis.get("fallback", {})
+                own_records = [r for r in station.get("source_records", [])
+                               if r.get("source") == "ticon"
+                               and r.get("source_record_id") == cs.get("source_record_id")]
+                if (cs.get("source_type") == "analysis" and cs.get("quantity") == "water_level"
+                        and cs.get("qc_status") in ("ok", "flagged") and datum.get("zero") == "harmonic_mean"
+                        and lat_basis.get("kind") == "computed" and lat_basis.get("method") == "harmonic_extremes"
+                        and fallback.get("reason") == "datum_gate_failed"
+                        and isinstance(fallback.get("basis"), str) and fallback["basis"].strip()
+                        and isinstance(fallback.get("otc_finding"), str) and fallback["otc_finding"].strip()
+                        and own_records and all(isinstance(r.get("published_set_ids"), list)
+                                                and cs["set_id"] in r["published_set_ids"] for r in own_records)
+                        and country_rows and all(r["LAT_evidence_status"] == "not_LAT" for r in country_rows)):
+                    computed_approximate_sets.add(cs["set_id"])
             if cs.get("source") != "gesla-fit":
                 continue
             own_records = [r for r in station.get("source_records", [])
@@ -204,7 +223,6 @@ def derive_chart_datums(release: dict, *, include_computed_approximate: bool = T
                    if r.get("source") == "gesla" and r.get("source_record_id") == cs.get("source_record_id")]
             if own and all(m.get("COUNTRY") == "USA" and m.get("GAUGE TYPE") == "Coastal" for m in own):
                 coastal_sets.add(cs["set_id"])
-        country_rows = [r for r in table["rows"] if r["country_code"] == station.get("country")]
         convention = next((r for r in country_rows if not country_conflict and (
             station.get("country") == "USA" and r["stated_convention"] == "MLLW" and coastal_sets or
             r["match"] == "country" or (
