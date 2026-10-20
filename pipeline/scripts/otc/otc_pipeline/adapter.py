@@ -429,9 +429,13 @@ def _set_errors(attrs, fetched, sets, keys, conv, lics, good_sha: set[str], erro
             seen.add(rid)
             if rid not in keys:
                 errors.append(f"{where}: no watch key for {rid!r}")
-        if ss.subordinate_offsets is not None and hint.get("type") != "subordinate":
-            errors.append(f"{where}: a set with subordinate_offsets needs station_hint type 'subordinate'")
         cs = ss.constant_set
+        mixed_current = (hint.get("type") == "reference" and isinstance(cs, dict)
+                         and cs.get("quantity") == "current" and bool(cs.get("current_bins"))
+                         and isinstance(ss.subordinate_offsets, dict)
+                         and "current_offsets" in ss.subordinate_offsets)
+        if ss.subordinate_offsets is not None and hint.get("type") != "subordinate" and not mixed_current:
+            errors.append(f"{where}: a set with subordinate_offsets needs station_hint type 'subordinate'")
         if isinstance(cs, dict):
             if hint.get("type") == "subordinate" and ss.subordinate_offsets is None:
                 errors.append(f"{where}: a subordinate station_hint needs subordinate_offsets")

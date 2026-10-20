@@ -88,6 +88,12 @@ def test_unresolved_subordinate_reference_fails(tmp_path):
     assert any("reference_source_record_id 'AAA'" in e for e in errors), errors
 
 
+def test_water_level_reference_cannot_carry_subordinate_offsets(tmp_path):
+    errors = run(_Mutated(lambda ss: replace(ss, subordinate_offsets={
+        "reference_source_record_id": ss.constant_set["source_record_id"]})), tmp_path)
+    assert any("needs station_hint type 'subordinate'" in e for e in errors), errors
+
+
 class _Mutated(OfficialStub):
     def __init__(self, mutate):
         self.mutate = mutate

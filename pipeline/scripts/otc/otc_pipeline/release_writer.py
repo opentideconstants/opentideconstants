@@ -537,7 +537,7 @@ def _current_bin_errors(cs: dict, sw: str, version, table: set, errors: list[str
 def _current_station_errors(st: dict, where: str, by_id: dict, licences: dict,
                             errors: list[str]) -> None:
     """current_offsets name an active reference station and one of its bins; default_current_bin
-    names a bin of the recommended set (reference) or of current_offsets (subordinate)."""
+    names a bin of the recommended set or of current_offsets, including mixed stations."""
     sid = st.get("station_id")
     cur_off = _dicts(st.get("current_offsets"))
     own_bins = set()
@@ -549,7 +549,7 @@ def _current_station_errors(st: dict, where: str, by_id: dict, licences: dict,
         own_bins.add(n)
         ref = co.get("reference_station_id")
         target = by_id.get(ref) if isinstance(ref, str) else None
-        if isinstance(ref, str) and ref == sid:
+        if isinstance(ref, str) and ref == sid and co.get("reference_bin") == n:
             errors.append(f"{cw}: reference_station_id {ref!r} is the station itself")
         elif not isinstance(target, dict) or target.get("status") != "active":
             errors.append(f"{cw}: reference_station_id {ref!r} is not an active station in this release")
@@ -563,7 +563,7 @@ def _current_station_errors(st: dict, where: str, by_id: dict, licences: dict,
             errors.append(f"{cw}: licence_id {lic!r} is not defined in licences")
     if "default_current_bin" in st:
         dcb = st["default_current_bin"]
-        bins = own_bins if cur_off else _bins_of(st)
+        bins = own_bins | _bins_of(st)
         if dcb not in bins:
             errors.append(f"{where}: default_current_bin {dcb!r} is not a bin of the "
                           f"{'current_offsets' if cur_off else 'recommended set'}")
