@@ -78,9 +78,71 @@ RSpec.describe 'the qualified native Slackwater file export' do
             expect(detail.fetch('bin').fetch('bin')).to eq(row.fetch('default_current_bin'))
             expect(station).not_to have_key('accepted')
         end
-        database.fetch('stations').select { |station| station['type'] == 'Subordinate' || station['id'].include?('_bin_') }.each do |station|
+        database.fetch('stations').select { |station| station['id'].include?('_bin_') }.each do |station|
             expect(station.fetch('accepted')).to be(false)
         end
+    end
+
+    it 'labels admission inherited from the exact emitted reference for six real subordinate cells and a false support control' do
+        log, status = Open3.capture2e(@flatc, '--json', '--strict-json', '--defaults-json', '-o', @directory,
+                                     @database_schema, '--', File.join(@directory, 'OTC_20261011.tcdb'))
+        expect(status.success?).to be(true), log
+        stations = JSON.parse(File.read(File.join(@directory, 'OTC_20261011.json'))).fetch('stations').to_h { |item| [item.fetch('id'), item] }
+        native_rows = @rows.to_h { |row| [row.fetch('station_id'), row] }
+        %w[OTC-0012535c OTC-0013852b OTC-0027239c OTC-0034ae14 OTC-004675ae OTC-00632b91 OTC-0247db70].each do |id|
+            row = native_rows.fetch(id)
+            offsets = row['current_offsets']&.find { |entry| entry['bin'] == row['default_current_bin'] } || row.fetch('subordinate_offsets')
+            native_reference = native_rows.fetch(offsets.fetch('reference_station_id'))
+            reference_id = native_reference.fetch('station_id')
+            reference_id += "_bin_#{offsets.fetch('reference_bin')}" if row['current_offsets'] && offsets.fetch('reference_bin') != native_reference.fetch('default_current_bin')
+            decoded = stations.fetch(id)
+            expect(decoded.dig('offsets', 'reference') || decoded.dig('current', 'offsets', 'reference')).to eq(reference_id)
+            reference = stations.fetch(reference_id)
+            expect(reference.fetch('accepted')).to eq(id != 'OTC-0247db70')
+            expect(decoded.fetch('accepted')).to eq(reference.fetch('accepted'))
+            station = JSON.parse(File.read(File.join(@directory, 'OTC_20261011-stations', "#{id}.json")))
+            detail = station.fetch('source').fetch('otc').fetch('acceptance')
+            expect(detail).to include('basis' => 'inherited', 'accepted' => reference.fetch('accepted'),
+                'reference_export_id' => reference_id, 'reference_station_id' => native_reference.fetch('station_id'),
+                'reference_set_id' => native_reference.fetch('recommended_set_id'))
+            if row['current_offsets']
+                expect(detail.fetch('reference_bin')).to eq(offsets.fetch('reference_bin'))
+            else
+                expect(detail).not_to have_key('reference_bin')
+            end
+            expect(detail.fetch('finding')).to include('independent subordinate accuracy is not established')
+            [station.fetch('disclaimers'), decoded.fetch('disclaimers'), decoded.fetch('attribution')].each do |notice|
+                lines = notice.lines.grep(/^OTC acceptance: /)
+                expect(lines.length).to eq(1)
+                expect(JSON.parse(lines.first.delete_prefix('OTC acceptance: '))).to eq(detail)
+            end
+            expect(report.fetch('records').find { |entry| entry['station_id'] == id }.fetch('acceptance')).to eq(detail)
+            expect(decoded.fetch('score')).to eq(0)
+            expect(station).not_to have_key('accepted')
+        end
+        stations.each_value do |station|
+            next unless station['type'] == 'Subordinate'
+            reference_id = station.dig('offsets', 'reference') || station.dig('current', 'offsets', 'reference')
+            expect(station.fetch('accepted')).to eq(stations.fetch(reference_id).fetch('accepted'))
+        end
+    end
+
+    it 'omits a real subordinate whose reference is unavailable instead of inheriting admission' do
+        id = 'OTC-0034ae14'
+        input = File.join(@directory, 'missing-reference.jsonl')
+        File.write(input, JSON.generate(@rows.find { |row| row['station_id'] == id }) + "\n")
+        output = File.join(@directory, 'missing-reference')
+        script = File.expand_path('../../scripts/otc/export_slackwater.rb', __dir__)
+        log, status = Open3.capture2e(RbConfig.ruby, script, '--input', input, '--release', @release,
+            '--output-dir', output, '--date', '20261011', '--database-schema', @database_schema,
+            '--station-schema', @station_schema, '--country-codes', @countries, '--flatc', @flatc)
+        expect(status.exitstatus).to eq(2), log
+        document = JSON.parse(File.read(File.join(output, 'OTC_20261011-swap-report.json')))
+        expect(document.fetch('exported')).to eq(0)
+        expect(document.fetch('records').first).to include('station_id' => id, 'status' => 'unrepresentable',
+            'reason' => 'current reference station unavailable')
+        expect(document.fetch('records').first).not_to have_key('acceptance')
+        expect(File.exist?(File.join(output, 'OTC_20261011-stations', "#{id}.json"))).to be(false)
     end
 
     it 'preserves the three actual recommendations, coefficients, datum meaning and notices' do
