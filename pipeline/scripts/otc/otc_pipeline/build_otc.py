@@ -237,7 +237,7 @@ def apply_official_datum_fallbacks(release: dict, path: Path, sha256: str) -> di
 
 
 def apply_ticon_harmonic_mean_fallbacks(release: dict, path: Path, sha256: str) -> dict:
-    """Attach relative levels and designate LAT only under existing cited conventions."""
+    """Attach relative levels, including labelled nonofficial LAT chart fallbacks."""
     from otc_pipeline.datums import derive_chart_datums
 
     staged = stage_official_datums(release, path, sha256)
@@ -247,13 +247,14 @@ def apply_ticon_harmonic_mean_fallbacks(release: dict, path: Path, sha256: str) 
     for row in staged["drafts"]:
         native[row["set_id"]]["datum"] = copy.deepcopy(row["datum"])
     preview = copy.deepcopy(release)
-    derive_chart_datums(preview, include_computed_approximate=False)
-    designated = {cs["set_id"]: cs.get("datum", {}).get("chart_datum")
-                  for station in preview["stations"] for cs in station.get("constant_sets", [])}
+    staged_ids = frozenset(row["set_id"] for row in staged["drafts"])
+    derive_chart_datums(preview, ticon_approximate_set_ids=staged_ids)
+    designated = {cs["set_id"]: cs.get("datum", {})
+                  for station in preview["stations"] for cs in station.get("constant_sets", [])
+                  if cs["set_id"] in staged_ids}
     for row in staged["drafts"]:
-        if designated[row["set_id"]] is not None:
-            row["datum"]["chart_datum"] = designated[row["set_id"]]
-            native[row["set_id"]]["datum"]["chart_datum"] = designated[row["set_id"]]
+        row["datum"] = copy.deepcopy(designated[row["set_id"]])
+        native[row["set_id"]]["datum"] = copy.deepcopy(row["datum"])
     return {**staged, "public_admission": True, "release_unchanged": not bool(staged["drafts"]),
             "normal_datum_gate_accepted": False, "accepted": False,
             "computed_basis_fallback_count": staged["staged_level_count"],

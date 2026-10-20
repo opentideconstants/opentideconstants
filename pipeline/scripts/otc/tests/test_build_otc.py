@@ -21,6 +21,47 @@ from test_datums import native_observed_chart_cases as native_observed_chart_cas
 from test_datums import native_approximate_chart_cases as native_approximate_chart_cases
 
 
+@pytest.mark.skipif("OTC_D4_CHART_PROOF" not in os.environ, reason="actual source-bound D4 chart witnesses")
+def test_native_ticon_non_lat_chart_fallback():
+    root = Path(os.environ["OTC_D4_CHART_PROOF"])
+    release = json.loads((root / "native.json").read_text())
+    accepted = json.loads((root / "accepted.json").read_text())
+    path = root / "drafts.jsonl"
+    result = build_otc.apply_ticon_harmonic_mean_fallbacks(
+        release, path, hashlib.sha256(path.read_bytes()).hexdigest())
+    (root / "candidate.json").write_text(json.dumps(release) + "\n")
+    assert result["accepted"] is False and result["normal_datum_gate_accepted"] is False
+    assert result["staged_set_count"] == 3
+    staged = {row["set_id"]: row["datum"] for row in result["drafts"]}
+    missing = []
+    for before, after in zip(accepted["stations"], release["stations"], strict=True):
+        restored = copy.deepcopy(after)
+        for old_set, new_set in zip(before["constant_sets"], restored["constant_sets"], strict=True):
+            if new_set["set_id"] not in staged:
+                continue
+            datum = new_set["datum"]
+            print(json.dumps({"station_id": after["station_id"], "set_id": new_set["set_id"],
+                              "chart_datum": datum.get("chart_datum"), "named": datum["named"]}))
+            if datum.get("chart_datum") != "lat":
+                missing.append(new_set["set_id"])
+                continue
+            assert datum == staged[new_set["set_id"]]
+            assert datum["named"] == old_set["datum"]["named"]
+            assert datum["zero"] == "harmonic_mean"
+            assert "msl_offset_m" not in datum and "zero_name" not in datum
+            basis = datum["basis"]["lat"]
+            assert basis == _expected_computed_reference_basis(old_set["datum"]["basis"]["lat"])
+            assert basis["kind"] == "computed" and basis["method"] == "harmonic_extremes"
+            assert basis["fallback"]["reason"] == "datum_gate_failed"
+            assert "Uncertainty is unestablished" in basis["fallback"]["otc_finding"]
+            assert "uncertainty_m" not in basis and "uncertainty_basis" not in basis
+            Draft202012Validator({"$ref": "#/$defs/datum", "$defs": pinned_schema()["$defs"]}).validate(datum)
+            datum.pop("chart_datum")
+            datum["basis"]["lat"] = old_set["datum"]["basis"]["lat"]
+        assert restored == before
+    assert not missing, f"missing nonofficial computed LAT chart designation: {missing}"
+
+
 @pytest.mark.skipif("OTC_TICON_CHART_PROOF" not in os.environ, reason="actual cached TICON chart witnesses")
 def test_native_ticon_cited_lat_chart_designation():
     root = Path(os.environ["OTC_TICON_CHART_PROOF"])
@@ -81,7 +122,12 @@ def test_native_ticon_publish_computed_fallback():
                 continue
             datum = new_set["datum"]
             assert datum["zero"] == "harmonic_mean"
-            assert "msl_offset_m" not in datum and "zero_name" not in datum and "chart_datum" not in datum
+            assert "msl_offset_m" not in datum and "zero_name" not in datum
+            if after["country"] == "CAN":
+                assert datum["chart_datum"] == "lat"
+                assert "existing computed LAT (nonofficial)" in datum["basis"]["lat"]["fallback"]["basis"]
+            else:
+                assert "chart_datum" not in datum
             for level in ("lat", "hat"):
                 basis = datum["basis"][level]
                 assert "uncertainty_m" not in basis and "uncertainty_basis" not in basis
