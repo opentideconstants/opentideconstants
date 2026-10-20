@@ -1,0 +1,14 @@
+{
+  "id": "ACT8856",
+  "refStationId": "ACT8856",
+  "refStationBin": 2,
+  "meanFloodDir": 306.0,
+  "meanEbbDir": 115.0,
+  "mfcTimeAdjMin": -11,
+  "sbeTimeAdjMin": 17,
+  "mecTimeAdjMin": -8,
+  "sbfTimeAdjMin": -32,
+  "mfcAmpAdj": 0.8,
+  "mecAmpAdj": 0.6,
+  "self": "https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations/ACT8856_3/currentpredictionoffsets.json"
+}
