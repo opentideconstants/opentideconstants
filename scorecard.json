@@ -1,7 +1,7 @@
 {
   "status": "UNRELEASED_CANDIDATE_MILESTONE_NOT_LAUNCH_APPROVAL",
   "milestone_date": "2026-10-21",
-  "scope": "39-row comparison scorecard. Row 1 resolves the regional clause with a newly dated symmetric map; its original BLOCKED history is preserved. Retain the earlier row 35 verdict and row 9 coverage updates. Other rows, product filters, recommendations, scientific gates and release status are unchanged.",
+  "scope": "39-row comparison scorecard. Row 1 resolves the regional clause with a newly dated symmetric map; its original BLOCKED history is preserved. Retain the earlier row 35 verdict and row 9 coverage updates. Other rows, product filters, recommendations, scientific gates and release status are unchanged. Row 4 applies the owner-approved 2026-10-21 tide prediction-availability predicate to the frozen comparator targets, preserving literal-offset history and distinct native-place counts.",
   "dataset_commit": "ebe3605e84328e4ecc546ddd4745614ec51f4271",
   "dataset_commit_url": "https://github.com/opentideconstants/opentideconstants/commit/ebe3605e84328e4ecc546ddd4745614ec51f4271",
   "baseline": {
@@ -16,8 +16,8 @@
   },
   "counts": {
     "WIN": 3,
-    "TIE": 11,
-    "BLOCKED": 16,
+    "TIE": 12,
+    "BLOCKED": 15,
     "LOSS": 9
   },
   "milestone_verdict_changes": [
@@ -32,6 +32,12 @@
       "before": "BLOCKED",
       "after": "WIN",
       "reason": "New 2026-10-21 source-backed symmetric regional map resolves the missing regional comparison; all eight geographic bars are strictly larger. Historical missing-map result remains preserved; quantity only, no accuracy claim."
+    },
+    {
+      "id": "4",
+      "before": "BLOCKED",
+      "after": "TIE",
+      "reason": "Dated owner-approved method-neutral tide target coverage: 2,196/2,196 targets, 2,194 distinct actual predicting native places. Historical offset counts remain unchanged; current inventory clause still passes."
     }
   ],
   "rows": [
@@ -264,14 +270,14 @@
     },
     {
       "id": "4",
-      "dimension": "Offset stations held (1 km, offset rows only)",
+      "dimension": "Predicting tide-station target coverage; current offset inventory",
       "checked": true,
       "historical_label": "BLOCKED",
-      "label": "BLOCKED",
+      "label": "TIE",
       "historical_predicate": "≥ Slackwater per kind at 1 km, after removing only the ids listed in `bars.json` `removed_upstream` (written by NOAA-IDS before any gate run, each with its saved NOAA response; nothing added after)",
-      "comparison_predicate": "≥ Slackwater per kind at 1 km, after removing only the ids listed in `bars.json` `removed_upstream` (written by NOAA-IDS before any gate run, each with its saved NOAA response; nothing added after)",
-      "predicate_changed": false,
-      "comparison_and_limit": "Offset records held is intentionally a data-format inventory on both sides, unlike predictive coverage. D7 raises current offset-role inventory 1,573 to 1,575; tide remains 2,195 vs 2,196. Frozen pre-gate removed_upstream exception binding is unavailable, so adjusted inventory verdict remains unproved.",
+      "comparison_predicate": "Tide: cover the same frozen 2,196 comparator station targets with actual finite tide predictions, using reference harmonics or subordinate/offset predictions on either side; retain the existing 1 km target bindings without reclustering. Count each comparator target once, and report distinct native places separately. The current-offset inventory clause is unchanged: 1,575 OTC roles versus 1,574 comparator roles, without upstream removals.",
+      "predicate_changed": true,
+      "comparison_and_limit": "The dated owner rule covers all 2,196 frozen comparator tide-station targets with actual Python predictions from 2,194 distinct mapped native places. NOAA8725441 counts through its recommended 37-constituent NOAA reference set, with no fabricated offset. The unchanged current inventory is 1,575 versus1,574. Original tide offset inventory remains2,195 versus2,196, and its missing removed_upstream binding remains historical. Quantity/availability TIE only; no accuracy or release claim.",
       "historical_measured_result": {
         "otc": {
           "tide": 2195,
@@ -282,11 +288,59 @@
           "current": 1574
         }
       },
-      "retained_product_or_scientific_requirement": "≥ Slackwater per kind at 1 km, after removing only the ids listed in `bars.json` `removed_upstream` (written by NOAA-IDS before any gate run, each with its saved NOAA response; nothing added after)",
+      "retained_product_or_scientific_requirement": "Prediction availability is separate from accuracy and launch. The literal offset-only predicate and missing original exception binding remain in predicate_history; no exceptions are inferred.",
       "source_evidence_packet_sha256": "2da6f0bfaf5603ca8482c4069d00bf81fdf6e26ff5d68bf3cefd3e7121d50701",
       "source_evidence": {
         "description": "post-ticon/population/rows.json (historical evidence retained locally; unbundled)",
         "bundled": false
+      },
+      "current_counts": {
+        "tide": {
+          "covered_comparator_targets": 2196,
+          "comparator_targets": 2196,
+          "distinct_native_places": 2194
+        },
+        "current_inventory_unchanged": {
+          "otc": 1575,
+          "comparator": 1574
+        }
+      },
+      "predicate_history": [
+        {
+          "recorded_date": "2026-10-21",
+          "reason": "Owner authorized method-neutral tide prediction availability in place of the literal offset-record requirement; the comparator cohort is unchanged.",
+          "prior_row": {
+            "id": "4",
+            "dimension": "Offset stations held (1 km, offset rows only)",
+            "checked": true,
+            "historical_label": "BLOCKED",
+            "label": "BLOCKED",
+            "historical_predicate": "≥ Slackwater per kind at 1 km, after removing only the ids listed in `bars.json` `removed_upstream` (written by NOAA-IDS before any gate run, each with its saved NOAA response; nothing added after)",
+            "comparison_predicate": "≥ Slackwater per kind at 1 km, after removing only the ids listed in `bars.json` `removed_upstream` (written by NOAA-IDS before any gate run, each with its saved NOAA response; nothing added after)",
+            "predicate_changed": false,
+            "comparison_and_limit": "Offset records held is intentionally a data-format inventory on both sides, unlike predictive coverage. D7 raises current offset-role inventory 1,573 to 1,575; tide remains 2,195 vs 2,196. Frozen pre-gate removed_upstream exception binding is unavailable, so adjusted inventory verdict remains unproved.",
+            "historical_measured_result": {
+              "otc": {
+                "tide": 2195,
+                "current": 1573
+              },
+              "sw": {
+                "tide": 2196,
+                "current": 1574
+              }
+            },
+            "retained_product_or_scientific_requirement": "≥ Slackwater per kind at 1 km, after removing only the ids listed in `bars.json` `removed_upstream` (written by NOAA-IDS before any gate run, each with its saved NOAA response; nothing added after)",
+            "source_evidence_packet_sha256": "2da6f0bfaf5603ca8482c4069d00bf81fdf6e26ff5d68bf3cefd3e7121d50701",
+            "source_evidence": {
+              "description": "post-ticon/population/rows.json (historical evidence retained locally; unbundled)",
+              "bundled": false
+            }
+          }
+        }
+      ],
+      "current_evidence": {
+        "path": "pipeline/data/scorecard/row4-predicting-stations-20261021.json",
+        "measurement": "2,194 actual finite Python prediction results cover the exact2,196 retained comparator targets; current inventory reuses accepted D7 evidence."
       }
     },
     {
@@ -916,7 +970,7 @@
         "unchanged_si_calls": 48,
         "selected_values": 4760,
         "pairwise_comparisons": 14280,
-        "relative_error_bar": 0.000000001,
+        "relative_error_bar": 1.0e-09,
         "maximum_conversion_relative_error": 0.0,
         "maximum_pairwise_relative_error": 5.772397136613917e-15,
         "red_green": "Original real requests failed all four before edits; same real surfaces passed after edits. U0-U5 immutable receipts retain requests, source/proof hashes and outputs."
