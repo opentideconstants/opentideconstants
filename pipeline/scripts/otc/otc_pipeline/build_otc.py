@@ -612,6 +612,8 @@ def cached_subordinate_main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(prog="otc_pipeline.build_otc --cached-subordinate", allow_abbrev=False)
     for name in ("native", "subordinate-drafts", "tuning", "congen-run", "out"):
         parser.add_argument(f"--{name}", type=Path, required=True)
+    parser.add_argument("--fes-congen-run", type=Path,
+                        help="authenticated FES astronomy run when the input retains FES34")
     for name in ("native-sha256", "native-meta-sha256", "subordinate-drafts-sha256", "tuning-sha256"):
         parser.add_argument(f"--{name}", required=True)
     args = parser.parse_args(argv)
@@ -630,8 +632,10 @@ def cached_subordinate_main(argv: list[str]) -> int:
     if _sha256(args.native) != args.native_sha256 or _sha256(meta_path) != args.native_meta_sha256:
         raise ValueError("cached native release changed during staging")
     congen = load_congen_run(args.congen_run)
+    runs = ({TABLE_ID: congen, FES_TABLE_ID: load_congen_run(args.fes_congen_run, fes=True)}
+            if args.fes_congen_run is not None else congen)
     files = write_release(release, args.out, datestamp=release["release"]["datestamp"],
-                          app_export=None, congen_run=congen)
+                          app_export=None, congen_run=runs)
     (args.out / "SUBORDINATE_DATUM_STAGE.json").write_text(json.dumps(staged, allow_nan=False, sort_keys=True) + "\n")
     report = {"mode": "cached_subordinate_only", "native": str(args.native), "native_sha256": args.native_sha256,
               "native_meta_sha256": args.native_meta_sha256, "stations_preserved": station_count,
