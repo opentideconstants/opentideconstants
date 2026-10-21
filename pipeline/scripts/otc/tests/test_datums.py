@@ -12,6 +12,121 @@ import pytest
 from otc_pipeline import datums
 from otc_pipeline.datums import datum_build_errors, period, published
 from otc_pipeline.gesla_sets import _published_stated_zero
+from otc_pipeline.release_writer import pinned_schema
+from jsonschema import Draft202012Validator
+
+
+@pytest.fixture(scope="session")
+def native_convention_unverified_inputs(tmp_path_factory):
+    root = os.environ.get("OTC_UNVERIFIED_CHART_PROOF")
+    if root:
+        return Path(root)
+    tmp_path = tmp_path_factory.mktemp("convention-unverified")
+    profile = Path(__file__).resolve().parents[3] / "data/otc/computed_datums/ticon-760-20261011"
+    ids = ["OTC-9bec1f59/ticon-4/aasiaat-aas-grl-gloss/as-published",
+           "OTC-389cdf49/ticon-4/abidjanridi-230a-civ-uhslc_rq/as-published",
+           "OTC-ae8deca6/ticon-4/acapulco-316-mex-unam_hist/as-published",
+           "OTC-00599bc8/ticon-4/rabaul-010a-png-uhslc_rq/as-published",
+           "OTC-05030c44/ticon-4/cochino_pequeno-269a-hnd-uhslc_rq/as-published",
+           "OTC-0bea25e6/ticon-4/manzanillo-395b-mex-uhslc_rq/as-published",
+           "OTC-ca13cd1f/ticon-4/parnu-par-est-cmems/as-published"]
+    station_ids = {value.split("/")[0] for value in ids}
+    release = json.loads((profile / "baseline/OTC_20261011.meta.json").read_text())
+    with (profile / "baseline/OTC_20261011.jsonl").open() as source:
+        release["stations"] = [row for line in source if (row := json.loads(line))["station_id"] in station_ids]
+    assert len(release["stations"]) == len(station_ids)
+    with (profile / "drafts.jsonl").open() as source:
+        drafts = [row for line in source if (row := json.loads(line))["station_id"] in station_ids]
+    assert set(ids) <= {row["set_id"] for row in drafts}
+    (tmp_path / "native.json").write_text(json.dumps(release))
+    (tmp_path / "drafts.jsonl").write_text("".join(json.dumps(row) + "\n" for row in drafts))
+    native = {cs["set_id"]: cs for station in release["stations"] for cs in station["constant_sets"]}
+    for row in drafts:
+        native[row["set_id"]]["datum"] = row["draft_datum"]
+    (tmp_path / "accepted.json").write_text(json.dumps(release))
+    (tmp_path / "sets.json").write_text(json.dumps(ids))
+    return tmp_path
+
+
+@pytest.fixture
+def native_convention_unverified_case(native_convention_unverified_inputs):
+    document = json.loads((native_convention_unverified_inputs / "accepted.json").read_text())
+    ids = frozenset(json.loads((native_convention_unverified_inputs / "sets.json").read_text()))
+    return document, ids
+
+
+def test_native_convention_unverified_designation(native_convention_unverified_case):
+    release, ids = native_convention_unverified_case
+    before = copy.deepcopy(release)
+    receipt = datums.derive_chart_datums(release, ticon_approximate_set_ids=ids,
+                                       ticon_convention_unverified_set_ids=ids)
+    assert receipt["changed_sets"] == len(ids)
+    for station in release["stations"]:
+        for cs in station["constant_sets"]:
+            if cs["set_id"] not in ids:
+                continue
+            datum = cs["datum"]
+            assert datum["chart_datum"] == "lat"
+            basis = datum["basis"]["lat"]
+            assert "convention_unverified" in basis["flags"]
+            assert "convention unverified" in basis["fallback"]["basis"]
+            assert "convention unverified" in basis["fallback"]["otc_finding"]
+            assert "uncertainty_m" not in basis and "uncertainty_basis" not in basis
+    again = copy.deepcopy(release)
+    assert datums.derive_chart_datums(release, ticon_approximate_set_ids=ids,
+                                    ticon_convention_unverified_set_ids=ids)["changed_sets"] == 0
+    assert release == again
+    unchanged = copy.deepcopy(before)
+    assert datums.derive_chart_datums(unchanged, ticon_approximate_set_ids=ids)["changed_sets"] == 0
+    assert unchanged == before
+
+
+@pytest.mark.parametrize("guard", ["unstaged", "existing_chart", "source_link", "nonfinite", "low_water", "agency"])
+def test_native_convention_unverified_guards(native_convention_unverified_case, guard):
+    release, ids = native_convention_unverified_case
+    station = release["stations"][0]
+    cs = next(cs for cs in station["constant_sets"] if cs["set_id"] in ids)
+    ids = frozenset([cs["set_id"]])
+    authenticated = ids
+    if guard == "unstaged":
+        authenticated = frozenset()
+    elif guard == "existing_chart":
+        cs["datum"]["chart_datum"] = "hat"
+    elif guard == "source_link":
+        for record in station["source_records"]:
+            if record.get("source") == "ticon" and record.get("source_record_id") == cs["source_record_id"]:
+                record["published_set_ids"] = []
+    elif guard == "nonfinite":
+        cs["datum"]["named"]["lat"] = float("inf")
+    elif guard == "low_water":
+        cs["record_issues"] = [{"issue": "flatline"}]
+    elif guard == "agency":
+        station["constant_sets"].append({"set_id": "agency-control", "datum": {
+            "chart_datum": "msl", "named": {"msl": 0}, "basis": {"msl": {"kind": "published"}}}})
+    release = {"stations": [station]}
+    before = copy.deepcopy(release)
+    assert datums.derive_chart_datums(release, ticon_approximate_set_ids=authenticated,
+                                    ticon_convention_unverified_set_ids=ids)["changed_sets"] == 0
+    assert release == before
+
+
+def test_convention_unverified_schema_is_computed_only(native_convention_unverified_case):
+    release, ids = native_convention_unverified_case
+    cs = next(cs for station in release["stations"] for cs in station["constant_sets"] if cs["set_id"] in ids)
+    basis = copy.deepcopy(cs["datum"]["basis"]["lat"])
+    basis.setdefault("flags", []).append("convention_unverified")
+    schema = pinned_schema()
+    validator = Draft202012Validator({"$ref": "#/$defs/datum_basis", "$defs": schema["$defs"]})
+    validator.validate(basis)
+    published_basis = {"kind": "published", "method": "source", "source_name": "Agency", "flags": ["convention_unverified"]}
+    observed_basis = {"kind": "observed", "method": "first_reduction", "epoch": {"start": "2020-01-01", "end": "2020-12-31"},
+                      "data_span": {"start": "2020-01-01", "end": "2020-12-31", "months": 12},
+                      "fallback": basis["fallback"], "flags": ["no_qualified_control", "convention_unverified"]}
+    for other in (published_basis, observed_basis):
+        without = copy.deepcopy(other)
+        without["flags"].remove("convention_unverified")
+        validator.validate(without)
+        assert not validator.is_valid(other)
 
 
 @pytest.fixture

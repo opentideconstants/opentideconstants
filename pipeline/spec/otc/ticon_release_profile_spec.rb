@@ -15,7 +15,8 @@ RSpec.describe 'the committed TICON release profile' do
         output, status = Open3.capture2e(RbConfig.ruby, script, '--verify')
         expect(status.success?).to be(true), output
         expect(JSON.parse(output)).to include('subordinate_pairs' => 1182, 'prior_ticon_pairs' => 758,
-            'd4_chart_sets' => 330, 'new_ticon_pairs' => 760, 'new_ticon_stations' => 549)
+            'd4_chart_sets' => 330, 'new_ticon_pairs' => 760, 'new_ticon_stations' => 549,
+            'convention_unverified_sets' => 658)
     end
 
     it 'fails when a required release input is absent' do

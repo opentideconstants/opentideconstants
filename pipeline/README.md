@@ -69,6 +69,14 @@ These are labelled approximate fallbacks with normal datum acceptance false;
 the TICON uncertainty remains unestablished. Building this candidate does not
 publish a public release or establish new scientific accuracy.
 
+The profile also designates LAT as a nonofficial chart-reference stand-in for the
+exact 658 committed source-bound sets in `convention-unverified-sets.json`. Their
+LAT basis carries `convention_unverified` and the readable qualification
+"convention unverified". No agency convention, datum equivalence or vertical tie
+is asserted. The recipe verifies that only those chart pointers and qualification
+fields change from the accepted integration result; all numbers, sources,
+defaults and earlier computed cohorts remain unchanged.
+
 ## XTide and OpenCPN data files
 
 From `pipeline`, install the locked Ruby bundle and export a qualified native

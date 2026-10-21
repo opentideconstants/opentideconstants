@@ -53,6 +53,10 @@ jobs:
           tests/test_source_inventory.py
           tests/test_station_map.py
           tests/test_station_map_r3.py
+      - name: Check convention-unverified chart references
+        run: >-
+          uv run --frozen python -m pytest tests/test_datums.py tests/test_build_otc.py
+          -k convention_unverified -q
 
   ruby:
     runs-on: ubuntu-latest

@@ -60,6 +60,11 @@ class TiconReleaseProfile
         @subordinate = drafts('prior/subordinate-drafts.jsonl', 'station_id', 1182)
         @prior_ticon = drafts('prior/ticon-758-drafts.jsonl', 'set_id', 758)
         @new_ticon = drafts('drafts.jsonl', 'set_id', 760)
+        @extension_ids = json('convention-unverified-sets.json')
+        check(@extension_ids.size == 658 && @extension_ids.uniq.size == 658 &&
+            (@extension_ids - @new_ticon.keys).empty?, 'Convention-unverified exact cohort mismatch')
+        check(/\A[0-9a-f]{64}\z/.match?(@profile.fetch('expected_native_sha256').to_s),
+            'Final output SHA-256 pin required')
         check((@prior_ticon.keys & @new_ticon.keys).empty?, 'Prior and new TICON cohorts overlap')
         check(@new_ticon.values.map { |row| row.fetch('station_id') }.uniq.size == 549, 'New TICON station count mismatch')
         tuning = json('prior/subordinate-tuning.json')
@@ -106,7 +111,7 @@ class TiconReleaseProfile
         end
         expected = @profile.fetch('expected_counts')
         seen.each { |name, count| check(count == expected.fetch(name), "Imported cohort mismatch: #{name}=#{count}") }
-        seen.merge('new_ticon_stations' => 549)
+        seen.merge('new_ticon_stations' => 549, 'convention_unverified_sets' => @extension_ids.size)
     end
 
     def verify_pair(row, datum, method)
@@ -127,6 +132,43 @@ class TiconReleaseProfile
         end
     end
 
+    def verify_extension_output(native)
+        digest = Digest::SHA256.new
+        seen = []
+        File.foreach(native) do |line|
+            station = JSON.parse(line)
+            station.fetch('constant_sets', []).each do |set|
+                id = set.fetch('set_id')
+                next unless @extension_ids.include?(id)
+                seen << id
+                datum = set.fetch('datum')
+                verify_pair(@new_ticon.fetch(id), datum, 'harmonic_extremes')
+                check(datum['chart_datum'] == 'lat', "Missing extension chart pointer: #{id}")
+                old = @new_ticon.fetch(id).fetch('draft_datum').fetch('basis').fetch('lat')
+                basis = datum.fetch('basis').fetch('lat')
+                check(basis.fetch('flags') == old.fetch('flags', []) + ['convention_unverified'], "Extension flags changed: #{id}")
+                %w[basis otc_finding].each do |field|
+                    text = basis.fetch('fallback').fetch(field)
+                    check(text.start_with?(old.fetch('fallback').fetch(field)) &&
+                        text.include?('approximate chart-reference stand-in') && text.end_with?('; convention unverified'),
+                        "Extension qualification missing: #{id}:#{field}")
+                end
+                check(basis.fetch('fallback').fetch('basis').include?('(nonofficial)'), "Extension official claim: #{id}")
+                restored = JSON.parse(JSON.generate(basis))
+                old.key?('flags') ? restored['flags'] = old.fetch('flags') : restored.delete('flags')
+                %w[basis otc_finding].each { |field| restored.fetch('fallback')[field] = old.fetch('fallback').fetch(field) }
+                check(restored == old, "Unapproved LAT basis change: #{id}")
+                datum.delete('chart_datum')
+                datum.fetch('basis')['lat'] = old
+            end
+            digest << JSON.generate(station) << "\n"
+        end
+        check(seen.sort == @extension_ids.sort, 'Extension output cohort mismatch')
+        check(digest.hexdigest == @profile.fetch('integration_structure_sha256'),
+            'Extension changed numeric, source, default or other unapproved material')
+        digest.hexdigest
+    end
+
     def build(output)
         counts = verify
         output = File.expand_path(output)
@@ -141,12 +183,16 @@ class TiconReleaseProfile
             '--native', path('baseline/OTC_20261011.jsonl'), '--native-sha256', pins.fetch('baseline/OTC_20261011.jsonl'),
             '--native-meta-sha256', pins.fetch('baseline/OTC_20261011.meta.json'),
             '--harmonic-mean-drafts', path('drafts.jsonl'), '--harmonic-mean-drafts-sha256', pins.fetch('drafts.jsonl'),
+            '--convention-unverified-sets', path('convention-unverified-sets.json'),
+            '--convention-unverified-sets-sha256', pins.fetch('convention-unverified-sets.json'),
             '--congen-run', path('astro'), '--out', output]
         check(system(env, *command), 'Cached release producer failed')
         native = File.join(output, 'OTC_20261011.jsonl')
+        structural_sha256 = verify_extension_output(native)
         check(Digest::SHA256.file(native).hexdigest == @profile.fetch('expected_native_sha256'), 'Produced native hash differs from accepted candidate')
         check(Digest::SHA256.file(File.join(output, 'OTC_20261011.meta.json')).hexdigest == pins.fetch('baseline/OTC_20261011.meta.json'), 'Produced metadata changed')
-        result = counts.merge('native_sha256' => Digest::SHA256.file(native).hexdigest)
+        result = counts.merge('native_sha256' => Digest::SHA256.file(native).hexdigest,
+            'preserved_integration_structure_sha256' => structural_sha256)
         File.write(File.join(output, 'PROFILE_REPORT.json'), JSON.pretty_generate(result) + "\n")
         result
     end

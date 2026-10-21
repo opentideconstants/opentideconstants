@@ -19,9 +19,10 @@
     "astro/otc-tcd-20251228-ma2mb2.tcd": "ab8fa42c6dfce040924b3b035c1a87bef1cc4f10ed17449ae3ea16d0c76516a9",
     "astro/otc_constituents.txt": "ada296c1ef5e95860ed435ebf68f8c3b520c40a5049fd936295f2dfa6ccfcbf2",
     "astro/tcd-1700-2100.json": "92a0f97a941ba9d7b3d40cfc9a487a3c443c122f94beb82d08e83b56591b2b7a",
-    "astro/tcd-1900-2100.json": "73f80a56ed85e816e09e1cd5fd4476234a0286b8aff87241791dc10f40896458"
+    "astro/tcd-1900-2100.json": "73f80a56ed85e816e09e1cd5fd4476234a0286b8aff87241791dc10f40896458",
+    "convention-unverified-sets.json": "6a4cad1ad372072a9df71d7f8ebe01f56a9943bb6fda882ea4b148dfe2cbdd91"
   },
-  "expected_native_sha256": "3072e6844fa323827fa3c5cf9750e0b7a5ac55d36e27576890d1b8b5d66b23da",
+  "expected_native_sha256": "4f47050c9a67131605f1705fb3324bed7e56467f8779c20cb756f0255c52efa5",
   "expected_counts": {
     "subordinate_pairs": 1182,
     "prior_ticon_pairs": 758,
@@ -1688,5 +1689,8 @@
       "set_id": "OTC-ff3e1b0a/ticon-4/north_galiano_bc-7435-can-meds",
       "lat_m": -2.794400571666021
     }
-  ]
+  ],
+  "extension_scope_source_sha256": "481b2ea69761843fcbee7a83be540024cac85b1879995653f99e1e5774394223",
+  "integration_native_sha256": "3072e6844fa323827fa3c5cf9750e0b7a5ac55d36e27576890d1b8b5d66b23da",
+  "integration_structure_sha256": "da8d29e2a5a495b23da5e78f988cd96902cc96ed6929958293ba3defede05af6"
 }
