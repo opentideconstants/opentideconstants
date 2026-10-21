@@ -480,7 +480,7 @@
       "historical_predicate": "≥ Slackwater in places at 1 km, all and accepted. DS's 0.01° figures are not used for the bar; YLD and DT10 recount at 1 km",
       "comparison_predicate": "LAT/HAT availability over all labelled records on both sides, in the same matched 1 km place universe.",
       "predicate_changed": true,
-      "comparison_and_limit": "Compare all-record LAT/HAT availability. 5,591/6,342 leaves 751 uncovered, so LOSS survives removal of unequal accepted-quality sub-bar. D4 chart designation adds no LAT/HAT values.",
+      "comparison_and_limit": "All-labelled LAT/HAT availability is 6,332/6,342, leaving 10 uncovered, so LOSS remains. Accepted merged PR90 adds 741 covered target places to the earlier 5,591 using 769 subordinate records and 1,538 computed levels. Previous covered cells are preserved under the same finite, same-datum LAT/HAT predicate and frozen place bindings, without reclustering or new matching. These are labelled fallbacks: normal datum acceptance and accuracy parity remain false. Availability does not establish all-month prediction accuracy or release approval. D4 chart designation adds no LAT/HAT values.",
       "historical_measured_result": {
         "covered_after": 5591,
         "sw_feature_leaders": 6342,
@@ -490,13 +490,25 @@
       "retained_product_or_scientific_requirement": "≥ Slackwater in places at 1 km, all and accepted. DS's 0.01° figures are not used for the bar; YLD and DT10 recount at 1 km",
       "source_evidence_packet_sha256": "2da6f0bfaf5603ca8482c4069d00bf81fdf6e26ff5d68bf3cefd3e7121d50701",
       "current_counts": {
-        "covered": 5591,
+        "covered": 6332,
         "comparator": 6342,
-        "remaining": 751
+        "remaining": 10,
+        "previous_accepted_covered": 5591,
+        "PR90_gain": 741,
+        "admitted_records": 769,
+        "new_levels": 1538,
+        "normal_datum_gate_accepted": false,
+        "accepted_accuracy_parity_proved": false
       },
       "source_evidence": {
         "description": "post-ticon/population/rows.json (historical evidence retained locally; unbundled)",
         "bundled": false
+      },
+      "current_evidence": {
+        "pull_request": "https://github.com/opentideconstants/opentideconstants/pull/90",
+        "result": "/Users/jpr5/.local/share/copilotkit/cr/otc-impl/row10-subordinate-residual/bulk/row10-result.json",
+        "method": "Existing finite same-datum LAT/HAT predicate on frozen residual place-to-native-cluster bindings; previous covered cells preserved; no reclustering or new matching.",
+        "proof_reuse": "Accepted real three-cell pilot, bulk coverage and preservation proofs reused unchanged; no prediction or computation rerun for this scorecard correction."
       }
     },
     {
