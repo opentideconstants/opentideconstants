@@ -1,0 +1,1692 @@
+{
+  "name": "OTC 20261011 computed datum release",
+  "inputs": {
+    "baseline/OTC_20261011.jsonl": "15d7c5d70e40690c64ac7e8a0c0106fa462e3a8d53e95c215b0dce08384d5292",
+    "baseline/OTC_20261011.meta.json": "616100f70b7b15552f7a9980bec07116da8b6bfc72dd6eaf86caadd61b2bd35b",
+    "drafts.jsonl": "6ab9837f85c349275636e0a316650444d097d574a078e3319779fa1be5f63327",
+    "prior/baseline/OTC_20261011.jsonl": "7fff33ef681912b6d9ab266910a87986d54a3af85ccb876237ea1a854059dffc",
+    "prior/baseline/OTC_20261011.meta.json": "616100f70b7b15552f7a9980bec07116da8b6bfc72dd6eaf86caadd61b2bd35b",
+    "prior/subordinate-drafts.jsonl": "0d72f4606f1775b02b201dda4c59873683b3af90d13064b33c905fe56bacc316",
+    "prior/subordinate-tuning.json": "75d7e741483d6be0d804b22c6773e7ff42d7482cf11d462ab6eaba81220969d9",
+    "prior/ticon-758-drafts.jsonl": "d7a0716c895cd94effe1254ff67d9f8ba417b9c08ef5ecad297983b82dde9fcf",
+    "prior/subordinate-accepted-receipt.json": "10087d8e374f8a06bf48b16fd117942609f0fc112cb5c204df7927ef37c12928",
+    "prior/subordinate-source-freeze.json": "044a816a2675fa4304172fcded4408a14629707a450f68ed23c020c572d80e68",
+    "prior/subordinate-writer-command.json": "a8a781bc79d118e7496d5a519e397f40eaf598fb3583ddf68e03be0ed846ec9c",
+    "astro/PROVENANCE.json": "b4c102aa30bbf083199538acaf7f14334f3f7833b9017bac02c0cc65339d3119",
+    "astro/congen-1700-2100.json": "dda8498437faa4f799411bdf3a3b61f840818e2de7b2bb0bd34492dbd001b30e",
+    "astro/congen-1700-2100.tcd": "c0d5715ece280e6a194aaea4ec309cc4fc098c9ee6f6029066e2f8eda2812c01",
+    "astro/congen_input+otc.txt": "401fd81a7963e88a51349b9bd933188f249639036d2e1e3016193c3d7ee3cad2",
+    "astro/otc-tcd-20251228-ma2mb2.tcd": "ab8fa42c6dfce040924b3b035c1a87bef1cc4f10ed17449ae3ea16d0c76516a9",
+    "astro/otc_constituents.txt": "ada296c1ef5e95860ed435ebf68f8c3b520c40a5049fd936295f2dfa6ccfcbf2",
+    "astro/tcd-1700-2100.json": "92a0f97a941ba9d7b3d40cfc9a487a3c443c122f94beb82d08e83b56591b2b7a",
+    "astro/tcd-1900-2100.json": "73f80a56ed85e816e09e1cd5fd4476234a0286b8aff87241791dc10f40896458"
+  },
+  "expected_native_sha256": "3072e6844fa323827fa3c5cf9750e0b7a5ac55d36e27576890d1b8b5d66b23da",
+  "expected_counts": {
+    "subordinate_pairs": 1182,
+    "prior_ticon_pairs": 758,
+    "d4_chart_sets": 330,
+    "new_ticon_pairs": 760,
+    "new_ticon_stations": 549
+  },
+  "accepted_subordinate_source_head": "48ed7a9017755aabf29c749e514816e3baa02a1b",
+  "accepted_subordinate_native_sha256": "9165bf52868a66d41676e8a988954ad1b7d3fd2d2898697444fdd2978c54da9c",
+  "accepted_subordinate_sources": {
+    "pipeline/scripts/otc/otc_pipeline/build_otc.py": "8e38c6b6f5d603dc4326cf3db14466d2c37e4ffd3c7ce0ef76d8ebee53f881e4",
+    "pipeline/scripts/otc/otc_pipeline/lat_hat_subordinate.py": "d04c2bd987efaabbc0be17c409b597d2859efa4981c71edbd2734949f93afde2",
+    "pipeline/scripts/otc/otc_pipeline/lat_hat_strict.rb": "61502e7ec76bda386830e610e7ff7e60348e05617a76ac8d13f4fd8984e68c9b"
+  },
+  "d4_source_sha256": "4a60ba35e8d7a5a48f390251cf929978cfc0b28ae7a333f9be7297111f98e13c",
+  "d4_chart_sets": [
+    {
+      "station_id": "OTC-00b6ed94",
+      "set_id": "OTC-00b6ed94/ticon-4/oak_bay_bc-7130-can-meds/as-published",
+      "lat_m": -2.299217435793796
+    },
+    {
+      "station_id": "OTC-0120ed93",
+      "set_id": "OTC-0120ed93/ticon-4/havre_boucher-1576-can-meds",
+      "lat_m": -0.9428302595455
+    },
+    {
+      "station_id": "OTC-013bda9c",
+      "set_id": "OTC-013bda9c/ticon-4/crms6304-crms6304-usa-crms/as-published",
+      "lat_m": -0.052792823283563585
+    },
+    {
+      "station_id": "OTC-0258934c",
+      "set_id": "OTC-0258934c/ticon-4/tadoussac-3425-can-meds",
+      "lat_m": -2.8062269597630056
+    },
+    {
+      "station_id": "OTC-0285e761",
+      "set_id": "OTC-0285e761/ticon-4/argentia-835-can-meds",
+      "lat_m": -1.218382743488037
+    },
+    {
+      "station_id": "OTC-034fa528",
+      "set_id": "OTC-034fa528/ticon-4/belledune-2145-can-meds",
+      "lat_m": -1.2128673597773265
+    },
+    {
+      "station_id": "OTC-05f077e0",
+      "set_id": "OTC-05f077e0/ticon-4/oshawa_ontario-13450-can-meds",
+      "lat_m": -0.40751006379820065
+    },
+    {
+      "station_id": "OTC-07f86480",
+      "set_id": "OTC-07f86480/ticon-4/okeover_inlet_bc-8006-can-meds/as-published",
+      "lat_m": -3.51376836757534
+    },
+    {
+      "station_id": "OTC-0c841b08",
+      "set_id": "OTC-0c841b08/ticon-4/parry_sound_ontario-11375-can-meds",
+      "lat_m": -0.1721381832257761
+    },
+    {
+      "station_id": "OTC-0c930657",
+      "set_id": "OTC-0c930657/ticon-4/midland_ontario-11445-can-meds",
+      "lat_m": -0.17097559222966194
+    },
+    {
+      "station_id": "OTC-0e93c04c",
+      "set_id": "OTC-0e93c04c/ticon-4/point_petre_ontario-13750-can-meds",
+      "lat_m": -0.2599182264446933
+    },
+    {
+      "station_id": "OTC-0ea208a2",
+      "set_id": "OTC-0ea208a2/ticon-4/whaletown_bc-8038-can-meds/as-published",
+      "lat_m": -3.4020288129310425
+    },
+    {
+      "station_id": "OTC-0ebe905f",
+      "set_id": "OTC-0ebe905f/ticon-4/rossport_ontario-10220-can-meds",
+      "lat_m": -0.18106023714435904
+    },
+    {
+      "station_id": "OTC-11b36fe8",
+      "set_id": "OTC-11b36fe8/ticon-4/crms0194-crms0194-usa-crms/as-published",
+      "lat_m": -0.06658758380987564
+    },
+    {
+      "station_id": "OTC-11df9024",
+      "set_id": "OTC-11df9024/ticon-4/tofino-542-can-uhslc_fd",
+      "lat_m": -2.2631159062777453
+    },
+    {
+      "station_id": "OTC-11e984d4",
+      "set_id": "OTC-11e984d4/ticon-4/sault_ste_marie_ontario-10980-can-meds",
+      "lat_m": -0.21495475012787363
+    },
+    {
+      "station_id": "OTC-125df752",
+      "set_id": "OTC-125df752/ticon-4/saint_jean_io-3105-can-meds/as-published",
+      "lat_m": -3.05802172462557
+    },
+    {
+      "station_id": "OTC-1279f3e7",
+      "set_id": "OTC-1279f3e7/ticon-4/crms0595-crms0595-usa-crms/as-published",
+      "lat_m": -0.02566223648995416
+    },
+    {
+      "station_id": "OTC-12ed5c58",
+      "set_id": "OTC-12ed5c58/ticon-4/hatfield_point-97-can-meds",
+      "lat_m": -1.1241411421907626
+    },
+    {
+      "station_id": "OTC-13ea4c5a",
+      "set_id": "OTC-13ea4c5a/ticon-4/esquimalt_government_hbr_bc-7110-can-meds",
+      "lat_m": -2.063443567492331
+    },
+    {
+      "station_id": "OTC-152e2f76",
+      "set_id": "OTC-152e2f76/ticon-4/crms0504-crms0504-usa-crms/as-published",
+      "lat_m": -0.08202724968326273
+    },
+    {
+      "station_id": "OTC-17b695e7",
+      "set_id": "OTC-17b695e7/ticon-4/ganges_bc-7407-can-meds/as-published",
+      "lat_m": -2.630802220100094
+    },
+    {
+      "station_id": "OTC-17f66189",
+      "set_id": "OTC-17f66189/ticon-4/esquimalt_lagoon_bc-7107-can-meds/as-published",
+      "lat_m": -0.4822193141215824
+    },
+    {
+      "station_id": "OTC-1875d4d5",
+      "set_id": "OTC-1875d4d5/ticon-4/anchor_point-2637-can-meds/as-published",
+      "lat_m": -0.9048838003096211
+    },
+    {
+      "station_id": "OTC-18c6c971",
+      "set_id": "OTC-18c6c971/ticon-4/lund_bc-7885-can-meds",
+      "lat_m": -3.4052178901772345
+    },
+    {
+      "station_id": "OTC-18dca45b",
+      "set_id": "OTC-18dca45b/ticon-4/whaler_bay_bc-7532-can-meds",
+      "lat_m": -3.0066701021299593
+    },
+    {
+      "station_id": "OTC-1a2e250e",
+      "set_id": "OTC-1a2e250e/ticon-4/point_grey_bc-7635-can-meds",
+      "lat_m": -3.0843823382434388
+    },
+    {
+      "station_id": "OTC-1b2ec152",
+      "set_id": "OTC-1b2ec152/ticon-4/north_sydney-612-can-meds",
+      "lat_m": -0.8038453761078338
+    },
+    {
+      "station_id": "OTC-1bb9512e",
+      "set_id": "OTC-1bb9512e/ticon-4/long_sault_dam-14805-can-meds",
+      "lat_m": -0.5679077601905497
+    },
+    {
+      "station_id": "OTC-1c5a6916",
+      "set_id": "OTC-1c5a6916/ticon-4/lachine-15390-can-meds",
+      "lat_m": -0.21854537117924341
+    },
+    {
+      "station_id": "OTC-1d004b06",
+      "set_id": "OTC-1d004b06/ticon-4/britannia_ontario-16125-can-meds",
+      "lat_m": -0.4803367316735611
+    },
+    {
+      "station_id": "OTC-1de6657b",
+      "set_id": "OTC-1de6657b/ticon-4/port_dover_ontario-12710-can-meds",
+      "lat_m": -0.16042532791762493
+    },
+    {
+      "station_id": "OTC-1e373df0",
+      "set_id": "OTC-1e373df0/ticon-4/rivi_a475re_du_loup-3130-can-meds",
+      "lat_m": -2.7892161836534877
+    },
+    {
+      "station_id": "OTC-1f26e77e",
+      "set_id": "OTC-1f26e77e/ticon-4/oak_point-96-can-meds",
+      "lat_m": -1.0777742368211147
+    },
+    {
+      "station_id": "OTC-1f392cb8",
+      "set_id": "OTC-1f392cb8/ticon-4/bonilla_island_bc-9227-can-meds",
+      "lat_m": -3.656889846913936
+    },
+    {
+      "station_id": "OTC-1fddb9d0",
+      "set_id": "OTC-1fddb9d0/ticon-4/beauharnois_amont-15260-can-meds",
+      "lat_m": -0.3224824905261501
+    },
+    {
+      "station_id": "OTC-1ffeb2c1",
+      "set_id": "OTC-1ffeb2c1/ticon-4/cape_dor-240-can-meds/as-published",
+      "lat_m": -8.324209995962407
+    },
+    {
+      "station_id": "OTC-2104d166",
+      "set_id": "OTC-2104d166/ticon-4/beauharnois_aval-15262-can-meds",
+      "lat_m": -0.1829612309711909
+    },
+    {
+      "station_id": "OTC-215da48c",
+      "set_id": "OTC-215da48c/ticon-4/acadia_cove-4170-can-meds/as-published",
+      "lat_m": -4.331638621433005
+    },
+    {
+      "station_id": "OTC-21b80b9c",
+      "set_id": "OTC-21b80b9c/ticon-4/port_renfrew_bc-8525-can-meds",
+      "lat_m": -1.9944902350077418
+    },
+    {
+      "station_id": "OTC-22205d64",
+      "set_id": "OTC-22205d64/ticon-4/porpoise_bay_bc-7852-can-meds/as-published",
+      "lat_m": -1.7495050601183006
+    },
+    {
+      "station_id": "OTC-22210e27",
+      "set_id": "OTC-22210e27/ticon-4/maple_bay_bc-7315-can-meds/as-published",
+      "lat_m": -2.6967828971631964
+    },
+    {
+      "station_id": "OTC-231ea1ea",
+      "set_id": "OTC-231ea1ea/ticon-4/vieux_quebec-3248-can-meds",
+      "lat_m": -2.7175989545922072
+    },
+    {
+      "station_id": "OTC-2601511b",
+      "set_id": "OTC-2601511b/ticon-4/maugerville-114-can-meds",
+      "lat_m": -1.134146557566788
+    },
+    {
+      "station_id": "OTC-272d5b78",
+      "set_id": "OTC-272d5b78/ticon-4/tuktoyaktuk-6485-can-meds/as-published",
+      "lat_m": -0.2841723208361115
+    },
+    {
+      "station_id": "OTC-2975c54d",
+      "set_id": "OTC-2975c54d/ticon-4/pointe_claire-15330-can-meds/as-published",
+      "lat_m": -0.23263093532907642
+    },
+    {
+      "station_id": "OTC-297f94c1",
+      "set_id": "OTC-297f94c1/ticon-4/coteau_landing-15110-can-meds",
+      "lat_m": -0.045955581161657176
+    },
+    {
+      "station_id": "OTC-2b2976e1",
+      "set_id": "OTC-2b2976e1/ticon-4/kitsilano-7707-can-meds/as-published",
+      "lat_m": -3.1743839027427194
+    },
+    {
+      "station_id": "OTC-2b32f4ab",
+      "set_id": "OTC-2b32f4ab/ticon-4/lile_aux_grues-3180-can-meds/as-published",
+      "lat_m": -3.0943933450030814
+    },
+    {
+      "station_id": "OTC-2c2ccebf",
+      "set_id": "OTC-2c2ccebf/ticon-4/ambleside_bc-7780-can-meds/as-published",
+      "lat_m": -3.151789722148894
+    },
+    {
+      "station_id": "OTC-2e84433c",
+      "set_id": "OTC-2e84433c/ticon-4/qikiqtarjuaq-3980-can-meds",
+      "lat_m": -0.8303755629317667
+    },
+    {
+      "station_id": "OTC-2f2d346c",
+      "set_id": "OTC-2f2d346c/ticon-4/newcastle_creek-122-can-meds",
+      "lat_m": -0.863346577343999
+    },
+    {
+      "station_id": "OTC-303393ef",
+      "set_id": "OTC-303393ef/ticon-4/bedwell_hbr_bc-7350-can-meds/as-published",
+      "lat_m": -2.566439445842342
+    },
+    {
+      "station_id": "OTC-324ace33",
+      "set_id": "OTC-324ace33/ticon-4/vancouver_bc-7735-can-meds/as-published",
+      "lat_m": -3.1102089958098125
+    },
+    {
+      "station_id": "OTC-32e3298e",
+      "set_id": "OTC-32e3298e/ticon-4/neuville-3280-can-meds/as-published",
+      "lat_m": -2.1834670440458472
+    },
+    {
+      "station_id": "OTC-33914fa7",
+      "set_id": "OTC-33914fa7/ticon-4/murphys_cove-500-can-meds/as-published",
+      "lat_m": -1.2561129872379286
+    },
+    {
+      "station_id": "OTC-347f5aa3",
+      "set_id": "OTC-347f5aa3/ticon-4/pictou-1630-can-meds",
+      "lat_m": -1.205652255513373
+    },
+    {
+      "station_id": "OTC-34b6a1c5",
+      "set_id": "OTC-34b6a1c5/ticon-4/vermillion_rvr_n_of_i_10_at_lafayette_la-7386655-usa-usgs/as-published",
+      "lat_m": -0.4458023336949992
+    },
+    {
+      "station_id": "OTC-35662dea",
+      "set_id": "OTC-35662dea/ticon-4/carpenter_bay_bc-9717-can-meds/as-published",
+      "lat_m": -2.829929589538134
+    },
+    {
+      "station_id": "OTC-35c86d58",
+      "set_id": "OTC-35c86d58/ticon-4/saint_joseph_de_la_rive-3057-can-meds",
+      "lat_m": -3.6099359207600585
+    },
+    {
+      "station_id": "OTC-36f39592",
+      "set_id": "OTC-36f39592/ticon-4/wadhamsbc-8840-can-meds",
+      "lat_m": -2.7816915950134824
+    },
+    {
+      "station_id": "OTC-3803ba3c",
+      "set_id": "OTC-3803ba3c/ticon-4/st_lawrence-755-can-meds",
+      "lat_m": -1.107740156454449
+    },
+    {
+      "station_id": "OTC-383781f0",
+      "set_id": "OTC-383781f0/ticon-4/cambridge_bay-6240-can-meds",
+      "lat_m": -0.3581599318522566
+    },
+    {
+      "station_id": "OTC-386ee092",
+      "set_id": "OTC-386ee092/ticon-4/seal_cove_bc-9360-can-meds",
+      "lat_m": -3.9333034263957285
+    },
+    {
+      "station_id": "OTC-387af050",
+      "set_id": "OTC-387af050/ticon-4/coteau_du_lac-15140-can-meds/as-published",
+      "lat_m": -0.06683340557127303
+    },
+    {
+      "station_id": "OTC-3a7a8516",
+      "set_id": "OTC-3a7a8516/ticon-4/albert_harbour-5803-can-meds",
+      "lat_m": -1.13959246059303
+    },
+    {
+      "station_id": "OTC-3ba9f416",
+      "set_id": "OTC-3ba9f416/ticon-4/point_tupper-576-can-meds",
+      "lat_m": -0.9969429270161865
+    },
+    {
+      "station_id": "OTC-3c15fbdf",
+      "set_id": "OTC-3c15fbdf/ticon-4/crms0557-crms0557-usa-crms/as-published",
+      "lat_m": -0.08494342611799141
+    },
+    {
+      "station_id": "OTC-3e8df836",
+      "set_id": "OTC-3e8df836/ticon-4/la_grande_rivierepq-64680-can-meds",
+      "lat_m": -1.1249771465946827
+    },
+    {
+      "station_id": "OTC-3f619eae",
+      "set_id": "OTC-3f619eae/ticon-4/rea_point-6835-can-meds",
+      "lat_m": -0.6939012212418578
+    },
+    {
+      "station_id": "OTC-3fbdc9c1",
+      "set_id": "OTC-3fbdc9c1/ticon-4/taloyoak-6150-can-meds/as-published",
+      "lat_m": -0.284325391167188
+    },
+    {
+      "station_id": "OTC-3ff13436",
+      "set_id": "OTC-3ff13436/ticon-4/comox_bc-7965-can-meds/as-published",
+      "lat_m": -3.406941164398968
+    },
+    {
+      "station_id": "OTC-411ec2e0",
+      "set_id": "OTC-411ec2e0/ticon-4/gold_river_bc-8650-can-meds",
+      "lat_m": -2.4087456190523775
+    },
+    {
+      "station_id": "OTC-414473a3",
+      "set_id": "OTC-414473a3/ticon-4/longue_pointe-15590-can-meds",
+      "lat_m": -0.7111604069379192
+    },
+    {
+      "station_id": "OTC-41d8ef5c",
+      "set_id": "OTC-41d8ef5c/ticon-4/upper_iroquois_ontario-14600-can-meds/as-published",
+      "lat_m": -0.4026087514022942
+    },
+    {
+      "station_id": "OTC-41daa45c",
+      "set_id": "OTC-41daa45c/ticon-4/lark_harbour-2685-can-meds",
+      "lat_m": -1.0079660646782742
+    },
+    {
+      "station_id": "OTC-41eb09e4",
+      "set_id": "OTC-41eb09e4/ticon-4/crms0261-crms0261-usa-crms/as-published",
+      "lat_m": -0.21005719315334548
+    },
+    {
+      "station_id": "OTC-4238b515",
+      "set_id": "OTC-4238b515/ticon-4/bella_coola_bc-8937-can-meds",
+      "lat_m": -3.0319543168597187
+    },
+    {
+      "station_id": "OTC-4247d5f2",
+      "set_id": "OTC-4247d5f2/ticon-4/saint_jean_port_joli-3170-can-meds",
+      "lat_m": -2.910801271498615
+    },
+    {
+      "station_id": "OTC-4339f18e",
+      "set_id": "OTC-4339f18e/ticon-4/amherstburg_ontario-11995-can-meds",
+      "lat_m": -0.20393109292172246
+    },
+    {
+      "station_id": "OTC-448e5209",
+      "set_id": "OTC-448e5209/ticon-4/digby-325-can-meds",
+      "lat_m": -4.763936122783984
+    },
+    {
+      "station_id": "OTC-4536d312",
+      "set_id": "OTC-4536d312/ticon-4/port_weller_ontario-13030-can-meds",
+      "lat_m": -0.2693774980454915
+    },
+    {
+      "station_id": "OTC-45df7d61",
+      "set_id": "OTC-45df7d61/ticon-4/port_hawkesbury-575-can-meds",
+      "lat_m": -1.003185446927513
+    },
+    {
+      "station_id": "OTC-47fde316",
+      "set_id": "OTC-47fde316/ticon-4/port_saint_francois-3365-can-meds",
+      "lat_m": -0.8841326985258486
+    },
+    {
+      "station_id": "OTC-487905bd",
+      "set_id": "OTC-487905bd/ticon-4/beggars_bridge_creek_near_dawley_corners_va-204300267-usa-usgs/as-published",
+      "lat_m": -0.19070167949572156
+    },
+    {
+      "station_id": "OTC-4919f2e6",
+      "set_id": "OTC-4919f2e6/ticon-4/contrecoeur-15790-can-meds/as-published",
+      "lat_m": -0.6905692126044777
+    },
+    {
+      "station_id": "OTC-49d2daaf",
+      "set_id": "OTC-49d2daaf/ticon-4/lower_iroquois_ontario-14602-can-meds/as-published",
+      "lat_m": -0.28875575650880175
+    },
+    {
+      "station_id": "OTC-4a19ad41",
+      "set_id": "OTC-4a19ad41/ticon-4/sooke_basin_bc-7024-can-meds/as-published",
+      "lat_m": -1.9141683619442216
+    },
+    {
+      "station_id": "OTC-4aaa93da",
+      "set_id": "OTC-4aaa93da/ticon-4/irvines_landing_bc-7836-can-meds/as-published",
+      "lat_m": -3.3424015148629844
+    },
+    {
+      "station_id": "OTC-4ab9ffd9",
+      "set_id": "OTC-4ab9ffd9/ticon-4/la_prairie-15470-can-meds",
+      "lat_m": -0.15808661509392602
+    },
+    {
+      "station_id": "OTC-4bdc883e",
+      "set_id": "OTC-4bdc883e/ticon-4/st_lambert_amont-15505-can-meds/as-published",
+      "lat_m": -1.1080084189425088
+    },
+    {
+      "station_id": "OTC-4ca9e3d9",
+      "set_id": "OTC-4ca9e3d9/ticon-4/porpoise_channel_east-9341-can-meds",
+      "lat_m": -3.8658438861441993
+    },
+    {
+      "station_id": "OTC-4caad833",
+      "set_id": "OTC-4caad833/ticon-4/darrell_bay_bc-7808-can-meds",
+      "lat_m": -3.1883692339310317
+    },
+    {
+      "station_id": "OTC-4d46b9a8",
+      "set_id": "OTC-4d46b9a8/ticon-4/squamish_bc-7810-can-meds",
+      "lat_m": -3.1615909449722555
+    },
+    {
+      "station_id": "OTC-4e22260b",
+      "set_id": "OTC-4e22260b/ticon-4/copper_islands_bc-9724-can-meds/as-published",
+      "lat_m": -2.876483753308897
+    },
+    {
+      "station_id": "OTC-4e33c794",
+      "set_id": "OTC-4e33c794/ticon-4/nanoose_bay_bc-7930-can-meds",
+      "lat_m": -3.203673911587532
+    },
+    {
+      "station_id": "OTC-4f23b081",
+      "set_id": "OTC-4f23b081/ticon-4/varennes-15660-can-meds/as-published",
+      "lat_m": -0.6434807009245872
+    },
+    {
+      "station_id": "OTC-4f8da65d",
+      "set_id": "OTC-4f8da65d/ticon-4/woodwards_landing_bc-7610-can-meds",
+      "lat_m": -2.639845720147803
+    },
+    {
+      "station_id": "OTC-4fd048cd",
+      "set_id": "OTC-4fd048cd/ticon-4/cap_aux_meules-1970-can-meds",
+      "lat_m": -0.6832421729853305
+    },
+    {
+      "station_id": "OTC-50351a83",
+      "set_id": "OTC-50351a83/ticon-4/indian_arm_head_bc-7774-can-meds",
+      "lat_m": -3.1948872965947337
+    },
+    {
+      "station_id": "OTC-506d462c",
+      "set_id": "OTC-506d462c/ticon-4/crms0409-crms0409-usa-crms/as-published",
+      "lat_m": -0.06607388634759749
+    },
+    {
+      "station_id": "OTC-50eb736c",
+      "set_id": "OTC-50eb736c/ticon-4/point_pelee_ontario-12120-can-meds",
+      "lat_m": -0.2787420524833327
+    },
+    {
+      "station_id": "OTC-513796b5",
+      "set_id": "OTC-513796b5/ticon-4/sand_heads_bc-7594-can-meds",
+      "lat_m": -3.1052497684631835
+    },
+    {
+      "station_id": "OTC-5165d950",
+      "set_id": "OTC-5165d950/ticon-4/rose_harbour_bc-9713-can-meds",
+      "lat_m": -2.612414274548413
+    },
+    {
+      "station_id": "OTC-5218df47",
+      "set_id": "OTC-5218df47/ticon-4/batiscan-3345-can-meds",
+      "lat_m": -1.0573464389064238
+    },
+    {
+      "station_id": "OTC-52fc4ff5",
+      "set_id": "OTC-52fc4ff5/ticon-4/aero_trading-9338-can-meds",
+      "lat_m": -3.928662114693618
+    },
+    {
+      "station_id": "OTC-53fe79b8",
+      "set_id": "OTC-53fe79b8/ticon-4/contrecoeur_ioc-15780-can-meds",
+      "lat_m": -0.6849274169344963
+    },
+    {
+      "station_id": "OTC-55f9bcdd",
+      "set_id": "OTC-55f9bcdd/ticon-4/silva_bay_bc-7550-can-meds",
+      "lat_m": -3.1358953346723513
+    },
+    {
+      "station_id": "OTC-5723b6c7",
+      "set_id": "OTC-5723b6c7/ticon-4/alert-3765-can-meds",
+      "lat_m": -0.5777541994315208
+    },
+    {
+      "station_id": "OTC-57c2cb0a",
+      "set_id": "OTC-57c2cb0a/ticon-4/saltery_bay_bc-7868-can-meds/as-published",
+      "lat_m": -3.385947414722124
+    },
+    {
+      "station_id": "OTC-58295708",
+      "set_id": "OTC-58295708/ticon-4/pedder_bay_bc-7080-can-meds/as-published",
+      "lat_m": -2.084736244476833
+    },
+    {
+      "station_id": "OTC-588054e1",
+      "set_id": "OTC-588054e1/ticon-4/victoria_bc-543a-can-uhslc_rq",
+      "lat_m": -2.095120158972981
+    },
+    {
+      "station_id": "OTC-590aff52",
+      "set_id": "OTC-590aff52/ticon-4/wood_islands-1680-can-meds",
+      "lat_m": -1.4171690712350895
+    },
+    {
+      "station_id": "OTC-5bca0ef7",
+      "set_id": "OTC-5bca0ef7/ticon-4/ferndale_wash-7564-can-meds",
+      "lat_m": -2.7275432507692545
+    },
+    {
+      "station_id": "OTC-5c34208f",
+      "set_id": "OTC-5c34208f/ticon-4/crms0583-crms0583-usa-crms/as-published",
+      "lat_m": -0.05307413792187568
+    },
+    {
+      "station_id": "OTC-5e1b2b7d",
+      "set_id": "OTC-5e1b2b7d/ticon-4/pointe_aux_trembles-15630-can-meds/as-published",
+      "lat_m": -0.6241847511749337
+    },
+    {
+      "station_id": "OTC-5e20d475",
+      "set_id": "OTC-5e20d475/ticon-4/westfield_beach-89-can-meds",
+      "lat_m": -0.9931262420839508
+    },
+    {
+      "station_id": "OTC-5e3893b3",
+      "set_id": "OTC-5e3893b3/ticon-4/thunder_bay_ontario-10050-can-meds",
+      "lat_m": -0.18839207868999475
+    },
+    {
+      "station_id": "OTC-5f1e853d",
+      "set_id": "OTC-5f1e853d/ticon-4/lavaltrie-15793-can-meds/as-published",
+      "lat_m": -0.6817485980194434
+    },
+    {
+      "station_id": "OTC-5f26d517",
+      "set_id": "OTC-5f26d517/ticon-4/little_river_bc-7993-can-meds",
+      "lat_m": -3.3519324238598944
+    },
+    {
+      "station_id": "OTC-5f3ad389",
+      "set_id": "OTC-5f3ad389/ticon-4/fredericton-120-can-meds/as-published",
+      "lat_m": -1.3007432931059786
+    },
+    {
+      "station_id": "OTC-606b59d2",
+      "set_id": "OTC-606b59d2/ticon-4/dixon_entrance-9335-can-meds",
+      "lat_m": -3.8059008776426313
+    },
+    {
+      "station_id": "OTC-60d42141",
+      "set_id": "OTC-60d42141/ticon-4/hornby_island-7953-can-meds",
+      "lat_m": -3.2758156361339843
+    },
+    {
+      "station_id": "OTC-6258ad22",
+      "set_id": "OTC-6258ad22/ticon-4/welcome_bay_bc-7990-can-meds/as-published",
+      "lat_m": -3.3650692248579275
+    },
+    {
+      "station_id": "OTC-6374e756",
+      "set_id": "OTC-6374e756/ticon-4/crms1069-crms1069-usa-crms/as-published",
+      "lat_m": -0.04388671030796601
+    },
+    {
+      "station_id": "OTC-63d1ad82",
+      "set_id": "OTC-63d1ad82/ticon-4/sainte_anne_des_monts-2935-can-meds",
+      "lat_m": -1.7653092634127066
+    },
+    {
+      "station_id": "OTC-64e717a1",
+      "set_id": "OTC-64e717a1/ticon-4/long_sault_ontario-14800-can-meds",
+      "lat_m": -0.630282200408939
+    },
+    {
+      "station_id": "OTC-66f2764c",
+      "set_id": "OTC-66f2764c/ticon-4/joe_batts_arm-1047-can-meds",
+      "lat_m": -0.7733492588731776
+    },
+    {
+      "station_id": "OTC-673b2c4b",
+      "set_id": "OTC-673b2c4b/ticon-4/port_moody_bc-7755-can-meds",
+      "lat_m": -3.179188746737368
+    },
+    {
+      "station_id": "OTC-67524bdf",
+      "set_id": "OTC-67524bdf/ticon-4/paspebiac-2235-can-meds",
+      "lat_m": -1.1156961904042046
+    },
+    {
+      "station_id": "OTC-6a661ff3",
+      "set_id": "OTC-6a661ff3/ticon-4/repentigny-15668-can-meds",
+      "lat_m": -0.7742324324502646
+    },
+    {
+      "station_id": "OTC-6b486a3a",
+      "set_id": "OTC-6b486a3a/ticon-4/colorado_rv_at_wharton_tx-8162000-usa-usgs/as-published",
+      "lat_m": -0.4921635310201748
+    },
+    {
+      "station_id": "OTC-6da043d9",
+      "set_id": "OTC-6da043d9/ticon-4/port_elgin-1785-can-meds",
+      "lat_m": -1.6264193265842821
+    },
+    {
+      "station_id": "OTC-6dc5e240",
+      "set_id": "OTC-6dc5e240/ticon-4/spencers_island-242-can-meds/as-published",
+      "lat_m": -6.770066104525893
+    },
+    {
+      "station_id": "OTC-6e3663af",
+      "set_id": "OTC-6e3663af/ticon-4/cornwall_ontario-14870-can-meds",
+      "lat_m": -0.1330375180587763
+    },
+    {
+      "station_id": "OTC-6e61eadb",
+      "set_id": "OTC-6e61eadb/ticon-4/liverpool-440-can-meds/as-published",
+      "lat_m": -1.3377701010182077
+    },
+    {
+      "station_id": "OTC-716589f3",
+      "set_id": "OTC-716589f3/ticon-4/pointe_sapin-1830-can-meds",
+      "lat_m": -0.6990869683171832
+    },
+    {
+      "station_id": "OTC-72171287",
+      "set_id": "OTC-72171287/ticon-4/coyote_c_ab_hwy_237_a_milpitas_ca-11172175-usa-usgs/as-published",
+      "lat_m": -0.25142863748214433
+    },
+    {
+      "station_id": "OTC-72728c33",
+      "set_id": "OTC-72728c33/ticon-4/patos_island_wa-7505-can-meds",
+      "lat_m": -2.727223211224488
+    },
+    {
+      "station_id": "OTC-73a2e2ca",
+      "set_id": "OTC-73a2e2ca/ticon-4/hamilton_stoney_creek-13140-can-meds",
+      "lat_m": -0.3081954966084124
+    },
+    {
+      "station_id": "OTC-7519a6de",
+      "set_id": "OTC-7519a6de/ticon-4/kingsville_ontario-12065-can-meds",
+      "lat_m": -0.23674647492019094
+    },
+    {
+      "station_id": "OTC-791e4255",
+      "set_id": "OTC-791e4255/ticon-4/michipicoten_ontario-10750-can-meds",
+      "lat_m": -0.19457696871261318
+    },
+    {
+      "station_id": "OTC-79366af4",
+      "set_id": "OTC-79366af4/ticon-4/baie_comeau-2840-can-meds",
+      "lat_m": -2.2052368948399477
+    },
+    {
+      "station_id": "OTC-79d8f712",
+      "set_id": "OTC-79d8f712/ticon-4/champlain-3350-can-meds",
+      "lat_m": -0.9674419819684137
+    },
+    {
+      "station_id": "OTC-7a13c5cf",
+      "set_id": "OTC-7a13c5cf/ticon-4/crofton_bc-7450-can-meds",
+      "lat_m": -2.7129167254902895
+    },
+    {
+      "station_id": "OTC-7ad0240d",
+      "set_id": "OTC-7ad0240d/ticon-4/saint_laurent_io-3110-can-meds",
+      "lat_m": -2.8633662511103544
+    },
+    {
+      "station_id": "OTC-7c31bf06",
+      "set_id": "OTC-7c31bf06/ticon-4/churchill-274-can-uhslc_fd",
+      "lat_m": -2.660304996125286
+    },
+    {
+      "station_id": "OTC-7c31bf06",
+      "set_id": "OTC-7c31bf06/ticon-4/churchill-274a-can-uhslc_rq",
+      "lat_m": -2.662207501403436
+    },
+    {
+      "station_id": "OTC-7c57b91e",
+      "set_id": "OTC-7c57b91e/ticon-4/saanichton_bay_bc-7255-can-meds/as-published",
+      "lat_m": -2.490623409594526
+    },
+    {
+      "station_id": "OTC-7c9a5de3",
+      "set_id": "OTC-7c9a5de3/ticon-4/portneuf-3300-can-meds/as-published",
+      "lat_m": -2.1945225722510697
+    },
+    {
+      "station_id": "OTC-808930f5",
+      "set_id": "OTC-808930f5/ticon-4/collingwood_ontario-11500-can-meds",
+      "lat_m": -0.16460301428354843
+    },
+    {
+      "station_id": "OTC-8412cd8e",
+      "set_id": "OTC-8412cd8e/ticon-4/gamebridge_ontario-16500-can-meds",
+      "lat_m": -0.14494892519897562
+    },
+    {
+      "station_id": "OTC-856d8a55",
+      "set_id": "OTC-856d8a55/ticon-4/grenville-16045-can-meds",
+      "lat_m": -0.1329051546986066
+    },
+    {
+      "station_id": "OTC-857953b6",
+      "set_id": "OTC-857953b6/ticon-4/rimouski-2985-can-meds",
+      "lat_m": -2.333071632871592
+    },
+    {
+      "station_id": "OTC-8670fbc6",
+      "set_id": "OTC-8670fbc6/ticon-4/gros_cacouna-3125-can-meds",
+      "lat_m": -2.748132449960985
+    },
+    {
+      "station_id": "OTC-87880d81",
+      "set_id": "OTC-87880d81/ticon-4/prescott_ontario-14500-can-meds",
+      "lat_m": -0.28385534781840704
+    },
+    {
+      "station_id": "OTC-8789fc74",
+      "set_id": "OTC-8789fc74/ticon-4/vercheres-15720-can-meds/as-published",
+      "lat_m": -0.6520839968488854
+    },
+    {
+      "station_id": "OTC-878dbcb0",
+      "set_id": "OTC-878dbcb0/ticon-4/gorge_at_tillicum_bc-7123-can-meds",
+      "lat_m": -0.9227289679260898
+    },
+    {
+      "station_id": "OTC-879bacc7",
+      "set_id": "OTC-879bacc7/ticon-4/lauzon-3250-can-meds/as-published",
+      "lat_m": -2.7573608543705754
+    },
+    {
+      "station_id": "OTC-87c10419",
+      "set_id": "OTC-87c10419/ticon-4/west_point-1845-can-meds/as-published",
+      "lat_m": -0.6844283194479539
+    },
+    {
+      "station_id": "OTC-8812269a",
+      "set_id": "OTC-8812269a/ticon-4/cape_tormentine-1790-can-meds/as-published",
+      "lat_m": -1.6267316533873626
+    },
+    {
+      "station_id": "OTC-88fcd224",
+      "set_id": "OTC-88fcd224/ticon-4/holyrood_bay-925-can-meds",
+      "lat_m": -0.7593830849136872
+    },
+    {
+      "station_id": "OTC-89f7e9a0",
+      "set_id": "OTC-89f7e9a0/ticon-4/grondines-3325-can-meds/as-published",
+      "lat_m": -1.5281054797129254
+    },
+    {
+      "station_id": "OTC-8b570066",
+      "set_id": "OTC-8b570066/ticon-4/stanovan_bc-7747-can-meds",
+      "lat_m": -3.1549286495083817
+    },
+    {
+      "station_id": "OTC-8b7dc675",
+      "set_id": "OTC-8b7dc675/ticon-4/crms0192-crms0192-usa-crms/as-published",
+      "lat_m": -0.07039284476299074
+    },
+    {
+      "station_id": "OTC-8b9a1188",
+      "set_id": "OTC-8b9a1188/ticon-4/winchelsea_is_bc-7935-can-meds",
+      "lat_m": -3.2402227997563355
+    },
+    {
+      "station_id": "OTC-8cfd2cb1",
+      "set_id": "OTC-8cfd2cb1/ticon-4/ulukhaktok-6380-can-meds",
+      "lat_m": -0.4842393875902001
+    },
+    {
+      "station_id": "OTC-8d3c4056",
+      "set_id": "OTC-8d3c4056/ticon-4/pointe_au_pic-3045-can-meds/as-published",
+      "lat_m": -3.4003987318980005
+    },
+    {
+      "station_id": "OTC-8d80c1e7",
+      "set_id": "OTC-8d80c1e7/ticon-4/sooke_bc-7020-can-meds",
+      "lat_m": -2.0123846177036544
+    },
+    {
+      "station_id": "OTC-8da2490d",
+      "set_id": "OTC-8da2490d/ticon-4/crms0217-crms0217-usa-crms/as-published",
+      "lat_m": -0.10462672785337686
+    },
+    {
+      "station_id": "OTC-8fe2b188",
+      "set_id": "OTC-8fe2b188/ticon-4/deschaillons-3335-can-meds/as-published",
+      "lat_m": -1.3747635476806455
+    },
+    {
+      "station_id": "OTC-8fec43f0",
+      "set_id": "OTC-8fec43f0/ticon-4/owen_bay_bc-8120-can-meds",
+      "lat_m": -2.708557203303754
+    },
+    {
+      "station_id": "OTC-915b60b4",
+      "set_id": "OTC-915b60b4/ticon-4/sept_iles-2780-can-meds",
+      "lat_m": -1.7500564938191323
+    },
+    {
+      "station_id": "OTC-91836562",
+      "set_id": "OTC-91836562/ticon-4/forestville-2880-can-meds",
+      "lat_m": -2.441860941308079
+    },
+    {
+      "station_id": "OTC-92527c92",
+      "set_id": "OTC-92527c92/ticon-4/guadalupe_rv_nr_bloomington_tx-8177520-usa-usgs/as-published",
+      "lat_m": -0.6229301624371992
+    },
+    {
+      "station_id": "OTC-92e796d4",
+      "set_id": "OTC-92e796d4/ticon-4/bedford_institute-491-can-meds",
+      "lat_m": -1.1552719129896227
+    },
+    {
+      "station_id": "OTC-93e31c39",
+      "set_id": "OTC-93e31c39/ticon-4/sandy_cove_bc-7786-can-meds",
+      "lat_m": -3.14416526663806
+    },
+    {
+      "station_id": "OTC-9438a576",
+      "set_id": "OTC-9438a576/ticon-4/carillon_amont-16033-can-meds",
+      "lat_m": -0.3826010334770035
+    },
+    {
+      "station_id": "OTC-949e6141",
+      "set_id": "OTC-949e6141/ticon-4/boutiliers_point-482-can-meds",
+      "lat_m": -1.149406946576895
+    },
+    {
+      "station_id": "OTC-94d8d4dc",
+      "set_id": "OTC-94d8d4dc/ticon-4/savage_cove-2633-can-meds",
+      "lat_m": -0.7669117685294132
+    },
+    {
+      "station_id": "OTC-950f0417",
+      "set_id": "OTC-950f0417/ticon-4/finnerty_cove_bc-7140-can-meds/as-published",
+      "lat_m": -2.321861311860478
+    },
+    {
+      "station_id": "OTC-95bb8367",
+      "set_id": "OTC-95bb8367/ticon-4/st_lambert_aval-15507-can-meds/as-published",
+      "lat_m": -0.5835339019171627
+    },
+    {
+      "station_id": "OTC-96225423",
+      "set_id": "OTC-96225423/ticon-4/masset_bc-9910-can-meds",
+      "lat_m": -2.205762750046017
+    },
+    {
+      "station_id": "OTC-96d94fb7",
+      "set_id": "OTC-96d94fb7/ticon-4/port_colborne_ontario-12865-can-meds",
+      "lat_m": -0.14649103841738811
+    },
+    {
+      "station_id": "OTC-975b3c5f",
+      "set_id": "OTC-975b3c5f/ticon-4/hamilton_creek_near_mouth_at_n_bonneville_wa-14128895-usa-usgs/as-published",
+      "lat_m": -0.6799986632650551
+    },
+    {
+      "station_id": "OTC-97dec260",
+      "set_id": "OTC-97dec260/ticon-4/little_current_ontario-11195-can-meds",
+      "lat_m": -0.18868689981057296
+    },
+    {
+      "station_id": "OTC-98c51001",
+      "set_id": "OTC-98c51001/ticon-4/ile_dentree-1966-can-meds",
+      "lat_m": -0.6909621392969162
+    },
+    {
+      "station_id": "OTC-98f25067",
+      "set_id": "OTC-98f25067/ticon-4/kitimat_bc-9140-can-meds",
+      "lat_m": -3.3580775247587473
+    },
+    {
+      "station_id": "OTC-9a84e1b1",
+      "set_id": "OTC-9a84e1b1/ticon-4/thessalon_ontario-11070-can-meds",
+      "lat_m": -0.1759543209269916
+    },
+    {
+      "station_id": "OTC-9b994ab6",
+      "set_id": "OTC-9b994ab6/ticon-4/alert_bay_bc-8280-can-meds",
+      "lat_m": -2.8983882412849518
+    },
+    {
+      "station_id": "OTC-9c820f85",
+      "set_id": "OTC-9c820f85/ticon-4/prince_rupert-540-can-uhslc_fd",
+      "lat_m": -3.9410870172831984
+    },
+    {
+      "station_id": "OTC-9d75c853",
+      "set_id": "OTC-9d75c853/ticon-4/powell_river_bc-7880-can-meds",
+      "lat_m": -3.306389683502192
+    },
+    {
+      "station_id": "OTC-9d860ffc",
+      "set_id": "OTC-9d860ffc/ticon-4/cote_ste_catherine-15450-can-meds",
+      "lat_m": -0.19409429283126034
+    },
+    {
+      "station_id": "OTC-9ee92941",
+      "set_id": "OTC-9ee92941/ticon-4/halifax-275-can-uhslc_fd",
+      "lat_m": -1.1390280387910707
+    },
+    {
+      "station_id": "OTC-9f6adeb7",
+      "set_id": "OTC-9f6adeb7/ticon-4/cape_parry-6360-can-meds",
+      "lat_m": -0.4223827299898194
+    },
+    {
+      "station_id": "OTC-9f72efde",
+      "set_id": "OTC-9f72efde/ticon-4/french_creek-7940-can-meds/as-published",
+      "lat_m": -3.3001500013567813
+    },
+    {
+      "station_id": "OTC-a0c459f5",
+      "set_id": "OTC-a0c459f5/ticon-4/tasiujaq-4315-can-meds",
+      "lat_m": -8.721475568774146
+    },
+    {
+      "station_id": "OTC-a0d69f34",
+      "set_id": "OTC-a0d69f34/ticon-4/sachs_harbour-6424-can-meds/as-published",
+      "lat_m": -0.3268633755057529
+    },
+    {
+      "station_id": "OTC-a26ecb2a",
+      "set_id": "OTC-a26ecb2a/ticon-4/zeballos_bc-8670-can-meds",
+      "lat_m": -2.4609179656124023
+    },
+    {
+      "station_id": "OTC-a3429c85",
+      "set_id": "OTC-a3429c85/ticon-4/pointe_au_pere-2980-can-meds",
+      "lat_m": -2.364583819140606
+    },
+    {
+      "station_id": "OTC-a3fcf7a7",
+      "set_id": "OTC-a3fcf7a7/ticon-4/fulford_harbour_bc-7330-can-meds",
+      "lat_m": -2.4997552435069443
+    },
+    {
+      "station_id": "OTC-a4669036",
+      "set_id": "OTC-a4669036/ticon-4/erieau_ontario-12250-can-meds",
+      "lat_m": -0.1904256102230359
+    },
+    {
+      "station_id": "OTC-a4681e55",
+      "set_id": "OTC-a4681e55/ticon-4/kugluktuk-6290-can-meds/as-published",
+      "lat_m": -0.1634705781460907
+    },
+    {
+      "station_id": "OTC-a55b1107",
+      "set_id": "OTC-a55b1107/ticon-4/saint_francois_io-3100-can-meds",
+      "lat_m": -2.9535287587385994
+    },
+    {
+      "station_id": "OTC-a5e6c0b8",
+      "set_id": "OTC-a5e6c0b8/ticon-4/yarmouth-365-can-meds",
+      "lat_m": -2.5289523610135727
+    },
+    {
+      "station_id": "OTC-a6aa1006",
+      "set_id": "OTC-a6aa1006/ticon-4/kingston_ontario-13988-can-meds",
+      "lat_m": -0.26379349872839253
+    },
+    {
+      "station_id": "OTC-a6eed5e6",
+      "set_id": "OTC-a6eed5e6/ticon-4/port_simpson_bc-9390-can-meds",
+      "lat_m": -3.788860932000475
+    },
+    {
+      "station_id": "OTC-a6f08325",
+      "set_id": "OTC-a6f08325/ticon-4/gibsons_bc-7820-can-meds",
+      "lat_m": -3.1799341282600904
+    },
+    {
+      "station_id": "OTC-a77c6200",
+      "set_id": "OTC-a77c6200/ticon-4/twin_islands_bc-7892-can-meds/as-published",
+      "lat_m": -3.452062643884496
+    },
+    {
+      "station_id": "OTC-a7834277",
+      "set_id": "OTC-a7834277/ticon-4/gatineau-16105-can-meds",
+      "lat_m": -0.5103239954812787
+    },
+    {
+      "station_id": "OTC-a8fb47ad",
+      "set_id": "OTC-a8fb47ad/ticon-4/summerstown_ontario-14940-can-meds",
+      "lat_m": -0.07603768626459248
+    },
+    {
+      "station_id": "OTC-a9e72073",
+      "set_id": "OTC-a9e72073/ticon-4/upper_gagetown-108-can-meds",
+      "lat_m": -0.8669355200924227
+    },
+    {
+      "station_id": "OTC-aa8d7083",
+      "set_id": "OTC-aa8d7083/ticon-4/riviere_au_renard-2330-can-meds",
+      "lat_m": -1.0159366451869467
+    },
+    {
+      "station_id": "OTC-ab919dd3",
+      "set_id": "OTC-ab919dd3/ticon-4/nain-833-can-uhslc_fd/as-published",
+      "lat_m": -1.4425690191876739
+    },
+    {
+      "station_id": "OTC-ab919dd3",
+      "set_id": "OTC-ab919dd3/ticon-4/nain-1430-can-meds/as-published",
+      "lat_m": -1.4431704541375145
+    },
+    {
+      "station_id": "OTC-abda193f",
+      "set_id": "OTC-abda193f/ticon-4/gagetown-105-can-meds",
+      "lat_m": -1.1223195922851052
+    },
+    {
+      "station_id": "OTC-acf7ccc0",
+      "set_id": "OTC-acf7ccc0/ticon-4/mill_cove-475-can-meds",
+      "lat_m": -1.1804866376822392
+    },
+    {
+      "station_id": "OTC-ad5c06f9",
+      "set_id": "OTC-ad5c06f9/ticon-4/forteau_bay-2590-can-meds",
+      "lat_m": -0.8729692601387743
+    },
+    {
+      "station_id": "OTC-ae2f38fd",
+      "set_id": "OTC-ae2f38fd/ticon-4/cobourg_ontario-13590-can-meds",
+      "lat_m": -0.25745910160571855
+    },
+    {
+      "station_id": "OTC-ae7eb661",
+      "set_id": "OTC-ae7eb661/ticon-4/west_ste_modeste-2595-can-meds",
+      "lat_m": -0.7424084706101081
+    },
+    {
+      "station_id": "OTC-aea70661",
+      "set_id": "OTC-aea70661/ticon-4/new_westminster_bc-7654-can-meds/as-published",
+      "lat_m": -1.9410302344725152
+    },
+    {
+      "station_id": "OTC-aefbeda2",
+      "set_id": "OTC-aefbeda2/ticon-4/pointe_des_cascades-15220-can-meds",
+      "lat_m": -0.18573535281868897
+    },
+    {
+      "station_id": "OTC-b0e2c8b8",
+      "set_id": "OTC-b0e2c8b8/ticon-4/charlottetown-1700-can-meds",
+      "lat_m": -1.7932476847385304
+    },
+    {
+      "station_id": "OTC-b13eb00d",
+      "set_id": "OTC-b13eb00d/ticon-4/northwest_bay_bc-7938-can-meds/as-published",
+      "lat_m": -3.3193445792936984
+    },
+    {
+      "station_id": "OTC-b19fe470",
+      "set_id": "OTC-b19fe470/ticon-4/toronto_ontario-13320-can-meds",
+      "lat_m": -0.2682296682158488
+    },
+    {
+      "station_id": "OTC-b27a2a63",
+      "set_id": "OTC-b27a2a63/ticon-4/crms0697-crms0697-usa-crms/as-published",
+      "lat_m": -0.0308645178285502
+    },
+    {
+      "station_id": "OTC-b2bae46e",
+      "set_id": "OTC-b2bae46e/ticon-4/west_dipper_harbour-46-can-meds/as-published",
+      "lat_m": -3.9823462420908093
+    },
+    {
+      "station_id": "OTC-b63120f5",
+      "set_id": "OTC-b63120f5/ticon-4/oyster_river_near_durham_nh-1073000-usa-usgs/as-published",
+      "lat_m": -0.18502383885189325
+    },
+    {
+      "station_id": "OTC-b6cd52a0",
+      "set_id": "OTC-b6cd52a0/ticon-4/magnolia_river_at_us_98_near_foley_alabama-2378300-usa-usgs/as-published",
+      "lat_m": -0.05964042522710806
+    },
+    {
+      "station_id": "OTC-b6e132d6",
+      "set_id": "OTC-b6e132d6/ticon-4/point_atkinson_bc-7795-can-meds",
+      "lat_m": -3.1347825817903434
+    },
+    {
+      "station_id": "OTC-b6f567a0",
+      "set_id": "OTC-b6f567a0/ticon-4/louiseville-15972-can-meds",
+      "lat_m": -0.6922741422893869
+    },
+    {
+      "station_id": "OTC-b8165605",
+      "set_id": "OTC-b8165605/ticon-4/crms0571-crms0571-usa-crms/as-published",
+      "lat_m": -0.1042012195690171
+    },
+    {
+      "station_id": "OTC-b9025499",
+      "set_id": "OTC-b9025499/ticon-4/sorel-15930-can-meds",
+      "lat_m": -0.6586959821465531
+    },
+    {
+      "station_id": "OTC-b94836e6",
+      "set_id": "OTC-b94836e6/ticon-4/crms0128-crms0128-usa-crms/as-published",
+      "lat_m": -0.11175707478031104
+    },
+    {
+      "station_id": "OTC-b99eb21f",
+      "set_id": "OTC-b99eb21f/ticon-4/lyell_bay_bc-9756-can-meds",
+      "lat_m": -2.9946472954359225
+    },
+    {
+      "station_id": "OTC-b9eef12b",
+      "set_id": "OTC-b9eef12b/ticon-4/brockville_ontario-14400-can-meds",
+      "lat_m": -0.2579755180439709
+    },
+    {
+      "station_id": "OTC-ba20ef1e",
+      "set_id": "OTC-ba20ef1e/ticon-4/astoria_downtown-9439040-usa-da_sat/as-published",
+      "lat_m": -1.8754579772602924
+    },
+    {
+      "station_id": "OTC-ba42e5dc",
+      "set_id": "OTC-ba42e5dc/ticon-4/lac_saint_pierre-15975-can-meds",
+      "lat_m": -0.7504215340048299
+    },
+    {
+      "station_id": "OTC-ba59a743",
+      "set_id": "OTC-ba59a743/ticon-4/steveston_bc-7607-can-meds/as-published",
+      "lat_m": -2.7111222822799843
+    },
+    {
+      "station_id": "OTC-baab2e7a",
+      "set_id": "OTC-baab2e7a/ticon-4/bonavista-990-can-meds",
+      "lat_m": -0.7032967884183617
+    },
+    {
+      "station_id": "OTC-bc03b1f0",
+      "set_id": "OTC-bc03b1f0/ticon-4/crms1650-crms1650-usa-crms/as-published",
+      "lat_m": -0.06659023583678823
+    },
+    {
+      "station_id": "OTC-bcaf080b",
+      "set_id": "OTC-bcaf080b/ticon-4/belle_river_ontario-11965-can-meds",
+      "lat_m": -0.15493688367882502
+    },
+    {
+      "station_id": "OTC-bd7288b5",
+      "set_id": "OTC-bd7288b5/ticon-4/mtl_rue_frontenac-15540-can-meds/as-published",
+      "lat_m": -0.5749291351367328
+    },
+    {
+      "station_id": "OTC-bec349b8",
+      "set_id": "OTC-bec349b8/ticon-4/ucluelet_bc-8595-can-meds",
+      "lat_m": -2.153567923335223
+    },
+    {
+      "station_id": "OTC-bf12ccc5",
+      "set_id": "OTC-bf12ccc5/ticon-4/inukjuak-4575-can-meds",
+      "lat_m": -0.2642576957984596
+    },
+    {
+      "station_id": "OTC-c12b00d3",
+      "set_id": "OTC-c12b00d3/ticon-4/becancour-3353-can-meds/as-published",
+      "lat_m": -0.9271659134092334
+    },
+    {
+      "station_id": "OTC-c16829b8",
+      "set_id": "OTC-c16829b8/ticon-4/trois_rivieres-3360-can-meds/as-published",
+      "lat_m": -0.8649472938027087
+    },
+    {
+      "station_id": "OTC-c1b83d73",
+      "set_id": "OTC-c1b83d73/ticon-4/burlington_ontario-13150-can-meds",
+      "lat_m": -0.2911162813977753
+    },
+    {
+      "station_id": "OTC-c26a4ae8",
+      "set_id": "OTC-c26a4ae8/ticon-4/fairview_terminal-9348-can-meds",
+      "lat_m": -3.9842310941535453
+    },
+    {
+      "station_id": "OTC-c31972f4",
+      "set_id": "OTC-c31972f4/ticon-4/grosse_pointe_yc_mi-9034051-usa-noaa/as-published",
+      "lat_m": -0.5369418357608262
+    },
+    {
+      "station_id": "OTC-c33107cc",
+      "set_id": "OTC-c33107cc/ticon-4/queen_charlotte_city-9850-can-meds",
+      "lat_m": -4.132971119472532
+    },
+    {
+      "station_id": "OTC-c390ada2",
+      "set_id": "OTC-c390ada2/ticon-4/shediac_bay-1805-can-meds",
+      "lat_m": -0.8692381707703084
+    },
+    {
+      "station_id": "OTC-c3b42063",
+      "set_id": "OTC-c3b42063/ticon-4/henslung_cove-9958-can-meds",
+      "lat_m": -2.7221434577108
+    },
+    {
+      "station_id": "OTC-c3bfc651",
+      "set_id": "OTC-c3bfc651/ticon-4/langara_point-9964-can-meds",
+      "lat_m": -2.7948004683006884
+    },
+    {
+      "station_id": "OTC-c575656d",
+      "set_id": "OTC-c575656d/ticon-4/ramsay_island_bc-9746-can-meds/as-published",
+      "lat_m": -3.301323519216728
+    },
+    {
+      "station_id": "OTC-c7d12b7b",
+      "set_id": "OTC-c7d12b7b/ticon-4/estuaire_de_la_saint_charles-3246-can-meds",
+      "lat_m": -2.74665619560326
+    },
+    {
+      "station_id": "OTC-c9391db0",
+      "set_id": "OTC-c9391db0/ticon-4/tumbo_channel_bc-7510-can-meds",
+      "lat_m": -2.737835611873126
+    },
+    {
+      "station_id": "OTC-c93aa2b7",
+      "set_id": "OTC-c93aa2b7/ticon-4/hunger_harbour_bc-9570-can-meds/as-published",
+      "lat_m": -2.368679489648551
+    },
+    {
+      "station_id": "OTC-c963082b",
+      "set_id": "OTC-c963082b/ticon-4/bar_point_ontario-12005-can-meds",
+      "lat_m": -0.24452042823443587
+    },
+    {
+      "station_id": "OTC-c9a624aa",
+      "set_id": "OTC-c9a624aa/ticon-4/sand_point-9447239-usa-noaa/as-published",
+      "lat_m": -0.26921241364595067
+    },
+    {
+      "station_id": "OTC-ca3952e4",
+      "set_id": "OTC-ca3952e4/ticon-4/nanaimo_harbour_bc-7917-can-meds/as-published",
+      "lat_m": -3.229595600497758
+    },
+    {
+      "station_id": "OTC-ca8c79be",
+      "set_id": "OTC-ca8c79be/ticon-4/tecumseh_ontario-11975-can-meds",
+      "lat_m": -0.14705412902732334
+    },
+    {
+      "station_id": "OTC-caf5b1ab",
+      "set_id": "OTC-caf5b1ab/ticon-4/kennebecasis_bay-85-can-meds",
+      "lat_m": -1.0398165846553091
+    },
+    {
+      "station_id": "OTC-cb4499e4",
+      "set_id": "OTC-cb4499e4/ticon-4/franklin_river_bc-8565-can-meds",
+      "lat_m": -2.1419702802884895
+    },
+    {
+      "station_id": "OTC-cb8bb493",
+      "set_id": "OTC-cb8bb493/ticon-4/kelsey_bay_bc-8215-can-meds/as-published",
+      "lat_m": -2.9705068922498357
+    },
+    {
+      "station_id": "OTC-cd33b6fd",
+      "set_id": "OTC-cd33b6fd/ticon-4/lower_escuminac-2000-can-meds",
+      "lat_m": -0.7232341339639531
+    },
+    {
+      "station_id": "OTC-ce007f46",
+      "set_id": "OTC-ce007f46/ticon-4/montreal_jetee_1-15520-can-meds/as-published",
+      "lat_m": -0.9495316609248436
+    },
+    {
+      "station_id": "OTC-cf19f8a1",
+      "set_id": "OTC-cf19f8a1/ticon-4/patricia_bay_bc-7277-can-meds/as-published",
+      "lat_m": -2.5384133715604453
+    },
+    {
+      "station_id": "OTC-cfee90b1",
+      "set_id": "OTC-cfee90b1/ticon-4/tsawwassen_bc-7590-can-meds",
+      "lat_m": -2.952540147605714
+    },
+    {
+      "station_id": "OTC-d03a90e7",
+      "set_id": "OTC-d03a90e7/ticon-4/bamfield-541-can-uhslc_fd",
+      "lat_m": -2.170242106349094
+    },
+    {
+      "station_id": "OTC-d0ee1260",
+      "set_id": "OTC-d0ee1260/ticon-4/wiah_point_bc-9940-can-meds",
+      "lat_m": -3.139974536308956
+    },
+    {
+      "station_id": "OTC-d1036c72",
+      "set_id": "OTC-d1036c72/ticon-4/hubbards-480-can-meds",
+      "lat_m": -1.203662271657295
+    },
+    {
+      "station_id": "OTC-d23233a1",
+      "set_id": "OTC-d23233a1/ticon-4/big_bay_stuart_island-8060-can-meds",
+      "lat_m": -2.8581206143428015
+    },
+    {
+      "station_id": "OTC-d287fc3d",
+      "set_id": "OTC-d287fc3d/ticon-4/stewart_bc-9475-can-meds",
+      "lat_m": -4.104175709451145
+    },
+    {
+      "station_id": "OTC-d3ae5603",
+      "set_id": "OTC-d3ae5603/ticon-4/canoe_pass_bc-7603-can-meds/as-published",
+      "lat_m": -2.530862034770714
+    },
+    {
+      "station_id": "OTC-d4f8192a",
+      "set_id": "OTC-d4f8192a/ticon-4/port_lambton_ontario-11950-can-meds",
+      "lat_m": -0.11381325260726707
+    },
+    {
+      "station_id": "OTC-d5886a15",
+      "set_id": "OTC-d5886a15/ticon-4/esquimalt_harbour_bc-7109-can-meds",
+      "lat_m": -2.1284092790999574
+    },
+    {
+      "station_id": "OTC-d5d44347",
+      "set_id": "OTC-d5d44347/ticon-4/la_salle_ontario-11985-can-meds",
+      "lat_m": -0.16347003711370783
+    },
+    {
+      "station_id": "OTC-d7854735",
+      "set_id": "OTC-d7854735/ticon-4/rocher_neptune-3071-can-meds/as-published",
+      "lat_m": -3.377001508654781
+    },
+    {
+      "station_id": "OTC-d79e5425",
+      "set_id": "OTC-d79e5425/ticon-4/fort_churchill-5008-can-meds",
+      "lat_m": -2.784288921535003
+    },
+    {
+      "station_id": "OTC-d8654379",
+      "set_id": "OTC-d8654379/ticon-4/morrisburg_ontario-14660-can-meds",
+      "lat_m": -0.2968971036784202
+    },
+    {
+      "station_id": "OTC-d90178a7",
+      "set_id": "OTC-d90178a7/ticon-4/ladysmith_bc-7460-can-meds",
+      "lat_m": -2.7450927002692063
+    },
+    {
+      "station_id": "OTC-d90bff08",
+      "set_id": "OTC-d90bff08/ticon-4/martin_bayou_at_us_98_at_springfield_fl-2359315-usa-usgs/as-published",
+      "lat_m": -0.029016897926391425
+    },
+    {
+      "station_id": "OTC-d92e19c1",
+      "set_id": "OTC-d92e19c1/ticon-4/crms0056-crms0056-usa-crms/as-published",
+      "lat_m": -0.058989587810724615
+    },
+    {
+      "station_id": "OTC-da32b93f",
+      "set_id": "OTC-da32b93f/ticon-4/hopedale-1405-can-meds",
+      "lat_m": -1.3853406607288807
+    },
+    {
+      "station_id": "OTC-dacc563d",
+      "set_id": "OTC-dacc563d/ticon-4/tahsis_bc-8658-can-meds",
+      "lat_m": -2.469095225448636
+    },
+    {
+      "station_id": "OTC-dcb55687",
+      "set_id": "OTC-dcb55687/ticon-4/port_hardy_bc-8408-can-meds",
+      "lat_m": -2.9919191176326954
+    },
+    {
+      "station_id": "OTC-de08b7cf",
+      "set_id": "OTC-de08b7cf/ticon-4/port_stanley_ontario-12400-can-meds",
+      "lat_m": -0.1601792807512009
+    },
+    {
+      "station_id": "OTC-df1e440e",
+      "set_id": "OTC-df1e440e/ticon-4/st_johns-276a-can-uhslc_rq",
+      "lat_m": -0.7639455764596796
+    },
+    {
+      "station_id": "OTC-df1e440e",
+      "set_id": "OTC-df1e440e/ticon-4/st_johns-276-can-uhslc_fd/as-published",
+      "lat_m": -0.7722743052642584
+    },
+    {
+      "station_id": "OTC-df5114e2",
+      "set_id": "OTC-df5114e2/ticon-4/owls_head-473-can-meds",
+      "lat_m": -1.1048964240182542
+    },
+    {
+      "station_id": "OTC-df74cbc6",
+      "set_id": "OTC-df74cbc6/ticon-4/hartley_bay_bc-9130-can-meds",
+      "lat_m": -3.2970685567596454
+    },
+    {
+      "station_id": "OTC-df931e9b",
+      "set_id": "OTC-df931e9b/ticon-4/harrington_harbour-2550-can-meds",
+      "lat_m": -1.097726680872136
+    },
+    {
+      "station_id": "OTC-e01c8bf9",
+      "set_id": "OTC-e01c8bf9/ticon-4/arichat-580-can-meds",
+      "lat_m": -1.0227306767185222
+    },
+    {
+      "station_id": "OTC-e03d3c1f",
+      "set_id": "OTC-e03d3c1f/ticon-4/pelee_point_east-12122-can-meds",
+      "lat_m": -0.21533991367173982
+    },
+    {
+      "station_id": "OTC-e0b2441b",
+      "set_id": "OTC-e0b2441b/ticon-4/goderich_ontario-11860-can-meds",
+      "lat_m": -0.16833815455014411
+    },
+    {
+      "station_id": "OTC-e11157d2",
+      "set_id": "OTC-e11157d2/ticon-4/squamish_inner_bc-7811-can-meds/as-published",
+      "lat_m": -3.1806506343153274
+    },
+    {
+      "station_id": "OTC-e4c4f0d1",
+      "set_id": "OTC-e4c4f0d1/ticon-4/parkers_cove-320-can-meds/as-published",
+      "lat_m": -5.012018925063158
+    },
+    {
+      "station_id": "OTC-e4e98c1a",
+      "set_id": "OTC-e4e98c1a/ticon-4/bella_bella_bc-8976-can-meds",
+      "lat_m": -2.860520844318134
+    },
+    {
+      "station_id": "OTC-e57ede44",
+      "set_id": "OTC-e57ede44/ticon-4/port_alberni_bc-8575-can-meds",
+      "lat_m": -2.1669927157301565
+    },
+    {
+      "station_id": "OTC-e5bcfba5",
+      "set_id": "OTC-e5bcfba5/ticon-4/sidney_bc-7260-can-meds/as-published",
+      "lat_m": -2.5171307391444224
+    },
+    {
+      "station_id": "OTC-e997a805",
+      "set_id": "OTC-e997a805/ticon-4/l_cornwallis_i-705a-can-uhslc_rq",
+      "lat_m": -0.9004335743199477
+    },
+    {
+      "station_id": "OTC-eb0f9030",
+      "set_id": "OTC-eb0f9030/ticon-4/banc_du_cap_brule-3075-can-meds",
+      "lat_m": -2.9620241593117576
+    },
+    {
+      "station_id": "OTC-eb2a24d5",
+      "set_id": "OTC-eb2a24d5/ticon-4/sainte_anne_de_bellevue-16005-can-meds/as-published",
+      "lat_m": -0.5084656112629689
+    },
+    {
+      "station_id": "OTC-ebabf208",
+      "set_id": "OTC-ebabf208/ticon-4/evandale-98-can-meds",
+      "lat_m": -0.9442119460119808
+    },
+    {
+      "station_id": "OTC-ec23e85e",
+      "set_id": "OTC-ec23e85e/ticon-4/peace_bridge_below-12954-can-meds",
+      "lat_m": -0.14877226765664772
+    },
+    {
+      "station_id": "OTC-ec6ff288",
+      "set_id": "OTC-ec6ff288/ticon-4/campbell_river_bc-8074-can-meds/as-published",
+      "lat_m": -2.805897628164903
+    },
+    {
+      "station_id": "OTC-ecb84530",
+      "set_id": "OTC-ecb84530/ticon-4/resolute-5560-can-meds",
+      "lat_m": -1.013716760498459
+    },
+    {
+      "station_id": "OTC-edae3ddd",
+      "set_id": "OTC-edae3ddd/ticon-4/gros_cap_ontario-10920-can-meds",
+      "lat_m": -0.19925681245832794
+    },
+    {
+      "station_id": "OTC-ee42a039",
+      "set_id": "OTC-ee42a039/ticon-4/sault_ste_marie_ontario-11010-can-meds",
+      "lat_m": -0.12058656556465261
+    },
+    {
+      "station_id": "OTC-ee50df42",
+      "set_id": "OTC-ee50df42/ticon-4/jemseg-124-can-meds",
+      "lat_m": -0.9934168201185875
+    },
+    {
+      "station_id": "OTC-ef1963fd",
+      "set_id": "OTC-ef1963fd/ticon-4/point_edward_ontario-11940-can-meds",
+      "lat_m": -0.11341518320444026
+    },
+    {
+      "station_id": "OTC-f2839e87",
+      "set_id": "OTC-f2839e87/ticon-4/iqaluit-4140-can-meds/as-published",
+      "lat_m": -5.941572588988757
+    },
+    {
+      "station_id": "OTC-f2d14e6c",
+      "set_id": "OTC-f2d14e6c/ticon-4/tobermory_ontario-11690-can-meds",
+      "lat_m": -0.15111210696685604
+    },
+    {
+      "station_id": "OTC-f34da72e",
+      "set_id": "OTC-f34da72e/ticon-4/indiantown-75-can-meds",
+      "lat_m": -1.0488955358151792
+    },
+    {
+      "station_id": "OTC-f427f04e",
+      "set_id": "OTC-f427f04e/ticon-4/kimmirut-4205-can-meds/as-published",
+      "lat_m": -6.209467768447565
+    },
+    {
+      "station_id": "OTC-f43620f2",
+      "set_id": "OTC-f43620f2/ticon-4/rustico-1915-can-meds",
+      "lat_m": -0.5984438628090077
+    },
+    {
+      "station_id": "OTC-f482f3fd",
+      "set_id": "OTC-f482f3fd/ticon-4/port_aux_basques-273-can-uhslc_fd/as-published",
+      "lat_m": -0.8546905276414941
+    },
+    {
+      "station_id": "OTC-f59d3822",
+      "set_id": "OTC-f59d3822/ticon-4/chicoutimi-3480-can-meds",
+      "lat_m": -2.4476390779543657
+    },
+    {
+      "station_id": "OTC-f6359a03",
+      "set_id": "OTC-f6359a03/ticon-4/false_bay_bc-7982-can-meds",
+      "lat_m": -3.3386324376353804
+    },
+    {
+      "station_id": "OTC-f7974ef0",
+      "set_id": "OTC-f7974ef0/ticon-4/hall_beach-5275-can-meds",
+      "lat_m": -0.5533169153803806
+    },
+    {
+      "station_id": "OTC-f95422b3",
+      "set_id": "OTC-f95422b3/ticon-4/port_alfred-3460-can-meds",
+      "lat_m": -3.149637456783481
+    },
+    {
+      "station_id": "OTC-f9621c76",
+      "set_id": "OTC-f9621c76/ticon-4/saint_john-65-can-meds",
+      "lat_m": -4.573755987370011
+    },
+    {
+      "station_id": "OTC-fa6b61fc",
+      "set_id": "OTC-fa6b61fc/ticon-4/halfmoon_bay_bc-7830-can-meds/as-published",
+      "lat_m": -3.263555457528453
+    },
+    {
+      "station_id": "OTC-fb035802",
+      "set_id": "OTC-fb035802/ticon-4/lanoraie-15860-can-meds",
+      "lat_m": -0.7859052888299402
+    },
+    {
+      "station_id": "OTC-fb19f6af",
+      "set_id": "OTC-fb19f6af/ticon-4/hope_bay_bc-7360-can-meds/as-published",
+      "lat_m": -2.675001394043942
+    },
+    {
+      "station_id": "OTC-fbe7d25d",
+      "set_id": "OTC-fbe7d25d/ticon-4/dalhousie-2165-can-meds",
+      "lat_m": -1.402222296295393
+    },
+    {
+      "station_id": "OTC-feec744a",
+      "set_id": "OTC-feec744a/ticon-4/winter_harbour_bc-8735-can-meds",
+      "lat_m": -2.3988258937919213
+    },
+    {
+      "station_id": "OTC-ff0e1b61",
+      "set_id": "OTC-ff0e1b61/ticon-4/aulds_cove-1570-can-meds/as-published",
+      "lat_m": -0.9418242722466408
+    },
+    {
+      "station_id": "OTC-ff3e1b0a",
+      "set_id": "OTC-ff3e1b0a/ticon-4/north_galiano_bc-7435-can-meds",
+      "lat_m": -2.794400571666021
+    }
+  ]
+}
