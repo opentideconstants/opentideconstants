@@ -30,7 +30,8 @@
     "successful_distinct_native_places": 2194,
     "errors": 0,
     "operations": {
-      "harmonic_one_instant": 1405,
+      "harmonic_one_instant": 1404,
+      "harmonic_three_instant_witness": 1,
       "folded_offsets_one_instant": 8,
       "offset_extremes_24_hours": 781
     },
