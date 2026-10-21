@@ -1234,7 +1234,7 @@
     "Unreleased candidate status; this file does not approve launch, publication or release.",
     "Comparison labels use the accepted symmetric predicates. Historical product and scientific requirements remain recorded separately on each row.",
     "The row 35 capability measurement does not establish accuracy or PS Tier B acceptance, and does not claim an advantage over the comparator.",
-    "Row 9 remains LOSS at 5,874/6,353. Row 10 remains LOSS at 5,591/6,342; no new LAT/HAT coverage gain is claimed.",
+    "Row 9 remains LOSS at 5,874/6,353. Row 10 remains LOSS at 6,332/6,342, with 10 remaining and 741 newly covered target places from accepted PR90. These are labelled LAT/HAT fallbacks; normal datum acceptance and accuracy parity remain false.",
     "Raw measurements and historical evidence are retained locally and unbundled. This milestone is an evidence summary, not a standalone reproduction package."
   ]
 }
