@@ -21,7 +21,7 @@ set -euo pipefail
 
 SITE_COMMIT=e2a07d84214e26b50bce1c92ca9a080772940534   # explicit harmonic mean frame and computed fallback uncertainty
 SCHEMA_SRC=src/schema/otc-1.0.schema.json
-SCHEMA_SHA256=d6c21cf2a571713f12526dc7018814acbc03f3bd90c7ceb505e1dbf15242605b
+SCHEMA_SHA256=1faa9804cfee88ac082d98c5a473a3823013411953cdda44d20d611020ab4820
 EXAMPLE_SRC=src/schema/example.json
 EXAMPLE_SHA256=568014659b42af433a198c8ff1a81ad624b638099794baea5758d4d12e7d28df
 

@@ -14,8 +14,9 @@ command listed in `.github/workflows/producer.yml`. From `pipeline`, run
 `bundle install`, then `bundle exec rspec spec`. The producer Ruby bundle contains
 RSpec, Rubyzip, TCD and TZInfo. It does not load the WebCalTides application.
 
-CI checks out Git LFS data before running data-dependent tests. The seven selected
-metadata files use LFS; raw response fixtures remain byte-preserved plain Git.
+CI checks out Git LFS data before running data-dependent tests. Selected metadata
+and the pinned computed-datum release inputs use LFS; raw response fixtures remain
+byte-preserved plain Git.
 
 ## External proof profiles
 
@@ -43,6 +44,38 @@ The native release command is `pipeline/bin/build-otc` from the repository root.
 Full release builds require the already pinned external input and comparison
 profiles. Reuse accepted fit artifacts; relocation does not authorize refits or
 changed scientific bounds.
+
+## Pinned 20261011 computed-datum release
+
+For this dated release, use the committed profile from the repository root after
+`git lfs pull` and the locked Python environment setup above:
+
+```text
+ruby pipeline/data/otc/computed_datums/ticon-760-20261011/build.rb --verify
+ruby pipeline/data/otc/computed_datums/ticon-760-20261011/build.rb --out /data/otc-20261011
+```
+
+The output directory must be empty. Publish or export the generated output, not
+the profile's baseline. Bare `pipeline/bin/build-otc` does not automatically select
+this dated cache. The profile checks every committed input hash, imports the
+accepted D7 native data, and verifies all 1182 subordinate and 758 earlier TICON
+LAT/HAT pairs and the 330 D4 chart references against their retained caches.
+Original subordinate authentication receipts preserve the historical wrapper
+binding; no old computation is replayed or authenticated against a different
+wrapper. The existing cached producer adds the 760 new TICON pairs. It runs
+offline, without private scratch paths, extrema calculations or source acquisition.
+D5 labels, D7 current bins, numeric values and default selections remain intact.
+These are labelled approximate fallbacks with normal datum acceptance false;
+the TICON uncertainty remains unestablished. Building this candidate does not
+publish a public release or establish new scientific accuracy.
+
+The profile also designates LAT as a nonofficial chart-reference stand-in for the
+exact 658 committed source-bound sets in `convention-unverified-sets.json`. Their
+LAT basis carries `convention_unverified` and the readable qualification
+"convention unverified". No agency convention, datum equivalence or vertical tie
+is asserted. The recipe verifies that only those chart pointers and qualification
+fields change from the accepted integration result; all numbers, sources,
+defaults and earlier computed cohorts remain unchanged.
 
 ## XTide and OpenCPN data files
 

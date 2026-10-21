@@ -236,19 +236,23 @@ def apply_official_datum_fallbacks(release: dict, path: Path, sha256: str) -> di
     return _publish_official_datum_stage(release, staged)
 
 
-def apply_ticon_harmonic_mean_fallbacks(release: dict, path: Path, sha256: str) -> dict:
+def apply_ticon_harmonic_mean_fallbacks(release: dict, path: Path, sha256: str, *,
+                                      convention_unverified_set_ids: frozenset[str] = frozenset()) -> dict:
     """Attach relative levels, including labelled nonofficial LAT chart fallbacks."""
     from otc_pipeline.datums import derive_chart_datums
 
     staged = stage_official_datums(release, path, sha256)
     if any(row["source"] != "ticon-4" or row["datum"].get("zero") != "harmonic_mean" for row in staged["drafts"]):
         raise ValueError("harmonic_mean publication requires retained TICON drafts only")
+    staged_ids = frozenset(row["set_id"] for row in staged["drafts"])
+    if not convention_unverified_set_ids <= staged_ids:
+        raise ValueError("convention-unverified IDs must be a subset of authenticated staged TICON sets")
     native = {cs["set_id"]: cs for station in release["stations"] for cs in station.get("constant_sets", [])}
     for row in staged["drafts"]:
         native[row["set_id"]]["datum"] = copy.deepcopy(row["datum"])
     preview = copy.deepcopy(release)
-    staged_ids = frozenset(row["set_id"] for row in staged["drafts"])
-    derive_chart_datums(preview, ticon_approximate_set_ids=staged_ids)
+    derive_chart_datums(preview, ticon_approximate_set_ids=staged_ids,
+                        ticon_convention_unverified_set_ids=convention_unverified_set_ids)
     designated = {cs["set_id"]: cs.get("datum", {})
                   for station in preview["stations"] for cs in station.get("constant_sets", [])
                   if cs["set_id"] in staged_ids}
@@ -648,7 +652,20 @@ def cached_harmonic_mean_main(argv: list[str]) -> int:
         parser.add_argument(f"--{name}", type=Path, required=True)
     for name in ("native-sha256", "native-meta-sha256", "harmonic-mean-drafts-sha256"):
         parser.add_argument(f"--{name}", required=True)
+    parser.add_argument("--convention-unverified-sets", type=Path)
+    parser.add_argument("--convention-unverified-sets-sha256")
     args = parser.parse_args(argv)
+    if bool(args.convention_unverified_sets) != bool(args.convention_unverified_sets_sha256):
+        parser.error("convention-unverified sets and SHA-256 must be supplied together")
+    convention_unverified_ids = frozenset()
+    if args.convention_unverified_sets:
+        if _sha256(args.convention_unverified_sets) != args.convention_unverified_sets_sha256:
+            raise ValueError("convention-unverified sets SHA-256 mismatch")
+        ids = json.loads(args.convention_unverified_sets.read_text())
+        if (not isinstance(ids, list) or not ids or any(not isinstance(value, str) or not value for value in ids)
+                or len(ids) != len(set(ids))):
+            raise ValueError("convention-unverified sets must be a nonempty list of unique set IDs")
+        convention_unverified_ids = frozenset(ids)
     if args.out.exists() and any(args.out.iterdir()):
         raise ValueError("cached harmonic_mean output must be empty")
     meta_path = args.native.with_suffix(".meta.json")
@@ -657,7 +674,9 @@ def cached_harmonic_mean_main(argv: list[str]) -> int:
     release = json.loads(meta_path.read_text())
     with args.native.open() as source:
         release["stations"] = [json.loads(line) for line in source]
-    staged = apply_ticon_harmonic_mean_fallbacks(release, args.harmonic_mean_drafts, args.harmonic_mean_drafts_sha256)
+    staged = apply_ticon_harmonic_mean_fallbacks(
+        release, args.harmonic_mean_drafts, args.harmonic_mean_drafts_sha256,
+        convention_unverified_set_ids=convention_unverified_ids)
     if _sha256(args.native) != args.native_sha256 or _sha256(meta_path) != args.native_meta_sha256:
         raise ValueError("cached native release changed during staging")
     files = write_release(release, args.out, datestamp=release["release"]["datestamp"], app_export=None,

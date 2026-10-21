@@ -116,7 +116,8 @@ def _chart_conventions() -> tuple[dict, str]:
 
 
 def derive_chart_datums(release: dict, *, include_computed_approximate: bool = True,
-                        ticon_approximate_set_ids: frozenset[str] = frozenset()) -> dict:
+                        ticon_approximate_set_ids: frozenset[str] = frozenset(),
+                        ticon_convention_unverified_set_ids: frozenset[str] = frozenset()) -> dict:
     """Designate existing levels, with explicit labels for approximate stand-ins.
 
     Adds missing chart_datum pointers and appends stand-in findings where applicable.
@@ -154,7 +155,8 @@ def derive_chart_datums(release: dict, *, include_computed_approximate: bool = T
                         and isinstance(fallback.get("otc_finding"), str) and fallback["otc_finding"].strip()
                         and own_records and all(isinstance(r.get("published_set_ids"), list)
                                                 and cs["set_id"] in r["published_set_ids"] for r in own_records)
-                        and country_rows and all(r["LAT_evidence_status"] == "not_LAT" for r in country_rows)):
+                        and (cs["set_id"] in ticon_convention_unverified_set_ids
+                             or country_rows and all(r["LAT_evidence_status"] == "not_LAT" for r in country_rows))):
                     computed_approximate_sets.add(cs["set_id"])
             if cs.get("source") != "gesla-fit":
                 continue
@@ -257,9 +259,11 @@ def derive_chart_datums(release: dict, *, include_computed_approximate: bool = T
             if datum.get("chart_datum") is not None:
                 continue
             observed_approximate = cs["set_id"] in approximate_keys
+            unverified_ticon = (cs.get("source") == "ticon-4" and cs["set_id"] in ticon_approximate_set_ids
+                                and cs["set_id"] in ticon_convention_unverified_set_ids)
             computed_approximate = (include_computed_approximate and key == "lat"
                                     and cs["set_id"] in computed_approximate_sets
-                                    and not convention and not excluded)
+                                    and (unverified_ticon or not convention and not excluded))
             approximate = observed_approximate or computed_approximate
             kind = "observed" if key == "mllw" or observed_approximate else "computed"
             value = datum["named"][key]
@@ -268,7 +272,7 @@ def derive_chart_datums(release: dict, *, include_computed_approximate: bool = T
                 reason = f"not_finite_{kind}_{key}"
             elif published_chart:
                 reason = "published_chart_datum"
-            elif country_conflict:
+            elif country_conflict and not (computed_approximate and unverified_ticon):
                 reason = "unknown_convention_or_area"
             elif excluded and not approximate:
                 reason = "baltic_or_bscd2000"
@@ -286,6 +290,13 @@ def derive_chart_datums(release: dict, *, include_computed_approximate: bool = T
                                if computed_approximate else
                                "agency chart-datum equivalence and vertical tie are not established")
                     fallback["otc_finding"] += f"; {label}; {finding}"
+                if computed_approximate and unverified_ticon:
+                    flags = datum["basis"][key].setdefault("flags", [])
+                    if "convention_unverified" not in flags:
+                        flags.append("convention_unverified")
+                    for field in ("basis", "otc_finding"):
+                        if "convention unverified" not in fallback[field]:
+                            fallback[field] += "; convention unverified"
                 datum["chart_datum"] = key
                 changed += 1
                 approximate_changed += 1

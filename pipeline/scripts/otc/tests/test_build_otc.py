@@ -19,6 +19,94 @@ from otc_pipeline.observed_datums import produce as observed_produce
 from otc_pipeline.release_writer import pinned_schema
 from test_datums import native_observed_chart_cases as native_observed_chart_cases
 from test_datums import native_approximate_chart_cases as native_approximate_chart_cases
+from test_datums import native_convention_unverified_inputs as native_convention_unverified_inputs
+
+
+@pytest.mark.parametrize("case", ["path_only", "hash_only", "wrong_hash", "duplicate", "empty", "non_string"])
+def test_convention_unverified_cli_rejects_invalid_scope(tmp_path, case):
+    path = tmp_path / "sets.json"
+    values = {"duplicate": ["set", "set"], "empty": [], "non_string": [7]}.get(case, ["set"])
+    path.write_text(json.dumps(values))
+    args = ["--native", str(tmp_path / "missing.jsonl"), "--harmonic-mean-drafts", str(tmp_path / "missing-drafts.jsonl"),
+            "--congen-run", str(tmp_path), "--out", str(tmp_path / "out"),
+            "--native-sha256", "unused", "--native-meta-sha256", "unused", "--harmonic-mean-drafts-sha256", "unused"]
+    if case != "hash_only":
+        args.extend(["--convention-unverified-sets", str(path)])
+    if case != "path_only":
+        args.extend(["--convention-unverified-sets-sha256",
+                     "wrong" if case == "wrong_hash" else hashlib.sha256(path.read_bytes()).hexdigest()])
+    if case in ("path_only", "hash_only"):
+        with pytest.raises(SystemExit) as error:
+            build_otc.cached_harmonic_mean_main(args)
+        assert error.value.code == 2
+    else:
+        message = "SHA-256 mismatch" if case == "wrong_hash" else "nonempty list of unique set IDs"
+        with pytest.raises(ValueError, match=message):
+            build_otc.cached_harmonic_mean_main(args)
+    assert not (tmp_path / "out").exists()
+
+
+def test_native_convention_unverified_producer(native_convention_unverified_inputs):
+    root = native_convention_unverified_inputs
+    release = json.loads((root / "native.json").read_text())
+    accepted = json.loads((root / "accepted.json").read_text())
+    path = root / "drafts.jsonl"
+    ids = frozenset(json.loads((root / "sets.json").read_text()))
+    staged = build_otc.apply_ticon_harmonic_mean_fallbacks(
+        release, path, hashlib.sha256(path.read_bytes()).hexdigest(), convention_unverified_set_ids=ids)
+    (root / "candidate.json").write_text(json.dumps(release) + "\n")
+    assert staged["accepted"] is False and staged["normal_datum_gate_accepted"] is False
+    native = {cs["set_id"]: cs for station in release["stations"] for cs in station["constant_sets"]}
+    for row in staged["drafts"]:
+        assert row["datum"] == native[row["set_id"]]["datum"]
+    restored = copy.deepcopy(release)
+    original = {cs["set_id"]: cs for station in accepted["stations"] for cs in station["constant_sets"]}
+    for station in restored["stations"]:
+        for cs in station["constant_sets"]:
+            if cs["set_id"] not in ids:
+                continue
+            datum = cs["datum"]
+            print(f"GREEN {cs['set_id']}: chart={datum.get('chart_datum')}; LAT={datum['named']['lat']}")
+            assert datum["chart_datum"] == "lat"
+            basis = datum["basis"]["lat"]
+            assert "convention_unverified" in basis["flags"]
+            assert "convention unverified" in basis["fallback"]["basis"]
+            assert "convention unverified" in basis["fallback"]["otc_finding"]
+            assert datum["named"] == original[cs["set_id"]]["datum"]["named"]
+            datum.pop("chart_datum")
+            datum["basis"]["lat"] = original[cs["set_id"]]["datum"]["basis"]["lat"]
+    assert restored == accepted
+    untouched = json.loads((root / "native.json").read_text())
+    with pytest.raises(ValueError, match="authenticated staged TICON"):
+        build_otc.apply_ticon_harmonic_mean_fallbacks(
+            untouched, path, hashlib.sha256(path.read_bytes()).hexdigest(), convention_unverified_set_ids=ids | {"foreign-set"})
+    assert untouched == json.loads((root / "native.json").read_text())
+
+
+def test_native_convention_unverified_full_profile():
+    profile = Path(__file__).resolve().parents[3] / "data/otc/computed_datums/ticon-760-20261011"
+    path = profile / "drafts.jsonl"
+    drafts = [json.loads(line) for line in path.read_text().splitlines()]
+    station_ids = {row["station_id"] for row in drafts}
+    ids = frozenset(json.loads((profile / "convention-unverified-sets.json").read_text()))
+    assert len(ids) == 658 and len(drafts) == 760
+    release = json.loads((profile / "baseline/OTC_20261011.meta.json").read_text())
+    with (profile / "baseline/OTC_20261011.jsonl").open() as source:
+        release["stations"] = [row for line in source if (row := json.loads(line))["station_id"] in station_ids]
+    staged = build_otc.apply_ticon_harmonic_mean_fallbacks(
+        release, path, hashlib.sha256(path.read_bytes()).hexdigest(), convention_unverified_set_ids=ids)
+    native = {cs["set_id"]: cs for station in release["stations"] for cs in station["constant_sets"]}
+    qualified = {key for key, cs in native.items()
+                 if "convention_unverified" in cs.get("datum", {}).get("basis", {}).get("lat", {}).get("flags", [])}
+    assert qualified == ids
+    for row in drafts:
+        datum = native[row["set_id"]]["datum"]
+        assert datum["named"] == row["draft_datum"]["named"]
+        if row["set_id"] in ids:
+            assert datum["chart_datum"] == "lat"
+            assert "uncertainty_m" not in datum["basis"]["lat"]
+    assert staged["staged_set_count"] == 760 and staged["normal_datum_gate_accepted"] is False
+    print("GREEN exact 658 qualified sets; all 760 cached LAT/HAT pairs unchanged")
 
 
 @pytest.mark.skipif("OTC_D4_CHART_PROOF" not in os.environ, reason="actual source-bound D4 chart witnesses")
