@@ -1862,16 +1862,17 @@ def test_native_cached_subordinate_cli():
 
 @pytest.mark.skipif("OTC_SUBORDINATE_RESIDUAL_PILOT" not in os.environ,
                     reason="explicit real three-cell subordinate drafts and dual-table native release")
-def test_native_cached_subordinate_fes_cli():
+def test_native_cached_subordinate_fes_cli(tmp_path):
     root = Path(os.environ["OTC_SUBORDINATE_RESIDUAL_PILOT"])
     command = json.loads((root / "interface-red-writer-command.json").read_text())
     command[0] = sys.executable
     assert command[1:4] == ["-m", "otc_pipeline.build_otc", "--cached-subordinate"]
     assert "--fes-congen-run" in command
     source = Path(command[command.index("--native") + 1])
-    output = Path(command[command.index("--out") + 1])
+    output = tmp_path / "candidate"
+    command[command.index("--out") + 1] = str(output)
     completed = subprocess.run(command, text=True, capture_output=True)
-    (root / "green-writer.log").write_text(completed.stdout + completed.stderr)
+    (tmp_path / "writer.log").write_text(completed.stdout + completed.stderr)
     assert completed.returncode == 0, completed.stderr
     print(completed.stdout)
     original_meta = json.loads(source.with_suffix(".meta.json").read_text())
