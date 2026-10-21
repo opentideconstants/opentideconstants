@@ -1858,3 +1858,39 @@ def test_native_cached_subordinate_cli():
             assert restored["subordinate_offsets"]["datum"]["basis"]["lat"]["fallback"]["reason"] == "datum_gate_failed"
             restored["subordinate_offsets"].pop("datum")
         assert restored == before
+
+
+@pytest.mark.skipif("OTC_SUBORDINATE_RESIDUAL_PILOT" not in os.environ,
+                    reason="explicit real three-cell subordinate drafts and dual-table native release")
+def test_native_cached_subordinate_fes_cli(tmp_path):
+    root = Path(os.environ["OTC_SUBORDINATE_RESIDUAL_PILOT"])
+    command = json.loads((root / "interface-red-writer-command.json").read_text())
+    command[0] = sys.executable
+    assert command[1:4] == ["-m", "otc_pipeline.build_otc", "--cached-subordinate"]
+    assert "--fes-congen-run" in command
+    source = Path(command[command.index("--native") + 1])
+    output = tmp_path / "candidate"
+    command[command.index("--out") + 1] = str(output)
+    completed = subprocess.run(command, text=True, capture_output=True)
+    (tmp_path / "writer.log").write_text(completed.stdout + completed.stderr)
+    assert completed.returncode == 0, completed.stderr
+    print(completed.stdout)
+    original_meta = json.loads(source.with_suffix(".meta.json").read_text())
+    actual_meta = json.loads((output / source.with_suffix(".meta.json").name).read_text())
+    assert actual_meta["astro_tables"] == original_meta["astro_tables"]
+    assert {table["astro_table_id"] for table in actual_meta["astro_tables"]} == {
+        "otc-tcd-20251228-ma2mb2", "otc-tcd-20251228-ma2mb2-fes34"}
+    wanted = {"OTC-a333d6b4", "OTC-e09cdff7", "OTC-b70da835"}
+    seen = set()
+    with (output / source.name).open() as rows:
+        for line in rows:
+            station = json.loads(line)
+            if station["station_id"] not in wanted:
+                continue
+            seen.add(station["station_id"])
+            for level in ("lat", "hat"):
+                basis = station["subordinate_offsets"]["datum"]["basis"][level]
+                assert basis["method"] == "subordinate_offsets"
+                assert basis["fallback"]["reason"] == "datum_gate_failed"
+                assert basis["uncertainty_basis"] == "calibrated"
+    assert seen == wanted
