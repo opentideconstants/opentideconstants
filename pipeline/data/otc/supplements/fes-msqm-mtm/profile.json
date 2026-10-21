@@ -1,0 +1,12 @@
+{
+  "purpose": "Materialize retained FES2022b MSQM and MTM coefficients without resampling grids or changing quality decisions",
+  "native_sha256": "4f47050c9a67131605f1705fb3324bed7e56467f8779c20cb756f0255c52efa5",
+  "native_meta_sha256": "616100f70b7b15552f7a9980bec07116da8b6bfc72dd6eaf86caadd61b2bd35b",
+  "fes_extraction_sha256": "6f7301cdf4eb13947294670961b0e3a864390b0b364b31704c1c684d5e9b62d5",
+  "ocean_manifest_sha256": "6fe6a5233b4375065daea5a72ce134e91be4f072cd629533ef8ff89bab8ecadb",
+  "original_tcd_sha256": "ab8fa42c6dfce040924b3b035c1a87bef1cc4f10ed17449ae3ea16d0c76516a9",
+  "extended_tcd_sha256": "7a88037bf941ab6d880cccd0565047a635d67a64dd05238a93c0a571a41995ac",
+  "definitions_source": "https://github.com/CNES/aviso-fes/blob/89b902892a790d07aa566c4fba39c753ef876371/src/library/darwin/wave.cpp#L51-L57",
+  "nodal_factor_source": "https://github.com/CNES/aviso-fes/blob/89b902892a790d07aa566c4fba39c753ef876371/include/fes/angle/astronomic.hpp#L204-L210",
+  "accuracy_accepted": false
+}

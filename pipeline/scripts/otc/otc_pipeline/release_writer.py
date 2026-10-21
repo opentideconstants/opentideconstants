@@ -30,12 +30,14 @@ import os
 import re
 import secrets
 import sys
+from collections.abc import Mapping
 from datetime import date
 from pathlib import Path
 
 from jsonschema import Draft202012Validator, ValidationError, validators
 
-from otc_pipeline.astro_tables import CongenRun, astro_table_errors, release_table_errors
+from otc_pipeline.astro_tables import (FES_GENERATOR, FES_TABLE_ID, FES_TCD_SHA256,
+                                      CongenRun, astro_table_errors, release_table_errors)
 
 __all__ = ["BuiltRelease", "CSV_COLUMNS", "FORMAT_VERSION", "SCHEMA_SHA256", "SchemaPinError", "check_release_dir",
            "next_datestamp", "pinned_schema", "validate_release", "write_release"]
@@ -292,6 +294,15 @@ def _dicts(value) -> list[dict]:
 def _source_record_errors(st: dict, where: str, own_sets: dict, licences: dict,
                           source_owners: dict, release: dict, errors: list[str]) -> None:
     """Original source references and row annotations; never convert them to predictions."""
+    fes_convention = next((row for row in _dicts(release.get("conventions"))
+                           if row.get("convention_id") == "fes2022b-ocean-greenwich"
+                           and row.get("astro_table_id") == FES_TABLE_ID
+                           and row.get("constituent_table_version") == "fes2022b-supported"), None)
+    fes_table = next((row for row in _dicts(release.get("astro_tables"))
+                      if row.get("astro_table_id") == FES_TABLE_ID
+                      and row.get("tables_sha256") == FES_TCD_SHA256
+                      and row.get("generator") == FES_GENERATOR), None)
+    fes_terms = {"MSQM", "MTM"} if fes_convention is not None and fes_table is not None else set()
     for ri, record in enumerate(_dicts(st.get("source_records"))):
         source, version, record_id = (record.get(key) for key in ("source", "source_version", "source_record_id"))
         if not isinstance(source, str) or not isinstance(version, str) or not isinstance(record_id, str):
@@ -326,18 +337,23 @@ def _source_record_errors(st: dict, where: str, own_sets: dict, licences: dict,
             continue
         if licence is None:
             errors.append(f"{sw}: original harmonics require resolved applicable terms")
-        predictive = [c for cs in own_sets.values() for c in _dicts(cs.get("constituents"))]
-        predictive += [c for cs in own_sets.values() for b in _dicts(cs.get("current_bins"))
+        predictive = [(cs, c) for cs in own_sets.values() for c in _dicts(cs.get("constituents"))]
+        predictive += [(cs, c) for cs in own_sets.values() for b in _dicts(cs.get("current_bins"))
                        for c in _dicts(b.get("constituents"))]
         if any(isinstance(name, str) and name in _UNSUPPORTED_TICON_NAMES
-               for c in predictive for name in (c.get("name"), c.get("source_name"))):
+               and not (name in fes_terms and cs.get("source") == "fes2022"
+                        and cs.get("source_version") == "FES2022b"
+                        and cs.get("convention_id") == "fes2022b-ocean-greenwich")
+               for cs, c in predictive for name in (c.get("name"), c.get("source_name"))):
             errors.append(f"{sw}: unsupported original rows must not become predictive constituents")
         if any(isinstance(c.get("name"), str) and c["name"] in _UNSUPPORTED_TICON_NAMES
+               and not (c["name"] in fes_terms and c.get("constituent_table_version") == "fes2022b-supported")
                for c in _dicts(release.get("constituents"))):
             errors.append(f"{sw}: unsupported original rows must not create constituent definitions")
         for table in _dicts(release.get("astro_tables")):
             constituents = table.get("constituents")
-            if isinstance(constituents, dict) and _UNSUPPORTED_TICON_NAMES.intersection(constituents):
+            blocked = _UNSUPPORTED_TICON_NAMES - (fes_terms if table is fes_table else set())
+            if isinstance(constituents, dict) and blocked.intersection(constituents):
                 errors.append(f"{sw}: unsupported original rows must not create astro definitions")
         rows = raw.get("rows")
         if not isinstance(rows, list) or not all(isinstance(row, list) and len(row) == 18 and
@@ -824,7 +840,7 @@ class BuiltRelease(dict):
 
 
 def write_release(release: dict, out_dir: Path, *, datestamp: str,
-                  app_export: list[dict] | None, congen_run: CongenRun | None, parquet: bool = False,
+                  app_export: list[dict] | None, congen_run: CongenRun | Mapping[str, CongenRun] | None, parquet: bool = False,
                   jsonl_gz: bool = False) -> list[Path]:
     """Writes OTC_{D}.json, .json.gz, .jsonl, .meta.json, .csv (RFC 4180, UTF-8, LF, record_type column),
     optional .parquet, optional .app.json, then OTC_{D}.sha256 last. Refuses if validate_release is non-empty.
@@ -850,9 +866,18 @@ def write_release(release: dict, out_dir: Path, *, datestamp: str,
         raise ValueError("this release was made by a release build: write it with congen_run (its congen run), "
                          "so its astro tables are checked again; congen_run=None is only for other documents")
     if congen_run is not None:
-        if not isinstance(congen_run, CongenRun):
+        tables = release.get("astro_tables", [])
+        if isinstance(congen_run, Mapping):
+            if set(congen_run) != {table["astro_table_id"] for table in tables}:
+                raise ValueError("unbound astronomy table or unused congen run")
+            if not all(isinstance(run, CongenRun) for run in congen_run.values()):
+                raise ValueError("every table requires astro_tables.load_congen_run's CongenRun")
+            runs = congen_run
+        elif isinstance(congen_run, CongenRun):
+            runs = {table["astro_table_id"]: congen_run for table in tables}
+        else:
             raise ValueError(f"congen_run must be astro_tables.load_congen_run's CongenRun, not {type(congen_run).__name__}")
-        bad_tables = [e for t in release.get("astro_tables", []) for e in release_table_errors(t, *congen_run)]
+        bad_tables = [e for table in tables for e in release_table_errors(table, *runs[table["astro_table_id"]])]
         if bad_tables:
             raise ValueError(f"the astro tables are not the congen run's ({len(bad_tables)} errors): "
                              + "; ".join(bad_tables[:10]))

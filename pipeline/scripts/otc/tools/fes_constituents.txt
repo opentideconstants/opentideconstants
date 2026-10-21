@@ -1,0 +1,8 @@
+# Optional FES2022b constituents, appended after the unchanged OTC definitions.
+# CNES/aviso-fes 89b902892a790d07aa566c4fba39c753ef876371,
+# src/library/darwin/wave.cpp: MTM V=3s-p; MSQM V=4s-2h; both u=-2xi, f=f_Mf.
+# include/fes/angle/astronomic.hpp: f_Mf=sin(I)^2/0.1578 (Schureman formula 74).
+# MTM is defined directly; it is not an alias for congen's A7.
+# name  Basic   T  s  h  p  p1 c    xi  nu  nu' 2nu'' Q  R   f_formula
+MTM     Basic   0  3  0 -1  0  0    -2   0   0   0    0  0   74
+MSQM    Basic   0  4 -2  0  0  0    -2   0   0   0    0  0   74

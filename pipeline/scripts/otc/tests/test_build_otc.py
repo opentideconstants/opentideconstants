@@ -8,6 +8,7 @@ import subprocess
 from pathlib import Path
 from statistics import stdev
 import sys
+from types import SimpleNamespace
 
 import pytest
 from jsonschema import Draft202012Validator
@@ -20,6 +21,7 @@ from otc_pipeline.release_writer import pinned_schema
 from test_datums import native_observed_chart_cases as native_observed_chart_cases
 from test_datums import native_approximate_chart_cases as native_approximate_chart_cases
 from test_datums import native_convention_unverified_inputs as native_convention_unverified_inputs
+from test_fes2022 import retained_fes_astro as retained_fes_astro
 
 
 @pytest.mark.parametrize("case", ["path_only", "hash_only", "wrong_hash", "duplicate", "empty", "non_string"])
@@ -801,6 +803,102 @@ def test_fes_cli_rejects_changed_manifest_before_build(tmp_path):
     with pytest.raises(ValueError, match="FES manifest SHA-256 mismatch"):
         build_otc.main([*observed_cli_arguments(), "--fes-cache", str(tmp_path),
                         "--fes-manifest-sha256", "0" * 64])
+
+
+@pytest.mark.parametrize("missing", ["run", "cache"])
+def test_fes_normal_cli_requires_separate_authenticated_run(tmp_path, missing):
+    manifest = tmp_path / build_otc.fes2022.OCEAN_MANIFEST_NAME
+    manifest.write_text("{}\n")
+    arguments = (["--fes-cache", str(tmp_path), "--fes-manifest-sha256", build_otc._sha256(manifest)]
+                 if missing == "run" else ["--fes-congen-run", str(tmp_path)])
+    with pytest.raises(ValueError, match="--fes-cache requires --fes-congen-run"):
+        build_otc.main([*observed_cli_arguments(), *arguments])
+
+
+def test_fes_normal_entrypoint_retains_actual_extra_terms(retained_fes_astro, monkeypatch, tmp_path):
+    """Run normal main through its real FES attachment and writer with retained source inputs."""
+    from otc_pipeline.adapter import FetchResult
+    from otc_pipeline.release_writer import write_release
+
+    release, extraction, primary, extended = retained_fes_astro
+    for station in release["stations"]:
+        station["constant_sets"] = [cs for cs in station["constant_sets"] if cs["source"] != "fes2022"]
+        station["source_records"] = [row for row in station["source_records"] if row["source"] != "fes2022"]
+    release["conventions"] = [row for row in release["conventions"] if row["convention_id"] != "fes2022b-ocean-greenwich"]
+    release["constituents"] = [row for row in release["constituents"] if row["constituent_table_version"] != "fes2022b-supported"]
+    root = Path(os.environ["OTC_FES_ASTRO_PROOF"])
+    original = Path(os.environ["OTC_CONGEN_RUN"])
+    tcd = original / "tcd-1900-2100.json"
+    parts = SimpleNamespace(release=release, congen_run=primary,
+                            provenance={"tcd": {"sha256": build_otc._sha256(tcd)}},
+                            report=SimpleNamespace(summary=lambda: "retained three-station source slice"))
+
+    def retained_parts(**kwargs):
+        assert not {"MSQM", "MTM"}.intersection(kwargs["extra_names"])
+        return parts
+
+    # No grid sampling/refitting: upstream stages supply their accepted retained outputs.
+    monkeypatch.setattr(build_otc.gb, "head_commit", lambda: "67a59b0f8987f1b483a298ade9e9295cd346744b")
+    monkeypatch.setattr(build_otc.gb, "build_parts", retained_parts)
+    monkeypatch.setattr(build_otc.combine, "load_agency", lambda *args, **kwargs: {})
+    monkeypatch.setattr(build_otc, "gesla_comparators", lambda parts: [])
+    monkeypatch.setattr(build_otc, "run_canaries", lambda *args, **kwargs: ({}, {}))
+    monkeypatch.setattr(build_otc.combine, "merge", lambda *args, **kwargs:
+                        (release, SimpleNamespace(sources={}, canaries=None)))
+    monkeypatch.setattr(build_otc.sm, "load", lambda: SimpleNamespace(record_ids=lambda: {}))
+    fetched = FetchResult("fes2022", "FES2022b", tmp_path, (), extraction["items"])
+    monkeypatch.setattr(build_otc.fes2022.Fes2022Adapter, "fetch", lambda self, path: fetched)
+    attached_before = {}
+    attach = build_otc.fes2022.attach
+
+    def capture_attachment(*args, **kwargs):
+        report = attach(*args, **kwargs)
+        attached_before.update(copy.deepcopy(args[0]))
+        return report
+
+    monkeypatch.setattr(build_otc.fes2022, "attach", capture_attachment)
+    manifest = tmp_path / build_otc.fes2022.OCEAN_MANIFEST_NAME
+    # Bind the retained manifest bytes; no grid member is opened in this bounded repro.
+    manifest.write_bytes((root / build_otc.fes2022.OCEAN_MANIFEST_NAME).read_bytes())
+
+    class Written(Exception):
+        pass
+
+    def capture_writer(candidate, out, **kwargs):
+        assert set(kwargs["congen_run"]) == {build_otc.TABLE_ID, build_otc.FES_TABLE_ID}
+        assert kwargs["congen_run"][build_otc.TABLE_ID] is primary
+        assert kwargs["congen_run"][build_otc.FES_TABLE_ID].tcd.tcd_sha256 == extended.tcd.tcd_sha256
+        assert candidate["astro_tables"][0] == attached_before["astro_tables"][0]
+        for station in candidate["stations"]:
+            cs = next(cs for cs in station["constant_sets"] if cs["source"] == "fes2022")
+            names = {row["name"] for row in cs["constituents"]}
+            print(f"NORMAL {station['station_id']}: {len(names)} terms; MSQM={'MSQM' in names}; MTM={'MTM' in names}")
+        for station in candidate["stations"]:
+            cs = next(cs for cs in station["constant_sets"] if cs["source"] == "fes2022")
+            raw = {row["native_name"].upper(): row for row in extraction["items"][station["station_id"]]["native"]}
+            added = [row for row in cs["constituents"] if row["name"] in {"MSQM", "MTM"}]
+            assert len(added) == 2
+            for row in added:
+                assert (row["amplitude_m"], row["phase_deg"]) == (raw[row["name"]]["amplitude_m"], raw[row["name"]]["phase_deg"])
+            prior = next(row for row in attached_before["stations"] if row["station_id"] == station["station_id"])
+            restored = copy.deepcopy(station)
+            restored_set = next(row for row in restored["constant_sets"] if row["source"] == "fes2022")
+            prior_set = next(row for row in prior["constant_sets"] if row["source"] == "fes2022")
+            restored_set["constituents"] = [row for row in restored_set["constituents"] if row["name"] not in {"MSQM", "MTM"}]
+            restored_set["dropped_constituents"] = prior_set["dropped_constituents"]
+            assert restored == prior  # Includes canary labels, recommendations, defaults and source records.
+        write_release(candidate, out, **kwargs)
+        raise Written
+
+    monkeypatch.setattr(build_otc, "write_release", capture_writer)
+    arguments = observed_cli_arguments()
+    for name, value in {"congen-run": str(original), "out": str(tmp_path / "out"),
+                        "datestamp": release["release"]["datestamp"], "created": release["release"]["created"]}.items():
+        arguments[arguments.index(f"--{name}") + 1] = value
+    with pytest.raises(Written):
+        build_otc.main([*arguments, "--tcd", str(tcd), "--fes-cache", str(tmp_path),
+                        "--fes-manifest-sha256", build_otc._sha256(manifest),
+                        "--fes-congen-run", str(root / "astro-fes")])
 
 
 @pytest.mark.parametrize("missing", ["drafts", "drafts-sha256", "source-release", "source-release-sha256"])

@@ -31,6 +31,11 @@ Y0, Y1 = 2020, 2022
 REAL_SPEEDS = {"M2": 28.9841042, "K1": 15.0410686, "SA": 0.0410686, "M4": 57.9682084}
 
 
+def test_fes_extra_tables_refuse_unpinned_run(tmp_path):
+    with pytest.raises(AstroTableMismatch, match="pinned extended TCD"):
+        load_congen_run(tmp_path, fes=True, tcd_sha256="e" * 64)
+
+
 def dump(sha, edit=None, speeds=SPEEDS):
     """A 2020-2022 dump; edit maps (name, key, year index) -> value."""
     cons = {n: {"speed": s, "v0u": [359.996, 10.0, 20.25], "f": [1.0, 0.9779, 1.1]} for n, s in speeds.items()}

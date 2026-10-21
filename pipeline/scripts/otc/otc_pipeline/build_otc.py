@@ -42,7 +42,7 @@ from otc_pipeline import noaa_historical
 from otc_pipeline.adapters import fes2022
 from otc_pipeline.constituent_speeds import TableSpeeds
 from otc_pipeline.chs_identities import load_chs_identities
-from otc_pipeline.astro_tables import TABLE_ID
+from otc_pipeline.astro_tables import FES_TABLE_ID, TABLE_ID, load_congen_run
 from otc_pipeline.canary import CANARY_CONSTITUENTS, canary
 from otc_pipeline.release_writer import validate_release, write_release
 
@@ -688,12 +688,49 @@ def cached_harmonic_mean_main(argv: list[str]) -> int:
     return 0
 
 
+def cached_fes_astronomy_main(argv: list[str]) -> int:
+    """Add checked FES astronomy to already retained native coefficients; never resample grids."""
+    from otc_pipeline.astro_tables import FES_TABLE_ID, TABLE_ID, load_congen_run
+
+    parser = argparse.ArgumentParser(prog="otc_pipeline.build_otc --cached-fes-astronomy", allow_abbrev=False)
+    for name in ("native", "fes-extraction", "congen-run", "fes-congen-run", "out"):
+        parser.add_argument(f"--{name}", type=Path, required=True)
+    for name in ("native-sha256", "native-meta-sha256", "fes-extraction-sha256"):
+        parser.add_argument(f"--{name}", required=True)
+    args = parser.parse_args(argv)
+    if args.out.exists() and any(args.out.iterdir()):
+        raise ValueError("cached FES output must be empty")
+    metadata = args.native.with_suffix(".meta.json")
+    inputs = ((args.native, args.native_sha256), (metadata, args.native_meta_sha256),
+              (args.fes_extraction, args.fes_extraction_sha256))
+    if any(_sha256(path) != expected for path, expected in inputs):
+        raise ValueError("cached FES input SHA-256 mismatch")
+    primary = load_congen_run(args.congen_run)
+    extended = load_congen_run(args.fes_congen_run, fes=True)
+    release = json.loads(metadata.read_text())
+    with args.native.open() as source:
+        release["stations"] = [json.loads(line) for line in source]
+    extraction = json.loads(args.fes_extraction.read_text())
+    report = fes2022.extend_cached_astronomy(release, extraction, primary=primary, extended=extended)
+    if any(_sha256(path) != expected for path, expected in inputs):
+        raise ValueError("cached FES input changed during staging")
+    files = write_release(release, args.out, datestamp=release["release"]["datestamp"], app_export=None,
+                          congen_run={TABLE_ID: primary, FES_TABLE_ID: extended})
+    report["files"] = [str(path) for path in files]
+    report["accuracy_accepted"] = False
+    (args.out / "FES_ASTRONOMY_STAGE.json").write_text(json.dumps(report, sort_keys=True) + "\n")
+    print(json.dumps(report, sort_keys=True))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else list(argv)
     if argv and argv[0] == "--cached-subordinate":
         return cached_subordinate_main(argv[1:])
     if argv and argv[0] == "--cached-harmonic-mean":
         return cached_harmonic_mean_main(argv[1:])
+    if argv and argv[0] == "--cached-fes-astronomy":
+        return cached_fes_astronomy_main(argv[1:])
     ap = argparse.ArgumentParser(prog="otc_pipeline.build_otc", description=(__doc__ or "").split("\n")[0],
                                  allow_abbrev=False)
     for name in ("fit-run", "audit-dir", "verdicts-dir", "calibration", "ticon-csv", "ticon-refs", "congen-run",
@@ -719,6 +756,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--noaa-historical-comparison-sha256")
     ap.add_argument("--fes-cache", type=Path, help="private, complete FES2022b ocean input cache")
     ap.add_argument("--fes-manifest-sha256", help=f"SHA-256 of that cache's {fes2022.OCEAN_MANIFEST_NAME}")
+    ap.add_argument("--fes-congen-run", type=Path,
+                    help="authenticated extended FES astronomy run (required with --fes-cache)")
     ap.add_argument("--official-datum-drafts", type=Path,
                     help="stage pinned official computed drafts in DATUM_STAGE.json; release values stay unchanged")
     ap.add_argument("--official-datum-drafts-sha256")
@@ -739,6 +778,9 @@ def main(argv: list[str] | None = None) -> int:
         raise ValueError("--fes-cache and --fes-manifest-sha256 must be supplied together")
     if a.fes_cache is not None and _sha256(a.fes_cache / fes2022.OCEAN_MANIFEST_NAME) != a.fes_manifest_sha256:
         raise ValueError("FES manifest SHA-256 mismatch")
+    if (a.fes_cache is None) != (a.fes_congen_run is None):
+        raise ValueError("--fes-cache requires --fes-congen-run, and the FES run requires --fes-cache")
+    fes_run = load_congen_run(a.fes_congen_run, fes=True) if a.fes_congen_run is not None else None
     observed_inputs = (a.observed_datum_drafts, a.observed_datum_drafts_sha256,
                        a.observed_datum_source_release, a.observed_datum_source_release_sha256)
     if any(value is not None for value in observed_inputs) and any(value is None for value in observed_inputs):
@@ -872,6 +914,13 @@ def main(argv: list[str] | None = None) -> int:
         model_canary = canary("fes2022", cohort, comparators)
         model_report = fes2022.attach(release, model_fetched, build_commit=commit, table_id=TABLE_ID,
                                      canary_result=model_canary, adapter=model_adapter)
+        # Keep the original extraction/cache and canary inputs; only these two retained
+        # coefficients use the separately authenticated table after primary assembly.
+        model_report["astronomy_extension"] = fes2022.extend_cached_astronomy(release,
+            {"algorithm": fes2022.ALGORITHM_VERSION, "manifest_sha256": a.fes_manifest_sha256,
+             "items": model_fetched.items}, primary=parts.congen_run, extended=fes_run)
+        model_report["astronomy_extension"]["congen_run"] = str(a.fes_congen_run.resolve())
+        model_report["astronomy_extension"]["tcd_sha256"] = fes_run.tcd.tcd_sha256
         model_report["manifest_sha256"] = a.fes_manifest_sha256
         model_report["tcd_dump_sha256"] = model_adapter.speeds.dump_sha256
         model_report["excluded_station_count"] = len(release["stations"]) - len(model_adapter.stations)
@@ -888,7 +937,8 @@ def main(argv: list[str] | None = None) -> int:
     if errs or disputed:
         return 1
     a.out.mkdir(parents=True, exist_ok=True)
-    files = write_release(release, a.out, datestamp=a.datestamp, app_export=None, congen_run=parts.congen_run)
+    runs = {TABLE_ID: parts.congen_run, FES_TABLE_ID: fes_run} if fes_run is not None else parts.congen_run
+    files = write_release(release, a.out, datestamp=a.datestamp, app_export=None, congen_run=runs)
     if datum_stage is not None:
         (a.out / "DATUM_STAGE.json").write_text(json.dumps(datum_stage, allow_nan=False, sort_keys=True) + "\n")
     if observed_stage is not None:

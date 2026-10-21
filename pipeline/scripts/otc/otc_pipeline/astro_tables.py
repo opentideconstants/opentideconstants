@@ -43,6 +43,10 @@ TCD_SHA256 = "ab8fa42c6dfce040924b3b035c1a87bef1cc4f10ed17449ae3ea16d0c76516a9"
 SOURCE_TCD_SHA256 = "33f97cb73ac25a0fec273950c0b85ff55ddbe7edf4448e80ea8d5b3d59b0aeb1"
 OTC_ADDED = ("MA2", "MB2")
 OTC_DEFINITIONS = Path(__file__).resolve().parents[1] / "tools" / "otc_constituents.txt"
+FES_TABLE_ID = "otc-tcd-20251228-ma2mb2-fes34"
+FES_TCD_SHA256 = "7a88037bf941ab6d880cccd0565047a635d67a64dd05238a93c0a571a41995ac"
+FES_DEFINITIONS = OTC_DEFINITIONS.with_name("fes_constituents.txt")
+FES_ADDED = ("MTM", "MSQM")
 # The tool tarballs scripts/otc/tools/congen_tables.sh pins (the same values; a test checks they agree).
 CONGEN_SHA256 = "1dbae015e338e5780a505ebf233058f5e91628319a11bfbc465cb556cfb4b0d7"   # congen-1.7-r2.tar.xz
 LIBTCD_SHA256 = "e1dde9aafb771eab57c676a99b4b79d61c6800990a0e72782bc20057a8a2d877"   # libtcd-2.2.7-r3.tar.xz
@@ -59,6 +63,8 @@ CHECK7_SPEED_TOL = 1e-7
 CHECK7_SPEED_EPS = 1e-12
 GENERATOR = ("congen 1.7-r2 (XTide, David Flater), with OTC's MA2 and MB2 definitions, after Schureman, Manual of "
              "Harmonic Analysis and Prediction of Tides, US C&GS Special Publication 98")
+FES_GENERATOR = (GENERATOR + "; MTM and MSQM definitions from CNES/aviso-fes "
+                 "89b902892a790d07aa566c4fba39c753ef876371, src/library/darwin/wave.cpp")
 V0_MODEL = "schureman_tcd"
 # Release constituent names that the TCD (and congen) spell differently. A table row is keyed by the
 # name the release uses (the schema has no aliases in astro_tables), with the values of the TCD's row.
@@ -113,7 +119,7 @@ def _entry(prov: Mapping, key: str, run_dir: Path) -> Mapping:
     return entry
 
 
-def load_congen_run(run_dir: Path, *, tcd_sha256: str = TCD_SHA256) -> CongenRun:
+def load_congen_run(run_dir: Path, *, tcd_sha256: str | None = None, fes: bool = False) -> CongenRun:
     """The congen run of a congen_tables.sh run directory. PROVENANCE.json must name the pinned congen
     and libtcd tarballs (CONGEN_SHA256, LIBTCD_SHA256) and the congen command for FIRST_YEAR-LAST_YEAR.
     Every file (both dumps and the congen .tcd itself) is hashed on disk and checked against it; the
@@ -128,6 +134,10 @@ def load_congen_run(run_dir: Path, *, tcd_sha256: str = TCD_SHA256) -> CongenRun
     the OTC definitions (otc_definitions): the definitions file must be the committed OTC_DEFINITIONS, the congen
     input must end with it, and the fit dump must be of the same TCD with the TCD dump's values for its years."""
     run_dir = Path(run_dir)
+    if fes and tcd_sha256 not in (None, FES_TCD_SHA256):
+        raise AstroTableMismatch("the optional FES run requires its pinned extended TCD")
+    tcd_sha256 = tcd_sha256 or (FES_TCD_SHA256 if fes else TCD_SHA256)
+    definitions = OTC_DEFINITIONS.read_bytes() + (FES_DEFINITIONS.read_bytes() if fes else b"")
     try:
         prov = json.loads((run_dir / "PROVENANCE.json").read_text())
     except (OSError, json.JSONDecodeError) as e:
@@ -144,7 +154,10 @@ def load_congen_run(run_dir: Path, *, tcd_sha256: str = TCD_SHA256) -> CongenRun
         otc_file = _entry(prov, "otc_tcd", run_dir) if "otc_tcd" in prov["files"] else None
     except (KeyError, TypeError, json.JSONDecodeError) as e:
         raise AstroTableMismatch(f"{run_dir}/PROVENANCE.json: missing or malformed ({type(e).__name__}: {e})") from None
-    want_made = (SOURCE_TCD_SHA256, OTC_ADDED, _sha256(OTC_DEFINITIONS))
+    want_made = (TCD_SHA256 if fes else SOURCE_TCD_SHA256, FES_ADDED if fes else OTC_ADDED,
+                 hashlib.sha256(definitions).hexdigest())
+    if fes and otc.get("id") != FES_TABLE_ID:
+        raise AstroTableMismatch("the optional FES run has another table identity")
     if otc_made != want_made:
         raise AstroTableMismatch(f"{run_dir}: the run's OTC TCD is made from {otc_made} (source TCD, added, "
                                  f"definitions SHA-256), expected {want_made}")
@@ -175,7 +188,7 @@ def load_congen_run(run_dir: Path, *, tcd_sha256: str = TCD_SHA256) -> CongenRun
         absent = sorted(set(OTC_RUN_FILES) - set(prov["files"]))
         if absent:
             raise AstroTableMismatch(f"{run_dir}: a run with the OTC TCD must list {absent} in PROVENANCE files")
-        defs = OTC_DEFINITIONS.read_bytes()
+        defs = definitions
         if (run_dir / prov["files"]["otc_definitions"]["path"]).read_bytes() != defs:
             raise AstroTableMismatch(f"{run_dir}: the run's OTC definitions are not the committed {OTC_DEFINITIONS.name}")
         if not (run_dir / prov["files"]["congen_input"]["path"]).read_bytes().endswith(defs):
@@ -287,7 +300,8 @@ def astro_table(congen: TcdTable, tcd: TcdTable, names: Iterable[str], *, table_
                       "v0u_deg": [round(congen.v0u(c.name, y) % 360.0, 2) % 360.0 for y in years],
                       "f": [round(congen.f(c.name, y), 4) for y in years]}
     return {"astro_table_id": table_id, "v0_model": V0_MODEL, "tables_sha256": tcd.tcd_sha256,
-            "generator": GENERATOR, "first_year": first_year, "last_year": last_year, "constituents": rows}
+            "generator": FES_GENERATOR if tcd.tcd_sha256 == FES_TCD_SHA256 else GENERATOR,
+            "first_year": first_year, "last_year": last_year, "constituents": rows}
 
 
 def release_table_errors(table: Mapping, congen: TcdTable, tcd: TcdTable) -> list[str]:
@@ -301,8 +315,9 @@ def release_table_errors(table: Mapping, congen: TcdTable, tcd: TcdTable) -> lis
     if isinstance(gen, str) and gen.lstrip().upper().startswith("TEST ONLY"):
         return [f"{where}: generator {gen!r} marks a TEST ONLY table, which is never released"]
     errors = []
-    if gen != GENERATOR:
-        errors.append(f"{where}: generator {gen!r}, expected {GENERATOR!r}")
+    generator = FES_GENERATOR if tcd.tcd_sha256 == FES_TCD_SHA256 else GENERATOR
+    if gen != generator:
+        errors.append(f"{where}: generator {gen!r}, expected {generator!r}")
     if (table.get("first_year"), table.get("last_year")) != (FIRST_YEAR, LAST_YEAR):
         errors.append(f"{where}: years {table.get('first_year')}-{table.get('last_year')}, the release's tables "
                       f"cover {FIRST_YEAR}-{LAST_YEAR} (prediction spec, settled decision 2)")
