@@ -43,6 +43,52 @@ def _read(path: Path, descriptor: dict) -> bytes:
     return raw
 
 
+def append_noaa_8660754_datums(release: dict, path: Path, sha256: str, receipt_sha256: str) -> dict:
+    """Retain the acquired Carolina Forest response, without creating a predictive set.
+
+    The original inventory provenance remains historical. The later response and
+    its acquisition receipt are bound separately in existing metadata inputs.
+    """
+    path = Path(path).resolve()
+    receipt_path = Path(str(path) + '.meta.json')
+    bindings = [{'path': str(p), 'size': p.stat().st_size, 'sha256': digest}
+                for p, digest in ((path, sha256), (receipt_path, receipt_sha256))]
+    body, receipt = [json.loads(_read(Path(binding['path']), binding)) for binding in bindings]
+    endpoint = 'https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations/8660754/datums.json'
+    if (body.get('self') != endpoint or body.get('units') != 'meters'
+            or receipt.get('url') != endpoint + '?units=metric' or receipt.get('sha256') != sha256):
+        raise ValueError('NOAA 8660754 datum response and metric acquisition receipt must agree')
+    stations = [station for station in release['stations'] if station['station_id'] == 'OTC-d14a171f']
+    if len(stations) != 1:
+        raise ValueError('NOAA 8660754 requires its one existing native station')
+    station = stations[0]
+    if (station.get('aliases', {}).get('noaa') != '8660754' or station.get('constant_sets') != []
+            or station.get('recommended_set_id') is not None or station.get('subordinate_offsets')
+            or station.get('current_offsets')):
+        raise ValueError('NOAA 8660754 raw metadata requires the existing identity-only station')
+    records = [record for record in station.get('source_records', [])
+               if (record['source'], record['source_version'], record['source_record_id'])
+               == ('noaa', '20261008', '8660754')]
+    if len(records) != 1:
+        raise ValueError('NOAA 8660754 requires its one original source tuple')
+    metadata = records[0]['original_metadata']
+    rows = json.loads(metadata['raw_metadata_rows_json'])
+    inputs = json.loads(metadata['metadata_inputs_json'])
+    if not isinstance(rows, list) or not isinstance(inputs, list):
+        raise ValueError('NOAA original metadata rows and inputs must be arrays')
+    if body not in rows:
+        rows.append(body)
+    for binding in bindings:
+        if binding not in inputs:
+            inputs.append(binding)
+    # Serialize both before mutation; _json rejects non-finite original numbers.
+    raw_rows, raw_inputs = _json(rows), _json(inputs)
+    metadata.update(raw_metadata_rows_json=raw_rows, metadata_inputs_json=raw_inputs)
+    return {'station_id': station['station_id'], 'source_record_id': '8660754',
+            'response_sha256': sha256, 'receipt_sha256': receipt_sha256,
+            'prediction_capability_added': False, 'original_inventory_provenance_changed': False}
+
+
 def _licences() -> dict:
     classes = {**SOURCES, 'dmi': DmiAdapter, 'fmi': FmiAdapter, 'marine-institute': MarineInstituteAdapter,
                'rws': RwsAdapter, 'shom-refmar': ShomRefmarAdapter, 'smhi': SmhiAdapter,
