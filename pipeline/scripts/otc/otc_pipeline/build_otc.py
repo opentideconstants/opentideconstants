@@ -605,6 +605,44 @@ def apply_datum_drafts(release: dict, *, official: tuple | None = None, observed
     return official_stage, observed_stage
 
 
+def cached_noaa_original_metadata_main(argv: list[str]) -> int:
+    """Preserve the acquired NOAA 8660754 datum response in cached native metadata."""
+    from otc_pipeline.original_metadata import append_noaa_8660754_datums
+
+    parser = argparse.ArgumentParser(prog="otc_pipeline.build_otc --cached-noaa-original-metadata", allow_abbrev=False)
+    for name in ("native", "noaa-datums", "congen-run", "out"):
+        parser.add_argument(f"--{name}", type=Path, required=True)
+    parser.add_argument("--fes-congen-run", type=Path)
+    for name in ("native-sha256", "native-meta-sha256", "noaa-datums-sha256", "noaa-datums-receipt-sha256"):
+        parser.add_argument(f"--{name}", required=True)
+    args = parser.parse_args(argv)
+    if args.out.exists() and any(args.out.iterdir()):
+        raise ValueError("cached NOAA metadata output must be empty")
+    meta = args.native.with_suffix(".meta.json")
+    inputs = ((args.native, args.native_sha256), (meta, args.native_meta_sha256),
+              (args.noaa_datums, args.noaa_datums_sha256),
+              (Path(str(args.noaa_datums) + '.meta.json'), args.noaa_datums_receipt_sha256))
+    if any(_sha256(path) != digest for path, digest in inputs):
+        raise ValueError("cached NOAA metadata input SHA-256 mismatch")
+    release = json.loads(meta.read_text())
+    with args.native.open() as source:
+        release["stations"] = [json.loads(line) for line in source]
+    report = append_noaa_8660754_datums(release, args.noaa_datums, args.noaa_datums_sha256,
+                                      args.noaa_datums_receipt_sha256)
+    if any(_sha256(path) != digest for path, digest in inputs):
+        raise ValueError("cached NOAA metadata input changed during staging")
+    congen = load_congen_run(args.congen_run)
+    runs = ({TABLE_ID: congen, FES_TABLE_ID: load_congen_run(args.fes_congen_run, fes=True)}
+            if args.fes_congen_run is not None else congen)
+    files = write_release(release, args.out, datestamp=release["release"]["datestamp"],
+                          app_export=None, congen_run=runs)
+    report.update(native=str(args.native), native_sha256=args.native_sha256,
+                  native_meta_sha256=args.native_meta_sha256, files=[str(path) for path in files])
+    (args.out / "NOAA_ORIGINAL_METADATA_STAGE.json").write_text(json.dumps(report, allow_nan=False, sort_keys=True) + "\n")
+    print(json.dumps(report, sort_keys=True))
+    return 0
+
+
 def cached_subordinate_main(argv: list[str]) -> int:
     """Publish authenticated subordinate additions to an existing native release."""
     from otc_pipeline.astro_tables import load_congen_run
@@ -729,6 +767,8 @@ def cached_fes_astronomy_main(argv: list[str]) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else list(argv)
+    if argv and argv[0] == "--cached-noaa-original-metadata":
+        return cached_noaa_original_metadata_main(argv[1:])
     if argv and argv[0] == "--cached-subordinate":
         return cached_subordinate_main(argv[1:])
     if argv and argv[0] == "--cached-harmonic-mean":

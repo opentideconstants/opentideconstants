@@ -24,6 +24,64 @@ from test_datums import native_convention_unverified_inputs as native_convention
 from test_fes2022 import retained_fes_astro as retained_fes_astro
 
 
+@pytest.mark.skipif('OTC_NOAA_8660754_PROOF' not in os.environ,
+                    reason='explicit retained NOAA cache and native writer proof')
+def test_native_cached_noaa_original_metadata_cli():
+    root = Path(os.environ['OTC_NOAA_8660754_PROOF'])
+    command = json.loads((root / 'build-command.json').read_text())
+    options = dict(zip(command[2::2], command[3::2], strict=True))
+    source = Path(options['--native'])
+    output = Path(options['--out'])
+    response_path = Path(options['--noaa-datums'])
+    body = json.loads(response_path.read_text())
+    response_sha = hashlib.sha256(response_path.read_bytes()).hexdigest()
+    completed = subprocess.run(command, text=True, capture_output=True)
+    (root / 'writer.stdout').write_text(completed.stdout)
+    (root / 'writer.stderr').write_text(completed.stderr)
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(source.with_suffix('.meta.json').read_text()) == json.loads(
+        (output / source.with_suffix('.meta.json').name).read_text())
+    changed = []
+    station_count = 0
+    with source.open() as before_file, (output / source.name).open() as after_file:
+        for before_line, after_line in zip(before_file, after_file, strict=True):
+            station_count += 1
+            if before_line == after_line:
+                continue
+            before, after = json.loads(before_line), json.loads(after_line)
+            assert after['station_id'] == before['station_id'] == 'OTC-d14a171f'
+            changed.append(after['station_id'])
+            before_record = next(r for r in before['source_records']
+                                 if r['source'] == 'noaa' and r['source_record_id'] == '8660754')
+            after_record = next(r for r in after['source_records']
+                                if r['source'] == 'noaa' and r['source_record_id'] == '8660754')
+            old_metadata = before_record['original_metadata']
+            metadata = after_record['original_metadata']
+            old_rows = json.loads(old_metadata['raw_metadata_rows_json'])
+            assert body not in old_rows  # The real pre-fix omission, not a missing CLI operation.
+            assert json.loads(metadata['raw_metadata_rows_json']) == old_rows + [body]
+            old_inputs = json.loads(old_metadata['metadata_inputs_json'])
+            new_inputs = json.loads(metadata['metadata_inputs_json'])
+            assert new_inputs[:len(old_inputs)] == old_inputs
+            assert len(new_inputs) == len(old_inputs) + 2
+            for binding in new_inputs[len(old_inputs):]:
+                raw = Path(binding['path']).read_bytes()
+                assert len(raw) == binding['size']
+                assert hashlib.sha256(raw).hexdigest() == binding['sha256']
+            assert new_inputs[len(old_inputs)]['sha256'] == response_sha
+            assert after['constant_sets'] == [] and after['recommended_set_id'] is None
+            metadata['raw_metadata_rows_json'] = old_metadata['raw_metadata_rows_json']
+            metadata['metadata_inputs_json'] = old_metadata['metadata_inputs_json']
+            assert after == before  # Includes identity, all prior metadata and historical provenance.
+    assert changed == ['OTC-d14a171f']
+    proof = {'stage': 'GREEN', 'stations': station_count, 'changed_stations': changed,
+             'response_sha256': response_sha, 'response_retained': True,
+             'response_binding_retained': True, 'all_other_native_content_preserved': True,
+             'constant_sets': 0, 'recommended_set_id': None}
+    (root / 'green.json').write_text(json.dumps(proof, sort_keys=True) + '\n')
+    print(json.dumps(proof, sort_keys=True))
+
+
 @pytest.mark.parametrize("case", ["path_only", "hash_only", "wrong_hash", "duplicate", "empty", "non_string"])
 def test_convention_unverified_cli_rejects_invalid_scope(tmp_path, case):
     path = tmp_path / "sets.json"

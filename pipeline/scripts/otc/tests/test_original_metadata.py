@@ -1,10 +1,12 @@
 """Lossless metadata projection; the full pinned-input proof lives with the handoff."""
+import copy
 import hashlib
 import json
 from pathlib import Path
 
 import pytest
 
+from otc_pipeline import original_metadata
 from otc_pipeline.original_metadata import load_original_metadata
 from otc_pipeline.source_inventory import SourceInventory
 
@@ -24,6 +26,67 @@ def inventory(tmp_path, payloads, identities):
 def identity(rid, version='v1'):
     return {'source': 'dmi', 'version': version, 'upstream_record_id': rid,
             'granularity': 'gauge_station', 'input_sha256': ['a' * 64]}
+
+
+@pytest.fixture
+def noaa_raw_datums(tmp_path):
+    # Transport/preservation fixture only; actual agency-cache proof is separate.
+    url = 'https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations/8660754/datums.json'
+    body = {'self': url, 'units': 'meters', 'LAT': 1.0, 'HAT': 2.0,
+            'datums': [{'name': 'STND', 'value': 0.0}]}
+    path = tmp_path / '8660754.json'
+    path.write_text(json.dumps(body))
+    sha = hashlib.sha256(path.read_bytes()).hexdigest()
+    receipt = Path(str(path) + '.meta.json')
+    receipt.write_text(json.dumps({'url': url + '?units=metric', 'sha256': sha}))
+    record = {'source': 'noaa', 'source_record_id': '8660754', 'source_version': '20261008',
+              'provenance': {'input_sha256': ['a' * 64], 'inventory_sha256': 'b' * 64},
+              'original_metadata': {'raw_metadata_rows_json': '[{"id":"8660754"}]',
+                                    'metadata_inputs_json': '[]'}}
+    station = {'station_id': 'OTC-d14a171f', 'aliases': {'noaa': '8660754'},
+               'name': 'Carolina Forest, ICWW', 'lat': 33.734901428222656, 'lon': -78.88269805908203,
+               'constant_sets': [], 'recommended_set_id': None, 'source_records': [record]}
+    return {'stations': [station]}, path, sha, receipt
+
+
+def test_cached_noaa_datums_preserve_original_record_and_bind_later_response(noaa_raw_datums):
+    release, path, sha, receipt = noaa_raw_datums
+    before = copy.deepcopy(release)
+    receipt_sha = hashlib.sha256(receipt.read_bytes()).hexdigest()
+    original_metadata.append_noaa_8660754_datums(release, path, sha, receipt_sha)
+    record = release['stations'][0]['source_records'][0]
+    metadata = record['original_metadata']
+    assert json.loads(metadata['raw_metadata_rows_json']) == [
+        {'id': '8660754'}, json.loads(path.read_text())]
+    assert json.loads(metadata['metadata_inputs_json']) == [
+        {'path': str(p.resolve()), 'size': p.stat().st_size, 'sha256': digest}
+        for p, digest in ((path, sha), (receipt, receipt_sha))]
+    restored = copy.deepcopy(release)
+    restored['stations'][0]['source_records'][0]['original_metadata'] = before['stations'][0]['source_records'][0]['original_metadata']
+    assert restored == before
+    once = copy.deepcopy(release)
+    original_metadata.append_noaa_8660754_datums(release, path, sha, receipt_sha)
+    assert release == once
+
+
+@pytest.mark.parametrize('case', ['body_hash', 'receipt_hash', 'endpoint', 'identity', 'predictor'])
+def test_cached_noaa_datums_refuse_unbound_or_wrong_target_without_mutation(noaa_raw_datums, case):
+    release, path, sha, receipt = noaa_raw_datums
+    if case == 'body_hash':
+        sha = '0' * 64
+    elif case == 'endpoint':
+        data = json.loads(receipt.read_text())
+        data['url'] = data['url'].replace('8660754', '8443970')
+        receipt.write_text(json.dumps(data))
+    elif case == 'identity':
+        release['stations'][0]['source_records'][0]['source_record_id'] = '8443970'
+    elif case == 'predictor':
+        release['stations'][0]['constant_sets'] = [{'set_id': 'unexpected'}]
+    receipt_sha = '0' * 64 if case == 'receipt_hash' else hashlib.sha256(receipt.read_bytes()).hexdigest()
+    before = copy.deepcopy(release)
+    with pytest.raises(ValueError):
+        original_metadata.append_noaa_8660754_datums(release, path, sha, receipt_sha)
+    assert release == before
 
 
 def test_duplicate_captures_and_windows_are_retained(tmp_path):
