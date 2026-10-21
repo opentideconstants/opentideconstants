@@ -1,0 +1,1059 @@
+{
+  "status": "UNRELEASED_CANDIDATE_MILESTONE_NOT_LAUNCH_APPROVAL",
+  "milestone_date": "2026-10-21",
+  "scope": "39-row comparison scorecard. Preserve the accepted symmetric-comparison row identities and predicates. Only row 35 changes verdict; row 9 refreshes accepted coverage counts. Product filters, recommendations, scientific gates and release status are unchanged.",
+  "dataset_commit": "ebe3605e84328e4ecc546ddd4745614ec51f4271",
+  "dataset_commit_url": "https://github.com/opentideconstants/opentideconstants/commit/ebe3605e84328e4ecc546ddd4745614ec51f4271",
+  "baseline": {
+    "description": "Accepted 39-row symmetric comparison scorecard; original evidence retained locally and unbundled.",
+    "sha256": "07cac5ac3363ac2ba541595e992541f78d9c95651215dfaa5a4b9ad30f6f3ca5",
+    "counts": {
+      "BLOCKED": 18,
+      "WIN": 2,
+      "TIE": 10,
+      "LOSS": 9
+    }
+  },
+  "counts": {
+    "BLOCKED": 17,
+    "WIN": 2,
+    "TIE": 11,
+    "LOSS": 9
+  },
+  "milestone_verdict_changes": [
+    {
+      "id": "35",
+      "before": "BLOCKED",
+      "after": "TIE",
+      "reason": "Previously missing full-population slack/direction capability evidence is now measured for all 805 places in all four SDKs."
+    }
+  ],
+  "rows": [
+    {
+      "id": "1",
+      "dimension": "Places with real constants (1 km)",
+      "checked": true,
+      "historical_label": "LOSS",
+      "label": "BLOCKED",
+      "historical_predicate": "Overall ≥ 5,141 (all) and OTC ok ≥ 4,554 (accepted); per region per §3.1, with only the frozen exception E1",
+      "comparison_predicate": "All labelled real-constant places vs all labelled real-constant places at 1 km, globally and the same frozen regions/E1 on both sides.",
+      "predicate_changed": true,
+      "comparison_and_limit": "Same all-record constants predicate gives 8,785 vs 5,141, including flagged/model-labelled records on both sides. Global count passes. The explicitly geographic per-region comparison remains unproved: retained packets contain no frozen regional cohort assignment/count table or E1 application. This is a symmetric geographic requirement, not OTC QC acceptance. No regional superiority inferred from global totals.",
+      "historical_measured_result": {
+        "station_partition": {
+          "usable_constants_no_ok_qc_flagged": 8902,
+          "no_usable_constants_no_offsets_metadata": 1802,
+          "usable_constants_any_ok": 2769,
+          "no_usable_constants_tide_offsets": 863,
+          "no_usable_constants_current_offsets": 1703
+        },
+        "constants_1km": {
+          "otc_all": {
+            "tide": 7980,
+            "current": 805
+          },
+          "otc_ok": {
+            "tide": 1820,
+            "current": 805
+          },
+          "sw_all": {
+            "tide": 4344,
+            "current": 797
+          },
+          "sw_accepted": {
+            "tide": 3757,
+            "current": 797
+          }
+        }
+      },
+      "retained_product_or_scientific_requirement": "Overall ≥ 5,141 (all) and OTC ok ≥ 4,554 (accepted); per region per §3.1, with only the frozen exception E1",
+      "source_evidence_packet_sha256": "2da6f0bfaf5603ca8482c4069d00bf81fdf6e26ff5d68bf3cefd3e7121d50701",
+      "current_counts": {
+        "otc_all": 8785,
+        "comparator_all": 5141,
+        "global_clause": "PASS",
+        "regional_clause": "UNPROVED_FROZEN_REGION_COHORTS_AND_E1_BINDING_REQUIRED"
+      },
+      "source_evidence": {
+        "description": "post-ticon/population/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "2",
+      "dimension": "Places that can predict (constants or offsets, 1 km)",
+      "checked": true,
+      "historical_label": "WIN",
+      "label": "WIN",
+      "historical_predicate": "≥ 8,657; needs 2,657 of 3,721 (71%)",
+      "comparison_predicate": "≥ 8,657; needs 2,657 of 3,721 (71%)",
+      "predicate_changed": false,
+      "comparison_and_limit": "Same actually successful prediction-place count: retained all-four intersection 11,003 vs 8,657. Availability WIN retained, without an accuracy or publication claim.",
+      "historical_measured_result": {
+        "frozen_bar": "≥ 8,657; needs 2,657 of 3,721 (71%)",
+        "january_all_four_availability": 11003,
+        "bar": 8657,
+        "margin": 2346,
+        "verdict": "JANUARY_AVAILABILITY_CLAUSE_PASS",
+        "limit": "Measured all four SDK outcomes, not inference from finite conformance. No accuracy/launch assertion."
+      },
+      "retained_product_or_scientific_requirement": "≥ 8,657; needs 2,657 of 3,721 (71%)",
+      "source_evidence_packet_sha256": "2da6f0bfaf5603ca8482c4069d00bf81fdf6e26ff5d68bf3cefd3e7121d50701",
+      "source_evidence": {
+        "description": "post-ticon/population/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "3",
+      "dimension": "Subordinate stations predicted",
+      "checked": true,
+      "historical_label": "LOSS",
+      "label": "TIE",
+      "historical_predicate": "≥ Slackwater, tide and current separately, in places at 1 km; PS Tier B subordinate rows pass",
+      "comparison_predicate": "Coverage of the frozen comparator offset-place targets by actually successful OTC predictions of either method, at the same 1 km place semantics. Scientific accuracy is reported separately.",
+      "predicate_changed": true,
+      "comparison_and_limit": "New method-neutral join covers all 2,196 tide and 1,574 current comparator offset places. They map to 2,194 and 1,566 distinct successful OTC places; coverage of comparator targets is not a claim of those same distinct OTC totals. Prior 857/1,573 method-only counts are superseded for coverage. PS Tier B has no retained symmetric comparator qualification and remains an internal scientific gate, not a coverage blocker.",
+      "historical_measured_result": {
+        "frozen_bar": "≥ Slackwater, tide and current separately, in places at 1 km; PS Tier B subordinate rows pass",
+        "january_tide": 857,
+        "comparator_tide": 2196,
+        "tide_shortfall": 1339,
+        "january_current": 1573,
+        "comparator_current": 1574,
+        "current_shortfall": 1,
+        "verdict": "QUANTITY_BAR_NOT_MET",
+        "ps_tier_b": "Separate mandatory clause remains unproved by this census.",
+        "masked_paths": 1378,
+        "limit": "Masked native offset profiles were explicitly unexercised, not successful or failed calls. Zero call failures does not mean all offset places predicted."
+      },
+      "retained_product_or_scientific_requirement": "≥ Slackwater, tide and current separately, in places at 1 km; PS Tier B subordinate rows pass",
+      "source_evidence_packet_sha256": "2da6f0bfaf5603ca8482c4069d00bf81fdf6e26ff5d68bf3cefd3e7121d50701",
+      "current_counts": {
+        "tide": {
+          "comparator_places": 2196,
+          "covered_comparator_places": 2196,
+          "distinct_successful_otc_places_used": 2194
+        },
+        "current": {
+          "comparator_places": 1574,
+          "covered_comparator_places": 1574,
+          "distinct_successful_otc_places_used": 1566
+        }
+      },
+      "scientific_gate": "PS Tier B unproved; no same-gate comparator result in retained evidence. No accuracy TIE is asserted.",
+      "source_evidence": {
+        "description": "post-ticon/population/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "4",
+      "dimension": "Offset stations held (1 km, offset rows only)",
+      "checked": true,
+      "historical_label": "BLOCKED",
+      "label": "BLOCKED",
+      "historical_predicate": "≥ Slackwater per kind at 1 km, after removing only the ids listed in `bars.json` `removed_upstream` (written by NOAA-IDS before any gate run, each with its saved NOAA response; nothing added after)",
+      "comparison_predicate": "≥ Slackwater per kind at 1 km, after removing only the ids listed in `bars.json` `removed_upstream` (written by NOAA-IDS before any gate run, each with its saved NOAA response; nothing added after)",
+      "predicate_changed": false,
+      "comparison_and_limit": "Offset records held is intentionally a data-format inventory on both sides, unlike predictive coverage. D7 raises current offset-role inventory 1,573 to 1,575; tide remains 2,195 vs 2,196. Frozen pre-gate removed_upstream exception binding is unavailable, so adjusted inventory verdict remains unproved.",
+      "historical_measured_result": {
+        "otc": {
+          "tide": 2195,
+          "current": 1573
+        },
+        "sw": {
+          "tide": 2196,
+          "current": 1574
+        }
+      },
+      "retained_product_or_scientific_requirement": "≥ Slackwater per kind at 1 km, after removing only the ids listed in `bars.json` `removed_upstream` (written by NOAA-IDS before any gate run, each with its saved NOAA response; nothing added after)",
+      "source_evidence_packet_sha256": "2da6f0bfaf5603ca8482c4069d00bf81fdf6e26ff5d68bf3cefd3e7121d50701",
+      "source_evidence": {
+        "description": "post-ticon/population/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "5",
+      "dimension": "Accuracy vs held-out observations",
+      "checked": true,
+      "historical_label": "BLOCKED",
+      "label": "BLOCKED",
+      "historical_predicate": "Per §3.2: per group and per measure, frozen; scored on window B, and also on window C for the NOAA, Norway and WSV groups (§6.3)",
+      "comparison_predicate": "Per §3.2: per group and per measure, frozen; scored on window B, and also on window C for the NOAA, Norway and WSV groups (§6.3)",
+      "predicate_changed": false,
+      "comparison_and_limit": "Accuracy requires the same frozen groups, windows and measures for both systems. Missing current selection-bound holdout proof remains a genuine comparative evidence gap.",
+      "historical_measured_result": "Existing FIX-CONST window-B method copies pass reported observation measures: overall RMS 14.11 vs 14.28 cm (78/19/155 better/worse/tie), timing 10.88 vs 11.76 min (60/5/187). WSV observation measures and Norway timing improved to reported PASS. These remain historical method/scoring-copy results, not a current frozen-selection gate.",
+      "retained_product_or_scientific_requirement": "Per §3.2: per group and per measure, frozen; scored on window B, and also on window C for the NOAA, Norway and WSV groups (§6.3)",
+      "source_evidence_packet_sha256": "7d36671a6a2c299fc74840139ef588858f65df1d8ca6c13e15fe646bdfbc50a0",
+      "source_evidence": {
+        "description": "post-ticon/science/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "6",
+      "dimension": "Accuracy vs official tide tables",
+      "checked": true,
+      "historical_label": "BLOCKED",
+      "label": "BLOCKED",
+      "historical_predicate": "Per §3.3, frozen per group",
+      "comparison_predicate": "Per §3.3, frozen per group",
+      "predicate_changed": false,
+      "comparison_and_limit": "Official-table accuracy uses the same frozen groups and measures. Historical methods do not establish current recommended-set accuracy; remains unproved.",
+      "historical_measured_result": "Historical FIX-CONST method-copy WSV official-height result improves to 7.84 vs 8.12 cm, 1/1/6 PASS; TICON official timing remains 3.52 vs 4.39 min,18/0/25 PASS. NOAA and Norway method-copy official comparisons still show FAIL (e.g. NOAA timing 3.68vs 2.85 min; Norway 1.54vs 0.82 min); the historical report explicitly marks those agency groups informational before REC-SKILL selection.",
+      "retained_product_or_scientific_requirement": "Per §3.3, frozen per group",
+      "source_evidence_packet_sha256": "7d36671a6a2c299fc74840139ef588858f65df1d8ca6c13e15fe646bdfbc50a0",
+      "source_evidence": {
+        "description": "post-ticon/science/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "7",
+      "dimension": "Prediction-engine fidelity",
+      "checked": true,
+      "historical_label": "BLOCKED",
+      "label": "BLOCKED",
+      "historical_predicate": "Strictly better: each SDK's median time error to NOAA's tables < Slackwater engine's, same 178 gauges and constants",
+      "comparison_predicate": "Strictly better: each SDK's median time error to NOAA's tables < Slackwater engine's, same 178 gauges and constants",
+      "predicate_changed": false,
+      "comparison_and_limit": "Same 178 gauges and constants is symmetric. Missing actual four-SDK full-cohort timing comparison remains unproved; no coverage-to-accuracy inference.",
+      "historical_measured_result": "Historical reference predictor median timing error 0.26 min vs Slackwater 2.85 min over178 NOAA gauges with the same NOAA constants. Current qualified FES three-station cross-language height delta 5.551115123125783e-17 m and TICON three-pilot delta 2.220446049250313e-16 m show bounded arithmetic agreement only.",
+      "retained_product_or_scientific_requirement": "Strictly better: each SDK's median time error to NOAA's tables < Slackwater engine's, same 178 gauges and constants",
+      "source_evidence_packet_sha256": "7d36671a6a2c299fc74840139ef588858f65df1d8ca6c13e15fe646bdfbc50a0",
+      "source_evidence": {
+        "description": "post-ticon/science/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "8",
+      "dimension": "Currents (stations, bins)",
+      "checked": true,
+      "historical_label": "LOSS",
+      "label": "TIE",
+      "historical_predicate": "≥ Slackwater in places at 1 km for stations and subordinates; bins strictly more",
+      "comparison_predicate": "All harmonic-current station places and method-neutral coverage of comparator subordinate-current places; compare stored bins separately on both sides.",
+      "predicate_changed": true,
+      "comparison_and_limit": "Station counts 805 vs 797 and method-neutral coverage of all 1,574 comparator subordinate places clear the availability clauses. Reuse the accepted strictly-more stored-bin proof (2,218 OTC bins). Separately D7 merged implementation supplies two actual new offset roles, 1,573 to 1,575, with four bins verified in four SDKs for the fixed 48-hour window. Stored bins are not all-bin monthly predictions.",
+      "historical_measured_result": {
+        "frozen_bar": "≥ Slackwater in places at 1 km for stations and subordinates; bins strictly more",
+        "harmonic_current_places": 805,
+        "comparator_harmonic_current_places": 797,
+        "current_subordinate_places": 1573,
+        "comparator_current_subordinate_places": 1574,
+        "verdict": "CURRENT_SUBORDINATE_PLACE_BAR_NOT_MET",
+        "bins": "Existing stored-bin evidence reused separately; monthly nondefault candidates skipped after role/place success do not prove every-bin monthly prediction."
+      },
+      "retained_product_or_scientific_requirement": "≥ Slackwater in places at 1 km for stations and subordinates; bins strictly more",
+      "source_evidence_packet_sha256": "2da6f0bfaf5603ca8482c4069d00bf81fdf6e26ff5d68bf3cefd3e7121d50701",
+      "current_counts": {
+        "harmonic_places": 805,
+        "comparator_harmonic_places": 797,
+        "comparator_subordinate_places_covered": 1574,
+        "comparator_subordinate_places": 1574,
+        "merged_D7_actual_offset_roles": 1575,
+        "harmonic_bins_stored": 2218,
+        "bins_comparison": "Reuse accepted strictly-more stored-bin proof; no monthly all-bin claim"
+      },
+      "source_evidence": {
+        "description": "post-ticon/population/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "9",
+      "dimension": "Chart datum",
+      "checked": true,
+      "historical_label": "LOSS",
+      "label": "LOSS",
+      "historical_predicate": "≥ Slackwater in places at 1 km, all and accepted",
+      "comparison_predicate": "Chart-datum availability over all labelled records on both sides, in the same matched 1 km place universe.",
+      "predicate_changed": true,
+      "comparison_and_limit": "Chart-datum availability is 5,874/6,353 matched 1 km places across all labelled records, leaving 479 uncovered: LOSS. Accepted PR #86 extends 5,421 by 453 places; the combined gain from the earlier 5,361 baseline is 513. These are labelled computed fallbacks; normal datum acceptance gain remains zero.",
+      "historical_measured_result": {
+        "covered": 5031,
+        "denominator": 6353,
+        "gain_since_baseline": 166,
+        "remaining": 1322
+      },
+      "retained_product_or_scientific_requirement": "≥ Slackwater in places at 1 km, all and accepted",
+      "source_evidence_packet_sha256": "2da6f0bfaf5603ca8482c4069d00bf81fdf6e26ff5d68bf3cefd3e7121d50701",
+      "current_counts": {
+        "covered": 5874,
+        "comparator": 6353,
+        "remaining": 479,
+        "previous_accepted_covered": 5421,
+        "PR86_extension_gain": 453,
+        "prior_baseline_covered": 5361,
+        "combined_gain_since_prior_baseline": 513,
+        "D4_gain": 330,
+        "normal_acceptance_gain": 0
+      },
+      "source_evidence": {
+        "description": "post-ticon/population/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      },
+      "current_evidence": {
+        "pull_request": "https://github.com/opentideconstants/opentideconstants/pull/86",
+        "dataset_commit": "ebe3605e84328e4ecc546ddd4745614ec51f4271",
+        "profile": "Accepted normal-main build profile output; unreleased candidate"
+      }
+    },
+    {
+      "id": "10",
+      "dimension": "LAT/HAT",
+      "checked": true,
+      "historical_label": "LOSS",
+      "label": "LOSS",
+      "historical_predicate": "≥ Slackwater in places at 1 km, all and accepted. DS's 0.01° figures are not used for the bar; YLD and DT10 recount at 1 km",
+      "comparison_predicate": "LAT/HAT availability over all labelled records on both sides, in the same matched 1 km place universe.",
+      "predicate_changed": true,
+      "comparison_and_limit": "Compare all-record LAT/HAT availability. 5,591/6,342 leaves 751 uncovered, so LOSS survives removal of unequal accepted-quality sub-bar. D4 chart designation adds no LAT/HAT values.",
+      "historical_measured_result": {
+        "covered_after": 5591,
+        "sw_feature_leaders": 6342,
+        "actual_new_covered_sw_places": 759,
+        "accepted_parity_proved": false
+      },
+      "retained_product_or_scientific_requirement": "≥ Slackwater in places at 1 km, all and accepted. DS's 0.01° figures are not used for the bar; YLD and DT10 recount at 1 km",
+      "source_evidence_packet_sha256": "2da6f0bfaf5603ca8482c4069d00bf81fdf6e26ff5d68bf3cefd3e7121d50701",
+      "current_counts": {
+        "covered": 5591,
+        "comparator": 6342,
+        "remaining": 751
+      },
+      "source_evidence": {
+        "description": "post-ticon/population/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "11",
+      "dimension": "Observed datums",
+      "checked": true,
+      "historical_label": "LOSS",
+      "label": "LOSS",
+      "historical_predicate": "Places at 1 km with observed datums: strictly more than Slackwater's places at 1 km with observed datums (both counted by SC1); GATE-DATUM holdout passes",
+      "comparison_predicate": "Places at 1 km with observed datums: strictly more than Slackwater's places at 1 km with observed datums (both counted by SC1)",
+      "predicate_changed": true,
+      "comparison_and_limit": "Both sides require observed datums, with identical 1 km counting: 2,864 vs 3,040. LOSS is already established by quantity. Unaccepted GATE-DATUM is retained as scientific evidence limitation, not extra comparative quantity penalty.",
+      "historical_measured_result": {
+        "otc_places": 2864,
+        "sw_places": 3040,
+        "covered_comparator_places": 2269,
+        "uncovered_comparator_places": 771,
+        "gate_datum_holdout_accepted": false
+      },
+      "retained_product_or_scientific_requirement": "Places at 1 km with observed datums: strictly more than Slackwater's places at 1 km with observed datums (both counted by SC1); GATE-DATUM holdout passes",
+      "source_evidence_packet_sha256": "2da6f0bfaf5603ca8482c4069d00bf81fdf6e26ff5d68bf3cefd3e7121d50701",
+      "source_evidence": {
+        "description": "post-ticon/population/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "12a",
+      "dimension": "Licence clarity",
+      "checked": true,
+      "historical_label": "TIE",
+      "label": "TIE",
+      "historical_predicate": "true/false: every place states licence and commercial use",
+      "comparison_predicate": "true/false: every place states licence and commercial use",
+      "predicate_changed": false,
+      "comparison_and_limit": "Licence disclosure capability retained: all 21,375 sets resolve to licence ID, commercial boolean and attribution. This makes no additional permission grant or quality comparison.",
+      "historical_measured_result": {
+        "sets_checked": 21375,
+        "missing_licence_disclosure_sets": 0
+      },
+      "retained_product_or_scientific_requirement": "true/false: every place states licence and commercial use",
+      "source_evidence_packet_sha256": "2da6f0bfaf5603ca8482c4069d00bf81fdf6e26ff5d68bf3cefd3e7121d50701",
+      "source_evidence": {
+        "description": "post-ticon/population/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "12b",
+      "dimension": "Commercially usable places with constants (1 km)",
+      "checked": true,
+      "historical_label": "LOSS",
+      "label": "WIN",
+      "historical_predicate": "≥ Slackwater, all and accepted, in places at 1 km",
+      "comparison_predicate": "All labelled constant places with recorded strict commercial=true eligibility on both sides, at 1 km; no unequal QC subset.",
+      "predicate_changed": true,
+      "comparison_and_limit": "Use strict recorded commercial=true eligibility and all labelled constants on both sides, with no QC acceptance restriction: 8,677 vs 4,884 (tide 7,872 vs 4,087; current 805 vs 797). WIN. Explicit licence_reading alternative 8,746 is disclosed separately and is not needed or expanded.",
+      "historical_measured_result": {
+        "strict": {
+          "all": {
+            "tide": 7872,
+            "current": 805
+          },
+          "ok": {
+            "tide": 1718,
+            "current": 805
+          }
+        },
+        "as_published": {
+          "all": {
+            "tide": 7941,
+            "current": 805
+          },
+          "ok": {
+            "tide": 1718,
+            "current": 805
+          }
+        },
+        "sw_all": {
+          "tide": 4087,
+          "current": 797
+        },
+        "sw_accepted": {
+          "tide": 3504,
+          "current": 797
+        }
+      },
+      "retained_product_or_scientific_requirement": "≥ Slackwater, all and accepted, in places at 1 km",
+      "source_evidence_packet_sha256": "2da6f0bfaf5603ca8482c4069d00bf81fdf6e26ff5d68bf3cefd3e7121d50701",
+      "current_counts": {
+        "strict_otc_all": 8677,
+        "strict_comparator_all": 4884,
+        "as_published_otc_separate": 8746
+      },
+      "source_evidence": {
+        "description": "post-ticon/population/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "13",
+      "dimension": "Per-station attribution",
+      "checked": true,
+      "historical_label": "TIE",
+      "label": "TIE",
+      "historical_predicate": "Every place attribution from OTC native SDKs and applicable data-file exports; no npm API shim.",
+      "comparison_predicate": "Every place attribution from OTC native SDKs and applicable data-file exports; no npm API shim.",
+      "predicate_changed": false,
+      "comparison_and_limit": "Actual per-station attribution available across four SDKs and applicable exports; accepted row13 closure reused. No stricter input acceptance gate introduced.",
+      "historical_measured_result": {
+        "native_sdks": 4,
+        "per_sdk": {
+          "stations": 16039,
+          "sources": 40856,
+          "sets": 21375
+        },
+        "json_records": 14207,
+        "tcdb_records": 14207,
+        "recommended_tcd_records": 14211,
+        "complete_tcd_records": 26748,
+        "mismatches": 0
+      },
+      "retained_product_or_scientific_requirement": "Every place attribution from OTC native SDKs and applicable data-file exports; no npm API shim.",
+      "source_evidence_packet_sha256": "e4f32aa171e8441e8d3adc29fb5f826aae2d26b7597d3bc77b31729523f49c0d",
+      "source_evidence": {
+        "description": "post-ticon/products/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "14",
+      "dimension": "Data-file swap coverage",
+      "checked": true,
+      "historical_label": "LOSS",
+      "label": "LOSS",
+      "historical_predicate": "Approved data-file swapping for Swift/SlackwaterDatabase, Slackwater engine JSON and XTide/OpenCPN, proven by unchanged readers opening files and predicting, plus OTC own published npm SDK. Owner inclusion rule retains comparator coverage with labelled fallback.",
+      "comparison_predicate": "Approved data-file swapping for Swift/SlackwaterDatabase, Slackwater engine JSON and XTide/OpenCPN, proven by unchanged readers opening files and predicting, plus OTC own published npm SDK. Owner inclusion rule retains comparator coverage with labelled fallback.",
+      "predicate_changed": false,
+      "comparison_and_limit": "Same target-place data-file swap capability: retained actual coverage 9,235/9,538 still misses 303 and own published SDK remains held. No inference from global native counts or D5 label changes to full export coverage.",
+      "historical_measured_result": null,
+      "retained_product_or_scientific_requirement": "Approved data-file swapping for Swift/SlackwaterDatabase, Slackwater engine JSON and XTide/OpenCPN, proven by unchanged readers opening files and predicting, plus OTC own published npm SDK. Owner inclusion rule retains comparator coverage with labelled fallback.",
+      "source_evidence_packet_sha256": "e4f32aa171e8441e8d3adc29fb5f826aae2d26b7597d3bc77b31729523f49c0d",
+      "source_evidence": {
+        "description": "post-ticon/products/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "15",
+      "dimension": "Swift / `.tcdb`",
+      "checked": true,
+      "historical_label": "TIE",
+      "label": "TIE",
+      "historical_predicate": "Owner decision rows14/15/27: data-only TCDB, unchanged Swift reader opens file, lookups and predictions work.",
+      "comparison_predicate": "Owner decision rows14/15/27: data-only TCDB, unchanged Swift reader opens file, lookups and predictions work.",
+      "predicate_changed": false,
+      "comparison_and_limit": "Same unchanged-reader open, lookup and prediction capability is already demonstrated for actual TCDB; retain TIE, not full coverage superiority.",
+      "historical_measured_result": null,
+      "retained_product_or_scientific_requirement": "Owner decision rows14/15/27: data-only TCDB, unchanged Swift reader opens file, lookups and predictions work.",
+      "source_evidence_packet_sha256": "e4f32aa171e8441e8d3adc29fb5f826aae2d26b7597d3bc77b31729523f49c0d",
+      "source_evidence": {
+        "description": "post-ticon/products/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "16",
+      "dimension": "Hosted API",
+      "checked": true,
+      "historical_label": "LOSS",
+      "label": "LOSS",
+      "historical_predicate": "Option (ii): every one of Slackwater's seven routes has an equivalent in our frozen route list (same lookups: by id, by position, station list and search, extremes, timeline, OpenAPI); limits ≥ 100 per minute and ≥ 10,000 per day per IP; every prediction equals our TypeScript SDK's output (1 s, 0.01 mm). Option (i): their seven routes on our data, same limits. Option (iii): not scored, recorded as a known loss",
+      "comparison_predicate": "Option (ii): every one of Slackwater's seven routes has an equivalent in our frozen route list (same lookups: by id, by position, station list and search, extremes, timeline, OpenAPI); limits ≥ 100 per minute and ≥ 10,000 per day per IP; every prediction equals our TypeScript SDK's output (1 s, 0.01 mm). Option (i): their seven routes on our data, same limits. Option (iii): not scored, recorded as a known loss",
+      "predicate_changed": false,
+      "comparison_and_limit": "Equivalent existing seven-route product remains absent from retained OTC acceptance. Comparator route/rate capability is the shared target; LOSS retained without new endpoint probes.",
+      "historical_measured_result": null,
+      "retained_product_or_scientific_requirement": "Option (ii): every one of Slackwater's seven routes has an equivalent in our frozen route list (same lookups: by id, by position, station list and search, extremes, timeline, OpenAPI); limits ≥ 100 per minute and ≥ 10,000 per day per IP; every prediction equals our TypeScript SDK's output (1 s, 0.01 mm). Option (i): their seven routes on our data, same limits. Option (iii): not scored, recorded as a known loss",
+      "source_evidence_packet_sha256": "e4f32aa171e8441e8d3adc29fb5f826aae2d26b7597d3bc77b31729523f49c0d",
+      "source_evidence": {
+        "description": "post-ticon/products/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "17",
+      "dimension": "CLI",
+      "checked": true,
+      "historical_label": "LOSS",
+      "label": "LOSS",
+      "historical_predicate": "per decision 1b",
+      "comparison_predicate": "per decision 1b",
+      "predicate_changed": false,
+      "comparison_and_limit": "Comparator-equivalent released CLI/distribution capability remains absent from retained OTC install/execute acceptance. Source commands alone do not establish distributed product parity.",
+      "historical_measured_result": null,
+      "retained_product_or_scientific_requirement": "per decision 1b",
+      "source_evidence_packet_sha256": "e4f32aa171e8441e8d3adc29fb5f826aae2d26b7597d3bc77b31729523f49c0d",
+      "source_evidence": {
+        "description": "post-ticon/products/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "18",
+      "dimension": "Apps",
+      "checked": true,
+      "historical_label": "LOSS",
+      "label": "LOSS",
+      "historical_predicate": "per decision 2",
+      "comparison_predicate": "per decision 2",
+      "predicate_changed": false,
+      "comparison_and_limit": "Equivalent released offline iOS/Android products remain missing from retained OTC acceptance. SDK availability does not constitute these products.",
+      "historical_measured_result": null,
+      "retained_product_or_scientific_requirement": "per decision 2",
+      "source_evidence_packet_sha256": "e4f32aa171e8441e8d3adc29fb5f826aae2d26b7597d3bc77b31729523f49c0d",
+      "source_evidence": {
+        "description": "post-ticon/products/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "19",
+      "dimension": "Python, Ruby, TypeScript and Swift SDKs",
+      "checked": true,
+      "historical_label": "BLOCKED",
+      "label": "BLOCKED",
+      "historical_predicate": "Python, Ruby, TypeScript and Swift stay identical and green in CI; publishing/install acceptance waits for launch. C is paused by owner.",
+      "comparison_predicate": "Python, Ruby, TypeScript and Swift stay identical and green in CI; publishing/install acceptance waits for launch. C is paused by owner.",
+      "predicate_changed": false,
+      "comparison_and_limit": "Four native SDKs and merged CI evidence remain accepted; public install/publication capability remains owner-held. No new comparative scientific prerequisite; existing launch evidence gap remains.",
+      "historical_measured_result": null,
+      "retained_product_or_scientific_requirement": "Python, Ruby, TypeScript and Swift stay identical and green in CI; publishing/install acceptance waits for launch. C is paused by owner.",
+      "source_evidence_packet_sha256": "c6444af505e034cb476a49f495baccbf2437228e1d7195b9112aa2100f7f02f2",
+      "source_evidence": {
+        "description": "post-ticon/sdk/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "20",
+      "dimension": "Offline use",
+      "checked": true,
+      "historical_label": "TIE",
+      "label": "TIE",
+      "historical_predicate": "Prediction with zero network in OTC SDKs and applicable data-file swap consumers; no npm compatibility package.",
+      "comparison_predicate": "Prediction with zero network in OTC SDKs and applicable data-file swap consumers; no npm compatibility package.",
+      "predicate_changed": false,
+      "comparison_and_limit": "Same offline prediction capability is actually verified under network denial for SDKs and applicable unchanged readers. Retain accepted TIE.",
+      "historical_measured_result": null,
+      "retained_product_or_scientific_requirement": "Prediction with zero network in OTC SDKs and applicable data-file swap consumers; no npm compatibility package.",
+      "source_evidence_packet_sha256": "c6444af505e034cb476a49f495baccbf2437228e1d7195b9112aa2100f7f02f2",
+      "source_evidence": {
+        "description": "post-ticon/sdk/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "21",
+      "dimension": "Update cadence",
+      "checked": true,
+      "historical_label": "LOSS",
+      "label": "BLOCKED",
+      "historical_predicate": "true/false: every source watched weekly, and a NOAA change reaches a release within 7 days (shown on a fixture change)",
+      "comparison_predicate": "Compare actual source-watch/release cadence using the same source scope, interval and change-to-release measurement for both systems.",
+      "predicate_changed": true,
+      "comparison_and_limit": "The every-source weekly watch and seven-day fixture-to-release clause was applied only to OTC in retained evidence. No same-criterion comparator cycle evidence is supplied. Relative cadence is therefore unproved, not a demonstrated LOSS. OTC full-cycle launch/automation obligation remains incomplete; later NOAA component is not a full-cycle pass.",
+      "historical_measured_result": null,
+      "retained_product_or_scientific_requirement": "true/false: every source watched weekly, and a NOAA change reaches a release within 7 days (shown on a fixture change)",
+      "source_evidence_packet_sha256": "e4f32aa171e8441e8d3adc29fb5f826aae2d26b7597d3bc77b31729523f49c0d",
+      "source_evidence": {
+        "description": "post-ticon/products/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "22",
+      "dimension": "Schema stability",
+      "checked": true,
+      "historical_label": "BLOCKED",
+      "label": "BLOCKED",
+      "historical_predicate": "true/false: one published format version with a stated compatibility rule and a reader gate",
+      "comparison_predicate": "true/false: one published format version with a stated compatibility rule and a reader gate",
+      "predicate_changed": false,
+      "comparison_and_limit": "Public format version/compatibility capability still lacks OTC release evidence. Retain unproved status; no new equivalent-quality condition.",
+      "historical_measured_result": null,
+      "retained_product_or_scientific_requirement": "true/false: one published format version with a stated compatibility rule and a reader gate",
+      "source_evidence_packet_sha256": "c6444af505e034cb476a49f495baccbf2437228e1d7195b9112aa2100f7f02f2",
+      "source_evidence": {
+        "description": "post-ticon/sdk/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "23",
+      "dimension": "Citation",
+      "checked": true,
+      "historical_label": "LOSS",
+      "label": "BLOCKED",
+      "historical_predicate": "true/false: the DOI resolves to the release files",
+      "comparison_predicate": "Compare resolving release-bound citation/DOI capability under the same requirement for both systems.",
+      "predicate_changed": true,
+      "comparison_and_limit": "OTC concept_doi=null and held first release are established. Retained packet does not demonstrate a resolving release-file DOI for the comparator under the same predicate. Relative citation verdict is unproved; OTC DOI obligation and launch hold remain.",
+      "historical_measured_result": null,
+      "retained_product_or_scientific_requirement": "true/false: the DOI resolves to the release files",
+      "source_evidence_packet_sha256": "e4f32aa171e8441e8d3adc29fb5f826aae2d26b7597d3bc77b31729523f49c0d",
+      "source_evidence": {
+        "description": "post-ticon/products/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "24",
+      "dimension": "Provenance and QC transparency",
+      "checked": true,
+      "historical_label": "LOSS",
+      "label": "BLOCKED",
+      "historical_predicate": "true/false: every set has provenance and a time-base code, and every place with a reference has a validation row",
+      "comparison_predicate": "Compare provenance/time-base/validation transparency using equivalent disclosed fields and validation definitions for both systems; report internal universal completeness separately.",
+      "predicate_changed": true,
+      "comparison_and_limit": "OTC provenance 21,375/21,375, missing serialized time-base object/code 10,698, native validation rows zero. Retained evidence lacks comparator measurements under those same field/validation semantics. Internal completeness failure is preserved but no longer claimed as a relative LOSS; comparative transparency remains unproved.",
+      "historical_measured_result": {
+        "sets": 21375,
+        "missing_time_base_object": 10698,
+        "missing_time_base_status_or_code": 10698,
+        "set_level_fallbacks_included": 13654,
+        "station_validation_rows": 0
+      },
+      "retained_product_or_scientific_requirement": "true/false: every set has provenance and a time-base code, and every place with a reference has a validation row",
+      "source_evidence_packet_sha256": "2da6f0bfaf5603ca8482c4069d00bf81fdf6e26ff5d68bf3cefd3e7121d50701",
+      "source_evidence": {
+        "description": "post-ticon/population/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "25",
+      "dimension": "Reproducibility",
+      "checked": true,
+      "historical_label": "BLOCKED",
+      "label": "BLOCKED",
+      "historical_predicate": "**Depends on decision 4.** Option A: an outsider rebuilds with OSI-licensed code only and matches the content hash. Option B: an outsider rebuilds under the published licences (ELv2 grant allows own use) and matches the hash; Slackwater stays ahead on openness and this row is recorded as a known loss",
+      "comparison_predicate": "**Depends on decision 4.** Option A: an outsider rebuilds with OSI-licensed code only and matches the content hash. Option B: an outsider rebuilds under the published licences (ELv2 grant allows own use) and matches the hash; Slackwater stays ahead on openness and this row is recorded as a known loss",
+      "predicate_changed": false,
+      "comparison_and_limit": "Same outsider-rebuild and licence/openness comparison remains dependent on launch/licence choice. No data inclusion rule establishes reproducibility or licence permission.",
+      "historical_measured_result": null,
+      "retained_product_or_scientific_requirement": "**Depends on decision 4.** Option A: an outsider rebuilds with OSI-licensed code only and matches the content hash. Option B: an outsider rebuilds under the published licences (ELv2 grant allows own use) and matches the hash; Slackwater stays ahead on openness and this row is recorded as a known loss",
+      "source_evidence_packet_sha256": "e4f32aa171e8441e8d3adc29fb5f826aae2d26b7597d3bc77b31729523f49c0d",
+      "source_evidence": {
+        "description": "post-ticon/products/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "26",
+      "dimension": "Docs and migration guides",
+      "checked": true,
+      "historical_label": "BLOCKED",
+      "label": "BLOCKED",
+      "historical_predicate": "true/false: a tested guide for each Slackwater surface we cover",
+      "comparison_predicate": "true/false: a tested guide for each Slackwater surface we cover",
+      "predicate_changed": false,
+      "comparison_and_limit": "Tested public migration/install guide capability remains incompletely bound. Existing local examples are not a public install proof; retain comparative evidence gap.",
+      "historical_measured_result": null,
+      "retained_product_or_scientific_requirement": "true/false: a tested guide for each Slackwater surface we cover",
+      "source_evidence_packet_sha256": "e4f32aa171e8441e8d3adc29fb5f826aae2d26b7597d3bc77b31729523f49c0d",
+      "source_evidence": {
+        "description": "post-ticon/products/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "27",
+      "dimension": "Install-and-switch with data files",
+      "checked": true,
+      "historical_label": "LOSS",
+      "label": "LOSS",
+      "historical_predicate": "Data-file swapping for each approved tool, each proven by unchanged reader opening OTC file and predicting, plus OTC own published npm SDK.",
+      "comparison_predicate": "Data-file swapping for each approved tool, each proven by unchanged reader opening OTC file and predicting, plus OTC own published npm SDK.",
+      "predicate_changed": false,
+      "comparison_and_limit": "Actual unchanged data readers work; own published npm SDK remains held. Equivalent published install-and-switch capability is still unavailable in retained evidence.",
+      "historical_measured_result": null,
+      "retained_product_or_scientific_requirement": "Data-file swapping for each approved tool, each proven by unchanged reader opening OTC file and predicting, plus OTC own published npm SDK.",
+      "source_evidence_packet_sha256": "e4f32aa171e8441e8d3adc29fb5f826aae2d26b7597d3bc77b31729523f49c0d",
+      "source_evidence": {
+        "description": "post-ticon/products/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "28",
+      "dimension": "XTide TCD file",
+      "checked": true,
+      "historical_label": "BLOCKED",
+      "label": "BLOCKED",
+      "historical_predicate": "Both recommended/complete files at least equal to both Slackwater TCD and OpenCPN5.14 on quantity that loads/predicts and quality; better overall; complete adds labelled extras.",
+      "comparison_predicate": "Both recommended/complete files at least equal to both Slackwater TCD and OpenCPN5.14 on quantity that loads/predicts and quality; better overall; complete adds labelled extras.",
+      "predicate_changed": false,
+      "comparison_and_limit": "Quantity that actually loads/predicts and quality must be measured on both comparator files with the same predicate. Missing comparator files/crosswalk/results remain a symmetric evidence gap.",
+      "historical_measured_result": null,
+      "retained_product_or_scientific_requirement": "Both recommended/complete files at least equal to both Slackwater TCD and OpenCPN5.14 on quantity that loads/predicts and quality; better overall; complete adds labelled extras.",
+      "source_evidence_packet_sha256": "e4f32aa171e8441e8d3adc29fb5f826aae2d26b7597d3bc77b31729523f49c0d",
+      "source_evidence": {
+        "description": "post-ticon/products/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "29",
+      "dimension": "Recommended set by measured skill",
+      "checked": true,
+      "historical_label": "BLOCKED",
+      "label": "BLOCKED",
+      "historical_predicate": "rows 5 and 6 pass",
+      "comparison_predicate": "rows 5 and 6 pass",
+      "predicate_changed": false,
+      "comparison_and_limit": "Rows5/6 measured-skill comparison remains unproved. Heuristic selection is not evidence of comparative accuracy; internal measured-skill policy is kept separate.",
+      "historical_measured_result": "Existing recommendation identities are preserved into the current candidate. The qualified build report records 730 contested-place decisions using current 278,originator 255,sub_hourly 80,record_id 41 and other source/record heuristics; no measured-skill decision is recorded. The qualified FES census reports 0 sets with validation.",
+      "retained_product_or_scientific_requirement": "rows 5 and 6 pass",
+      "source_evidence_packet_sha256": "7d36671a6a2c299fc74840139ef588858f65df1d8ca6c13e15fe646bdfbc50a0",
+      "source_evidence": {
+        "description": "post-ticon/science/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "30",
+      "dimension": "Units (m/ft, m/s/knots)",
+      "checked": true,
+      "historical_label": "TIE",
+      "label": "TIE",
+      "historical_predicate": "Heights in m/ft and speeds in m/s/knots from every OTC SDK, matching to 1e-9 relative; applicable data-file units retained. Withdrawn npm shim units option is historical.",
+      "comparison_predicate": "Heights in m/ft and speeds in m/s/knots from every OTC SDK, matching to 1e-9 relative; applicable data-file units retained. Withdrawn npm shim units option is historical.",
+      "predicate_changed": false,
+      "comparison_and_limit": "Same units capability retained: actual four-SDK unit conversions and applicable file units already verified. Cross-SDK agreement does not assert better scientific accuracy.",
+      "historical_measured_result": {
+        "status": "LOCAL VERIFIED",
+        "ports": [
+          "python",
+          "ruby",
+          "typescript",
+          "swift"
+        ],
+        "operations": [
+          "heights",
+          "heights_at",
+          "extremes",
+          "currents",
+          "current_events"
+        ],
+        "selectors": {
+          "height": [
+            "meters",
+            "feet"
+          ],
+          "current": [
+            "m/s",
+            "knots"
+          ]
+        },
+        "metadata": "Read-only units on items and result collections; selected named values; existing SI values and defaults retained; localization/native construction preserve both representations.",
+        "conversion_order": "Final SI values after prediction/datum/offset adjustments; height / 0.3048; current / (1852.0 / 3600.0).",
+        "cells": [
+          "Boston reference tide OTC-e813b80c",
+          "Default subordinate OTC-0031a9c4",
+          "PUG1523 current OTC-00bdf4b5 bin 14"
+        ],
+        "modes": [
+          "eager",
+          "stream"
+        ],
+        "calls_per_sdk": 12,
+        "unchanged_si_calls": 48,
+        "selected_values": 4760,
+        "pairwise_comparisons": 14280,
+        "relative_error_bar": 1.0e-09,
+        "maximum_conversion_relative_error": 0.0,
+        "maximum_pairwise_relative_error": 5.772397136613917e-15,
+        "red_green": "Original real requests failed all four before edits; same real surfaces passed after edits. U0-U5 immutable receipts retain requests, source/proof hashes and outputs."
+      },
+      "retained_product_or_scientific_requirement": "Heights in m/ft and speeds in m/s/knots from every OTC SDK, matching to 1e-9 relative; applicable data-file units retained. Withdrawn npm shim units option is historical.",
+      "source_evidence_packet_sha256": "c6444af505e034cb476a49f495baccbf2437228e1d7195b9112aa2100f7f02f2",
+      "source_evidence": {
+        "description": "post-ticon/sdk/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "31",
+      "dimension": "Predictions against a chosen datum",
+      "checked": true,
+      "historical_label": "LOSS",
+      "label": "LOSS",
+      "historical_predicate": "Original matched-place datum-key availability and frozen X31 obligations retained; actual exported data carry datums/chart_datum for existing readers. No npm API shim.",
+      "comparison_predicate": "Original matched-place datum-key availability and frozen X31 obligations retained; actual exported data carry datums/chart_datum for existing readers. No npm API shim.",
+      "predicate_changed": false,
+      "comparison_and_limit": "Matched comparator-place named datum-key availability is a like-for-like feature. Actual all_sets readers confirm ordinary keys absent at named witnesses and at least 72 matched leaders lack MHW. This LOSS is not caused merely by a stricter default filter.",
+      "historical_measured_result": null,
+      "retained_product_or_scientific_requirement": "Original matched-place datum-key availability and frozen X31 obligations retained; actual exported data carry datums/chart_datum for existing readers. No npm API shim.",
+      "source_evidence_packet_sha256": "c6444af505e034cb476a49f495baccbf2437228e1d7195b9112aa2100f7f02f2",
+      "source_evidence": {
+        "description": "post-ticon/sdk/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "32",
+      "dimension": "Search: name, nearest, bbox",
+      "checked": true,
+      "historical_label": "TIE",
+      "label": "TIE",
+      "historical_predicate": "Name search, nearest and bbox in every OTC SDK; no reimplemented Slackwater npm search API.",
+      "comparison_predicate": "Name search, nearest and bbox in every OTC SDK; no reimplemented Slackwater npm search API.",
+      "predicate_changed": false,
+      "comparison_and_limit": "Equivalent name/nearest/bbox capability in each SDK is actually verified. Retain TIE, without npm API reimplementation requirement.",
+      "historical_measured_result": {
+        "public_variants": 144,
+        "runner_variants": 144,
+        "browser_cases": 12,
+        "source_pins": 104,
+        "default_counts": [
+          128,
+          59,
+          18
+        ]
+      },
+      "retained_product_or_scientific_requirement": "Name search, nearest and bbox in every OTC SDK; no reimplemented Slackwater npm search API.",
+      "source_evidence_packet_sha256": "c6444af505e034cb476a49f495baccbf2437228e1d7195b9112aa2100f7f02f2",
+      "source_evidence": {
+        "description": "post-ticon/sdk/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "33",
+      "dimension": "Per-station IANA time zone",
+      "checked": true,
+      "historical_label": "TIE",
+      "label": "TIE",
+      "historical_predicate": "100% of places have a valid IANA zone (tzdata check)",
+      "comparison_predicate": "100% of places have a valid IANA zone (tzdata check)",
+      "predicate_changed": false,
+      "comparison_and_limit": "Existing valid IANA-zone capability proof covers all 16,039 OTC places; retained feature TIE. No quality-labelled subset gate.",
+      "historical_measured_result": {
+        "stations_checked": 16039,
+        "invalid_or_absent_iana_timezone": 0
+      },
+      "retained_product_or_scientific_requirement": "100% of places have a valid IANA zone (tzdata check)",
+      "source_evidence_packet_sha256": "2da6f0bfaf5603ca8482c4069d00bf81fdf6e26ff5d68bf3cefd3e7121d50701",
+      "source_evidence": {
+        "description": "post-ticon/population/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "34",
+      "dimension": "Quality flag and default filter",
+      "checked": true,
+      "historical_label": "LOSS",
+      "label": "TIE",
+      "historical_predicate": "Documented native SDK default filters and actual data-file status mapping; no XP14 npm-wrapper implementation.",
+      "comparison_predicate": "Compare available documented filter/flag capability and implementation fidelity to each declared contract; do not require equal flag values or OTC-only unmeasured comparator audit.",
+      "predicate_changed": true,
+      "comparison_and_limit": "Compare availability of documented filters and faithful declared status mapping, not equality to competitor acceptance flags. Native default/filter proof remains accepted. D5 delivered 3,931 inherited labels, 3,811 false-to-true, 120 inherited-false; D7 preserves them. No current measured mapping defect is retained. Capability TIE; unfinished full internal mapping audit remains disclosed, not an unmatched comparator prerequisite.",
+      "historical_measured_result": {
+        "records": 14207,
+        "accepted_before": 0,
+        "accepted_after": 2716,
+        "tide_gain": 1887,
+        "current_gain": 829,
+        "remaining_comparator_alias_mismatches": 6107,
+        "ordinary_native_ok_mismatch_aliases_remaining": 0
+      },
+      "retained_product_or_scientific_requirement": "Documented native SDK default filters and actual data-file status mapping; no XP14 npm-wrapper implementation.",
+      "source_evidence_packet_sha256": "c6444af505e034cb476a49f495baccbf2437228e1d7195b9112aa2100f7f02f2",
+      "current_counts": {
+        "D5_inherited_labels": 3931,
+        "D5_false_to_true": 3811,
+        "D5_inherited_false": 120,
+        "current_measured_defect": false,
+        "full_internal_mapping_audit": "UNPROVED"
+      },
+      "source_evidence": {
+        "description": "post-ticon/sdk/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "35",
+      "dimension": "Slack water and current direction",
+      "checked": true,
+      "historical_label": "BLOCKED",
+      "label": "TIE",
+      "historical_predicate": "true/false: slack events and direction at every harmonic current place in every SDK; PS Tier B current and direction rows pass",
+      "comparison_predicate": "true/false: slack events and direction at every harmonic current place in every SDK",
+      "predicate_changed": true,
+      "comparison_and_limit": "The comparative capability bar passes for all 805 accepted harmonic-current places in Python, Ruby, TypeScript and Swift. Each SDK returned 115,920 actual vector samples from 805 currents calls; retained event replies passed slack semantics at all 805 places, including 90,653 slack events per SDK. Vector components, speed, source-bin direction geometry and cross-SDK agreement passed with no holes. This establishes capability, not accuracy or PS Tier B acceptance. No zero-speed vector sample occurred; the zero-speed null branch is not newly qualified. Event slack directions were correctly null.",
+      "historical_measured_result": null,
+      "retained_product_or_scientific_requirement": "true/false: slack events and direction at every harmonic current place in every SDK; PS Tier B current and direction rows pass",
+      "source_evidence_packet_sha256": "c6444af505e034cb476a49f495baccbf2437228e1d7195b9112aa2100f7f02f2",
+      "source_evidence": {
+        "description": "post-ticon/sdk/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      },
+      "current_counts": {
+        "required_places": 805,
+        "SDKs": [
+          "Python",
+          "Ruby",
+          "TypeScript",
+          "Swift"
+        ],
+        "passed_places_per_SDK": 805,
+        "currents_calls_per_SDK": 805,
+        "samples_per_place": 144,
+        "samples_per_SDK": 115920,
+        "total_currents_calls": 3220,
+        "total_vector_samples": 463680,
+        "retained_slack_places_per_SDK": 805,
+        "retained_slack_events_per_SDK": 90653,
+        "vector_holes_per_SDK": 0,
+        "event_holes_per_SDK": 0,
+        "zero_speed_vector_samples": 0,
+        "max_cross_SDK_numeric_difference": 6.252776074688882e-13
+      },
+      "measurement": {
+        "data": "OTC_20261011.jsonl from accepted normal-main profile output at dataset commit ebe3605e84328e4ecc546ddd4745614ec51f4271 (PR #86)",
+        "SDK_main_commit": "84283c15",
+        "executed_runtime_baseline_commit": "233a70d39288fb87dcfb88b70e2bd1feb09ae10b",
+        "runtime_binding": "Existing native artifacts reused under accepted unchanged-current-behavior binding to SDK main; exact artifact and command bindings are retained locally, unbundled.",
+        "cohort": "Frozen 805 accepted harmonic-current 1 km places; one representative with successful retained event output in every SDK per place. Current station, set and bin identities matched those representatives.",
+        "new_operations": {
+          "open": {
+            "file": "OTC_20261011.jsonl",
+            "mode": "stream"
+          },
+          "currents": {
+            "calls_per_SDK": 805,
+            "selection": "Explicit actual station_id, set_id and bin_number for each frozen representative",
+            "start_local": "December 31, 2026, 4:00 PM PST",
+            "stop_local_exclusive": "January 1, 2027, 4:00 PM PST",
+            "step_s": 600
+          }
+        },
+        "retained_events": "Existing January 2027 current_events replies were aggregated once; no event predictions were rerun. Checks covered slack type, zero velocity, null slack direction, max-event signs and source mean flood/ebb headings.",
+        "vector_checks": "Expected sample availability and times; finite major/minor velocity and speed; nonnegative speed equal to vector magnitude; nonzero-speed direction in [0, 360) matching the source-bin vector geometry; cross-SDK sample/time/null/numeric agreement. Tolerances: 1e-9 m/s for speed identity, 1e-8 degrees for vector direction, 1e-8 for cross-SDK numeric agreement.",
+        "runner_entry_points": {
+          "repository": "https://github.com/opentideconstants/sdk",
+          "python": "python conformance/runners/python/runner.py --installed",
+          "ruby": "ruby conformance/runners/ruby/runner.rb",
+          "typescript": "node conformance/runners/node/runner.mjs (explicit retained SDK artifact selected with --sdk)",
+          "swift": "Existing native Runner executable from the conformance runner build"
+        },
+        "orchestration": "Ruby JSONL request orchestration; one persistent SDK lane at a time; no SDK builds, fits or model calculations.",
+        "raw_evidence": {
+          "availability": "Measurement script, exact requests, raw native replies, retained-event check output and runtime bindings are retained locally and are not bundled in this repository. No public raw-evidence link is claimed.",
+          "script_name": "measure805.rb",
+          "script_sha256": "dd6578de4a7fcd62757b9575e3ee60165e6537eb0c404c499b645eab43365e13",
+          "output_name": "full-measurement.log",
+          "output_sha256": "e1a6432c6dd533b4e3e67f71e9fc2b60fc5dadf5e0cbdd6ddedf62a8ad86d5a8"
+        }
+      }
+    },
+    {
+      "id": "36",
+      "dimension": "Constituents per station",
+      "checked": true,
+      "historical_label": "BLOCKED",
+      "label": "BLOCKED",
+      "historical_predicate": "No matched place loses row 5 because of the cap: every place in FIX-CONST's list passes or keeps the agency set",
+      "comparison_predicate": "No matched place loses row 5 because of the cap: every place in FIX-CONST's list passes or keeps the agency set",
+      "predicate_changed": false,
+      "comparison_and_limit": "Same matched-place accuracy impact, rather than raw constituent count, is the criterion. Current FIX-CONST/row5 join remains missing; preserve independent scientific limitation.",
+      "historical_measured_result": "FIX-CONST scores show changed/extended-list method behavior at 37 of 252 gauges; retained historical measurements record Anchorage selecting a NOAA 111-constituent set rather than the GESLA 45-constituent fit. Current preservation receipts retain all coefficients and recommendation IDs; FES carries 32 supported constituents and labels MSQM/MTM unsupported.",
+      "retained_product_or_scientific_requirement": "No matched place loses row 5 because of the cap: every place in FIX-CONST's list passes or keeps the agency set",
+      "source_evidence_packet_sha256": "7d36671a6a2c299fc74840139ef588858f65df1d8ca6c13e15fe646bdfbc50a0",
+      "source_evidence": {
+        "description": "post-ticon/science/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "37",
+      "dimension": "Location metadata",
+      "checked": true,
+      "historical_label": "LOSS",
+      "label": "BLOCKED",
+      "historical_predicate": "Every place has locality, region and country code; no ODbL-derived field is shipped (true/false)",
+      "comparison_predicate": "Availability of equivalent locality, region and country information under each schema, using documented mappings and actual values; identical property names are not required.",
+      "predicate_changed": true,
+      "comparison_and_limit": "Retained OTC census proves missing explicit locality/region/country_code properties, while native country and 3,003 source-backed region_code values exist. Comparator snapshot has region in 11,586/12,015, country_code in 12,015/12,015 and no explicit locality property. These field-name differences do not measure equivalent semantic information. No retained complete cross-schema semantic mapping/value census supports a comparative LOSS or TIE; keep relative metadata availability unproved. Internal completeness and no-ODbL obligations remain unchanged.",
+      "historical_measured_result": {
+        "locality": 16039,
+        "region": 16039,
+        "country_code": 16039,
+        "region_code": 13036
+      },
+      "retained_product_or_scientific_requirement": "Every place has locality, region and country code; no ODbL-derived field is shipped (true/false)",
+      "source_evidence_packet_sha256": "2da6f0bfaf5603ca8482c4069d00bf81fdf6e26ff5d68bf3cefd3e7121d50701",
+      "source_evidence": {
+        "description": "post-ticon/population/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    },
+    {
+      "id": "T",
+      "dimension": "Time-base correctness (asked for by the owner; not a plan row)",
+      "checked": true,
+      "historical_label": "BLOCKED",
+      "label": "BLOCKED",
+      "historical_predicate": null,
+      "comparison_predicate": null,
+      "predicate_changed": false,
+      "comparison_and_limit": "Same-gauge/sample comparative clock correctness audit remains missing. Neither FES phase convention nor missing time-base object proves a clock error; retain unproved status.",
+      "historical_measured_result": "Source time-base fields, coefficients and recommendations are preserved by the qualified region/subordinate/TICON chain. Prior reports contain OTC-only sample clock checks and individual Slackwater cases; none is an equal-sample comparative clock audit.",
+      "retained_product_or_scientific_requirement": null,
+      "source_evidence_packet_sha256": "7d36671a6a2c299fc74840139ef588858f65df1d8ca6c13e15fe646bdfbc50a0",
+      "source_evidence": {
+        "description": "post-ticon/science/rows.json (historical evidence retained locally; unbundled)",
+        "bundled": false
+      }
+    }
+  ],
+  "limits": [
+    "Unreleased candidate status; this file does not approve launch, publication or release.",
+    "Comparison labels use the accepted symmetric predicates. Historical product and scientific requirements remain recorded separately on each row.",
+    "The row 35 capability measurement does not establish accuracy or PS Tier B acceptance, and does not claim an advantage over the comparator.",
+    "Row 9 remains LOSS at 5,874/6,353. Row 10 remains LOSS at 5,591/6,342; no new LAT/HAT coverage gain is claimed.",
+    "Raw measurements and historical evidence are retained locally and unbundled. This milestone is an evidence summary, not a standalone reproduction package."
+  ]
+}
