@@ -1,7 +1,7 @@
 {
   "status": "UNRELEASED_CANDIDATE_MILESTONE_NOT_LAUNCH_APPROVAL",
   "milestone_date": "2026-10-21",
-  "scope": "39-row comparison scorecard. Preserve the accepted symmetric-comparison row identities and predicates. Only row 35 changes verdict; row 9 refreshes accepted coverage counts. Product filters, recommendations, scientific gates and release status are unchanged.",
+  "scope": "39-row comparison scorecard. Row 1 resolves the regional clause with a newly dated symmetric map; its original BLOCKED history is preserved. Retain the earlier row 35 verdict and row 9 coverage updates. Other rows, product filters, recommendations, scientific gates and release status are unchanged.",
   "dataset_commit": "ebe3605e84328e4ecc546ddd4745614ec51f4271",
   "dataset_commit_url": "https://github.com/opentideconstants/opentideconstants/commit/ebe3605e84328e4ecc546ddd4745614ec51f4271",
   "baseline": {
@@ -15,9 +15,9 @@
     }
   },
   "counts": {
-    "BLOCKED": 17,
-    "WIN": 2,
+    "WIN": 3,
     "TIE": 11,
+    "BLOCKED": 16,
     "LOSS": 9
   },
   "milestone_verdict_changes": [
@@ -26,6 +26,12 @@
       "before": "BLOCKED",
       "after": "TIE",
       "reason": "Previously missing full-population slack/direction capability evidence is now measured for all 805 places in all four SDKs."
+    },
+    {
+      "id": "1",
+      "before": "BLOCKED",
+      "after": "WIN",
+      "reason": "New 2026-10-21 source-backed symmetric regional map resolves the missing regional comparison; all eight geographic bars are strictly larger. Historical missing-map result remains preserved; quantity only, no accuracy claim."
     }
   ],
   "rows": [
@@ -34,11 +40,11 @@
       "dimension": "Places with real constants (1 km)",
       "checked": true,
       "historical_label": "LOSS",
-      "label": "BLOCKED",
+      "label": "WIN",
       "historical_predicate": "Overall ≥ 5,141 (all) and OTC ok ≥ 4,554 (accepted); per region per §3.1, with only the frozen exception E1",
-      "comparison_predicate": "All labelled real-constant places vs all labelled real-constant places at 1 km, globally and the same frozen regions/E1 on both sides.",
+      "comparison_predicate": "All labelled real-constant places vs all labelled real-constant places at 1 km, globally and under the same newly dated 2026-10-21 country-to-region map on both sides; retain the named E1 pool and Unknown places.",
       "predicate_changed": true,
-      "comparison_and_limit": "Same all-record constants predicate gives 8,785 vs 5,141, including flagged/model-labelled records on both sides. Global count passes. The explicitly geographic per-region comparison remains unproved: retained packets contain no frozen regional cohort assignment/count table or E1 application. This is a symmetric geographic requirement, not OTC QC acceptance. No regional superiority inferred from global totals.",
+      "comparison_and_limit": "The accepted global count remains 8,785 vs 5,141. Reassigning retained constant-place leaders under one source-backed 2026-10-21 map gives strictly larger OTC counts in all six main tide regions, the named E1 pool and US currents. WIN is for constant-place quantity only, not prediction accuracy, scientific acceptance or public release. This is a new dated map, not recovery of the missing original SC0 map; the historical BLOCKED result is preserved.",
       "historical_measured_result": {
         "station_partition": {
           "usable_constants_no_ok_qc_flagged": 8902,
@@ -72,11 +78,120 @@
         "otc_all": 8785,
         "comparator_all": 5141,
         "global_clause": "PASS",
-        "regional_clause": "UNPROVED_FROZEN_REGION_COHORTS_AND_E1_BINDING_REQUIRED"
+        "regional_clause": "PASS_NEW_DATED_MAP_2026_10_21"
       },
       "source_evidence": {
         "description": "post-ticon/population/rows.json (historical evidence retained locally; unbundled)",
         "bundled": false
+      },
+      "regional_history": [
+        {
+          "label": "BLOCKED",
+          "comparison_predicate": "All labelled real-constant places vs all labelled real-constant places at 1 km, globally and the same frozen regions/E1 on both sides.",
+          "comparison_and_limit": "Same all-record constants predicate gives 8,785 vs 5,141, including flagged/model-labelled records on both sides. Global count passes. The explicitly geographic per-region comparison remains unproved: retained packets contain no frozen regional cohort assignment/count table or E1 application. This is a symmetric geographic requirement, not OTC QC acceptance. No regional superiority inferred from global totals.",
+          "current_counts": {
+            "otc_all": 8785,
+            "comparator_all": 5141,
+            "global_clause": "PASS",
+            "regional_clause": "UNPROVED_FROZEN_REGION_COHORTS_AND_E1_BINDING_REQUIRED"
+          },
+          "status": "Preserved historical result; original frozen map and regional/E1 binding not recovered."
+        }
+      ],
+      "regional_measurement": {
+        "date": "2026-10-21",
+        "map": "pipeline/data/scorecard/row1-regions-20261021.json",
+        "method": "Reuse retained 1 km constant-place clusters and their leaders; join current native country and retained comparator country_code to one source-backed table. No reclustering, new constants eligibility, prediction runs or geography acquisition.",
+        "bars": [
+          {
+            "region": "Asia",
+            "quantity": "tide",
+            "otc": 394,
+            "comparator": 343
+          },
+          {
+            "region": "Canada",
+            "quantity": "tide",
+            "otc": 1476,
+            "comparator": 300
+          },
+          {
+            "region": "E1 pool",
+            "quantity": "tide",
+            "otc": 71,
+            "comparator": 61
+          },
+          {
+            "region": "Europe",
+            "quantity": "tide",
+            "otc": 1062,
+            "comparator": 924
+          },
+          {
+            "region": "Latin America & Caribbean",
+            "quantity": "tide",
+            "otc": 269,
+            "comparator": 171
+          },
+          {
+            "region": "Oceania",
+            "quantity": "tide",
+            "otc": 859,
+            "comparator": 210
+          },
+          {
+            "region": "United States & territories",
+            "quantity": "current",
+            "otc": 805,
+            "comparator": 797
+          },
+          {
+            "region": "United States & territories",
+            "quantity": "tide",
+            "otc": 3849,
+            "comparator": 2335
+          }
+        ],
+        "e1_components": [
+          {
+            "region": "Africa",
+            "otc": 63,
+            "comparator": 58
+          },
+          {
+            "region": "Unknown",
+            "otc": 1,
+            "comparator": 0
+          },
+          {
+            "region": "Antarctica",
+            "otc": 7,
+            "comparator": 3
+          },
+          {
+            "region": "Atlantic Ocean",
+            "otc": 0,
+            "comparator": 0
+          }
+        ],
+        "unknown_places": [
+          {
+            "side": "otc",
+            "leader": "fes2022:OTC-1f91a5ad",
+            "country": null
+          }
+        ],
+        "cohort_conservation": {
+          "otc": 8785,
+          "comparator": 5141
+        },
+        "retained_inputs": {
+          "otc_clusters": "SCORECARD/post-ticon/population/row9/current-full-clusters.json",
+          "comparator_clusters": "INT-2/fix-r1/codex-verification/coverage/sw_clusters_1km.csv",
+          "otc_source_geography": "fes-msqm-mtm/main-build/OTC_20261011.jsonl",
+          "comparator_source_geography": "/Users/jpr5/.local/state/otc-slackwater-coverage/sw/sw_stations_20261009.json"
+        },
+        "input_note": "Relative retained input names are below the local otc-impl evidence root. These measurements remain unbundled, as with the existing scorecard; the dated region table is committed."
       }
     },
     {
@@ -801,7 +916,7 @@
         "unchanged_si_calls": 48,
         "selected_values": 4760,
         "pairwise_comparisons": 14280,
-        "relative_error_bar": 1.0e-09,
+        "relative_error_bar": 0.000000001,
         "maximum_conversion_relative_error": 0.0,
         "maximum_pairwise_relative_error": 5.772397136613917e-15,
         "red_green": "Original real requests failed all four before edits; same real surfaces passed after edits. U0-U5 immutable receipts retain requests, source/proof hashes and outputs."
