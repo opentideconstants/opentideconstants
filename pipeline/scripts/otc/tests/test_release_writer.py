@@ -1059,6 +1059,35 @@ def test_current_offsets_reference_must_be_a_station(release):
     assert any("'OTC-NOPE' is not an active station" in e for e in errors), errors
 
 
+def test_mixed_current_offsets_can_reference_an_own_harmonic_bin(release, tmp_path):
+    ref = _station(release, "OTC-EXAMPLE-0003")
+    offset = copy.deepcopy(_station(release, "OTC-EXAMPLE-0004")["current_offsets"][0])
+    offset["bin"] = 3
+    ref["current_offsets"] = [offset]
+    assert validate_release(release) == []
+    write(release, tmp_path)
+    assert json.loads((tmp_path / f"OTC_{D}.json").read_text()) == release
+
+
+@pytest.mark.parametrize("reference_bin,needle", [(3, "station itself"), (7, "not a bin")])
+def test_mixed_current_reference_requires_different_harmonic_bin(release, reference_bin, needle):
+    ref = _station(release, "OTC-EXAMPLE-0003")
+    offset = copy.deepcopy(_station(release, "OTC-EXAMPLE-0004")["current_offsets"][0])
+    offset.update(bin=3, reference_bin=reference_bin)
+    ref["current_offsets"] = [offset]
+    errors = validate_release(release)
+    assert any(needle in e for e in errors), errors
+
+
+def test_mixed_current_offsets_cannot_reference_an_offsets_only_station(release):
+    ref = _station(release, "OTC-EXAMPLE-0003")
+    offset = copy.deepcopy(_station(release, "OTC-EXAMPLE-0004")["current_offsets"][0])
+    offset.update(bin=3, reference_station_id="OTC-EXAMPLE-0004")
+    ref["current_offsets"] = [offset]
+    errors = validate_release(release)
+    assert any("'OTC-EXAMPLE-0004' is not a reference station" in e for e in errors), errors
+
+
 def test_default_current_bin_must_name_a_bin(release):
     _station(release, "OTC-EXAMPLE-0003")["default_current_bin"] = 9
     errors = validate_release(release)

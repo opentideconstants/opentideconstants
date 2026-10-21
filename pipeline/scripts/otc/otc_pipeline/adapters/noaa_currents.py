@@ -336,15 +336,10 @@ class NoaaCurrentsAdapter:
                     refs_ok[sid] = good
                 else:
                     out[sid] = "no H bin with usable constants"
-                if "S" in types:
-                    for r in it["rows"]:
-                        if r["type"] == "S":
-                            out[f"{sid}_{r['currbin']}"] = "S bin of a station with H bins (one station " \
-                                                           "is a reference or a subordinate, not both)"
             elif "S" not in types:
                 out[sid] = "W only: weak and variable (NOAA publishes no predictions)"
         for sid, it in sorted(fetched.items.items()):
-            if any(r["type"] == "H" for r in it["rows"]) or not any(r["type"] == "S" for r in it["rows"]):
+            if not any(r["type"] == "S" for r in it["rows"]):
                 continue
             good = 0
             for r in it["rows"]:
@@ -355,7 +350,7 @@ class NoaaCurrentsAdapter:
                 ref, rbin = off.get("refStationId"), off.get("refStationBin")
                 if not ref:
                     out[key] = "S bin with no reference station"
-                elif ref == sid:
+                elif ref == sid and rbin == r["currbin"]:
                     out[key] = "subordinate to itself"
                 elif ref not in refs_ok:
                     out[key] = f"reference {ref!r} is not a fetched station with usable H bins"
@@ -363,7 +358,7 @@ class NoaaCurrentsAdapter:
                     out[key] = f"reference bin {ref}_{rbin} is not a usable H bin"
                 else:
                     good += 1
-            if not good:
+            if not good and sid not in refs_ok:
                 out[sid] = "no S bin with a usable reference"
         return out
 
@@ -416,6 +411,8 @@ class NoaaCurrentsAdapter:
             if sid in skipped:
                 continue
             rows = it["rows"]
+            offs = [self._offset(r, it["offsets"][r["currbin"]], lic) for r in rows
+                    if r["type"] == "S" and f"{sid}_{r['currbin']}" not in skipped]
             if any(r["type"] == "H" for r in rows):
                 hb = self._h_bins(it)
                 bins = [self._bin(r, hb[r["currbin"]], it["offsets"].get(r["currbin"]))
@@ -440,10 +437,8 @@ class NoaaCurrentsAdapter:
                                        "input_sha256": list(it["input_sha256"]),
                                        "selection_reason": "NOAA CO-OPS current harmonic constants; speeds as "
                                                            "the release's astro table"},
-                    })
+                    }, subordinate_offsets={"current_offsets": offs} if offs else None)
             else:
-                offs = [self._offset(r, it["offsets"][r["currbin"]], lic) for r in rows
-                        if r["type"] == "S" and f"{sid}_{r['currbin']}" not in skipped]
                 hint = self._hint(sid, rows, "subordinate")
                 hint["default_current_bin"] = offs[0]["bin"]
                 yield SourceSet(station_hint=hint, constant_set=None,

@@ -160,6 +160,48 @@ def test_reference_bin_must_exist(tmp_path):
     assert "ACT0091" not in sets_by_id(a, f)
 
 
+@pytest.mark.parametrize("sid,number,expected", [
+    ("ACT8851", 1, (15, 2, 5, 17, 1.0, 1.1, 272, 91)),
+    ("ACT8851", 3, (-1, -3, -13, -18, 0.8, 0.9, 274, 94)),
+    ("ACT8856", 1, (7, -16, -1, 9, 1.0, 1.1, 295, 125)),
+    ("ACT8856", 3, (-11, 17, -8, -32, 0.8, 0.6, 306, 115)),
+])
+def test_mixed_current_bins_keep_saved_offsets(tmp_path, sid, number, expected):
+    a = adapter()
+    f = a.fetch(tmp_path, only=[sid])
+    assert f"{sid}_{number}" not in a.skipped(f), a.skipped(f)
+    ss = sets_by_id(a, f)[sid]
+    assert ss.station_hint["type"] == "reference"
+    assert ss.station_hint["default_current_bin"] == 2
+    assert [b["bin"] for b in ss.constant_set["current_bins"]] == [2]
+    co = next(o for o in ss.subordinate_offsets["current_offsets"] if o["bin"] == number)
+    assert (co["reference_source_record_id"], co["reference_bin"]) == (sid, 2)
+    fields = ("time_adj_max_flood_min", "time_adj_slack_before_ebb_min", "time_adj_max_ebb_min",
+              "time_adj_slack_before_flood_min", "flood_amp_ratio", "ebb_amp_ratio",
+              "mean_flood_dir_deg", "mean_ebb_dir_deg")
+    assert tuple(co[k] for k in fields) == expected
+    assert co["licence_id"] == "noaa-public-domain"
+    assert ss.constant_set["provenance"]["input_sha256"] == list(f.items[sid]["input_sha256"])
+    assert_contract(a, f)
+
+
+@pytest.mark.parametrize("reference_bin", [1, 3, 99])
+def test_bad_mixed_offsets_do_not_discard_harmonic_bin(tmp_path, reference_bin):
+    overrides = {}
+    for number in (1, 3):
+        off = json.loads((FIX / "offsets" / f"ACT8851_{number}.json").read_text())
+        off["refStationBin"] = reference_bin
+        overrides[f"offsets/ACT8851_{number}.json"] = off
+    a = adapter(overrides)
+    f = a.fetch(tmp_path, only=["ACT8851"])
+    skipped = a.skipped(f)
+    assert "ACT8851" not in skipped
+    assert all(f"ACT8851_{n}" in skipped for n in (1, 3))
+    ss = sets_by_id(a, f)["ACT8851"]
+    assert ss.subordinate_offsets is None
+    assert [b["bin"] for b in ss.constant_set["current_bins"]] == [2]
+
+
 def test_weak_and_variable_station_makes_nothing(tmp_path):
     a = adapter()
     f = a.fetch(tmp_path, only=["ACT0261"])     # W: no harcon or offsets request

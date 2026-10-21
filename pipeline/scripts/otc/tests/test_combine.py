@@ -6,17 +6,22 @@ from __future__ import annotations
 import copy
 import hashlib
 import math
+import json
 
 import pytest
 
 from otc_pipeline import combine
 from otc_pipeline import currents_canary as cc
 from otc_pipeline import station_map as sm
-from otc_pipeline.adapter import SourceSet
+from otc_pipeline.adapter import SourceSet, assemble_release
 from otc_pipeline.adapters.noaa import NoaaAdapter
 from otc_pipeline.adapters.noaa_currents import NoaaCurrentsAdapter
 from otc_pipeline.combine import AgencySource, CombineError, Place
 from otc_pipeline.current_proof import Comparison
+from otc_pipeline.release_writer import validate_release, write_release
+
+from contract_stubs import shape_only_astro_tables
+from test_noaa_currents import adapter as saved_current_adapter
 
 NOAA_LIC = NoaaAdapter().licence()
 TABLE = "tcd-20251228"
@@ -25,6 +30,31 @@ TABLE = "tcd-20251228"
 def test_noaa_sources_share_one_licence_object():
     # one release holds one licence per licence_id: both NOAA adapters must give the same object
     assert NoaaAdapter().licence() == NoaaCurrentsAdapter().licence()
+
+
+def test_real_mixed_current_bins_survive_builder_and_writer(tmp_path):
+    a = saved_current_adapter()
+    fetched = a.fetch(tmp_path / "source", only=["ACT8851", "ACT8856"])
+    sets = list(a.sets(fetched))
+    tables = shape_only_astro_tables(sets)
+    shell = assemble_release(a, [], fetched, a.constituent_table(), tables)
+    shell["conventions"] = []
+    ids = {"noaa-currents:ACT8851": "OTC-7c4e4c70", "noaa-currents:ACT8856": "OTC-14e250fa"}
+    source = AgencySource(a.source, fetched.source_version, a.convention(), [a.licence()], sets, "noaa")
+    result, report = combine.merge(shell, {a.source: source}, station_ids=ids, build_commit="abcdef0",
+                                   table_id=tables[0]["astro_table_id"], canaries={a.source: PASS})
+    assert report.refused == []
+    assert validate_release(result) == []
+    for st in result["stations"]:
+        ss = next(s for s in sets if s.station_hint["aliases"] == st["aliases"])
+        assert st["type"] == "reference" and st["default_current_bin"] == 2
+        assert st["constant_sets"][0]["current_bins"] == ss.constant_set["current_bins"]
+        assert st["recommended_set_id"] == st["constant_sets"][0]["set_id"]
+        assert [o["bin"] for o in st.get("current_offsets", [])] == [1, 3]
+        assert all(o["reference_station_id"] == st["station_id"] and o["reference_bin"] == 2
+                   for o in st["current_offsets"])
+    write_release(result, tmp_path / "written", datestamp="20000101", app_export=None, congen_run=None)
+    assert json.loads((tmp_path / "written" / "OTC_20000101.json").read_text()) == result
 
 
 # --- builders ---------------------------------------------------------------------------------------
