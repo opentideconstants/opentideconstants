@@ -278,6 +278,88 @@ def station_roster(release: dict) -> dict:
             and "default_current_bin" not in st}
 
 
+def extend_cached_astronomy(release: dict, extraction: dict, *, primary, extended) -> dict:
+    """Materialize only retained MSQM/MTM values using the separately authenticated FES table."""
+    from otc_pipeline.astro_tables import (FES_ADDED, FES_TABLE_ID, FES_TCD_SHA256, TABLE_ID,
+                                          TCD_SHA256, CongenRun, astro_table, release_table_errors)
+
+    if (not isinstance(primary, CongenRun) or not isinstance(extended, CongenRun)
+            or primary.tcd.tcd_sha256 != TCD_SHA256 or extended.tcd.tcd_sha256 != FES_TCD_SHA256):
+        raise ValueError("FES extension requires authenticated original and extended astronomy runs")
+    if set(extended.tcd.constituents) != set(primary.tcd.constituents) | set(FES_ADDED):
+        raise ValueError("FES extension changes other constituent identities")
+    for name, old in primary.tcd.constituents.items():
+        new = extended.tcd.constituents[name]
+        if (old.speed, old.v0u, old.f) != (new.speed, new.v0u, new.f):
+            raise ValueError(f"FES extension changes existing astronomy: {name}")
+    if dict(primary.tcd.aliases) != dict(extended.tcd.aliases):
+        raise ValueError("FES extension changes existing astronomy aliases")
+    if extraction.get("algorithm") != ALGORITHM_VERSION:
+        raise ValueError("FES extraction algorithm differs")
+    conventions = [row for row in release["conventions"] if row["convention_id"] == "fes2022b-ocean-greenwich"]
+    if len(conventions) != 1 or conventions[0]["astro_table_id"] != TABLE_ID:
+        raise ValueError("FES convention is absent or already extended")
+    table = next(row for row in release["astro_tables"] if row["astro_table_id"] == TABLE_ID)
+    if release_table_errors(table, *primary):
+        raise ValueError("Original astronomy table differs from the accepted run")
+    speeds = TableSpeeds({name: row.speed for name, row in extended.tcd.constituents.items()}, extended.tcd.aliases)
+    staged, names = [], set(FES_ADDED)
+    for station in release["stations"]:
+        for cs in station["constant_sets"]:
+            if cs["source"] != "fes2022":
+                continue
+            sid = station["station_id"]
+            item = extraction.get("items", {}).get(sid)
+            if item is None or cs["provenance"]["input_sha256"] != item.get("input_sha256"):
+                raise ValueError(f"FES retained input binding differs: {sid}")
+            record = next((row for row in station["source_records"] if row["source"] == "fes2022"), None)
+            if record is None or record["provenance"]["inventory_sha256"] != extraction.get("manifest_sha256"):
+                raise ValueError(f"FES retained manifest differs: {sid}")
+            if cs["constituents"] != item.get("constituents"):
+                raise ValueError(f"FES existing coefficients differ: {sid}")
+            raw = {row["native_name"]: row for row in item["native"]}
+            if len(raw) != len(item["native"]) or set(raw) != set(NATIVE_NAMES):
+                raise ValueError(f"FES native inventory differs: {sid}")
+            for coefficient in cs["constituents"]:
+                source = raw[coefficient["source_name"]]
+                if source["status"] != "available" or any(coefficient[key] != source[key] for key in ("amplitude_m", "phase_deg")):
+                    raise ValueError(f"FES retained coefficient differs: {sid}")
+            additions = []
+            for name in FES_ADDED:
+                source = raw[name.lower()]
+                if source["status"] != "available":
+                    continue
+                amplitude, phase = source["amplitude_m"], source["phase_deg"]
+                if not math.isfinite(amplitude) or amplitude < 0 or not math.isfinite(phase) or not 0 <= phase < 360:
+                    raise ValueError(f"Invalid retained FES coefficient: {sid}/{name}")
+                dropped = next((row for row in cs.get("dropped_constituents", []) if row["name"] == name), None)
+                if dropped != dropped_no_row(name):
+                    raise ValueError(f"FES constituent has another exclusion: {sid}/{name}")
+                additions.append({"name": name, "source_name": name.lower(), "speed_deg_per_hour": speeds.speed(name),
+                                  "amplitude_m": amplitude, "phase_deg": phase})
+            staged.append((cs, additions))
+            names.update(row["name"] for row in cs["constituents"])
+    extended_table = astro_table(*extended, names, table_id=FES_TABLE_ID)
+    for name in names - set(FES_ADDED):
+        if extended_table["constituents"][name] != table["constituents"][name]:
+            raise ValueError(f"FES extension changes a published astronomy row: {name}")
+    # All bindings and numerical preservation checks precede mutation.
+    for cs, additions in staged:
+        cs["constituents"].extend(additions)
+        added = {row["name"] for row in additions}
+        dropped = [row for row in cs.get("dropped_constituents", []) if row["name"] not in added]
+        if dropped:
+            cs["dropped_constituents"] = dropped
+        else:
+            cs.pop("dropped_constituents", None)
+    conventions[0]["astro_table_id"] = FES_TABLE_ID
+    release["astro_tables"].append(extended_table)
+    release["constituents"].extend({"name": name, "constituent_table_version": conventions[0]["constituent_table_version"],
+                                    "speed_deg_per_hour": speeds.speed(name)} for name in FES_ADDED)
+    return {"sets_extended": sum(bool(rows) for _, rows in staged),
+            "coefficients_added": sum(len(rows) for _, rows in staged)}
+
+
 def attach(release: dict, fetched: FetchResult, *, build_commit: str, table_id: str,
            canary_result, adapter: Fes2022Adapter) -> dict:
     """Append model results by canonical ID, preserving all preexisting source values."""

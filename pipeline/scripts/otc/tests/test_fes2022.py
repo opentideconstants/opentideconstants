@@ -254,3 +254,104 @@ def test_native_aliases_never_substitute_unsupported_harmonics():
 def test_unknown_station_is_rejected_before_reading_grids(tmp_path):
     with pytest.raises(ValueError, match="unknown FES station"):
         Fes2022Adapter().fetch(tmp_path, only=["made-up"])
+
+
+@pytest.fixture
+def retained_fes_astro():
+    root = os.environ.get("OTC_FES_ASTRO_PROOF")
+    if not root:
+        pytest.skip("requires retained actual FES extraction and authenticated astronomy runs")
+    from otc_pipeline.astro_tables import load_congen_run
+
+    root = Path(root)
+    release = json.loads((root / "baseline.meta.json").read_text())
+    release["stations"] = list(json.loads((root / "actual-three-stations.json").read_text()).values())
+    extraction = {"algorithm": "complex-bilinear-valid-corners-ocean-v1",
+                  "manifest_sha256": "6fe6a5233b4375065daea5a72ce134e91be4f072cd629533ef8ff89bab8ecadb",
+                  "items": json.loads((root / "actual-three-extractions.json").read_text())}
+    return (release, extraction, load_congen_run(Path(os.environ["OTC_CONGEN_RUN"])),
+            load_congen_run(root / "astro-fes", fes=True))
+
+
+def test_cached_fes_extra_terms_materialize_actual_three_stations(retained_fes_astro):
+    from otc_pipeline.adapters.fes2022 import extend_cached_astronomy
+    from otc_pipeline.astro_tables import FES_TABLE_ID
+
+    release, extraction, primary, extended = retained_fes_astro
+    before = copy.deepcopy(release)
+    report = extend_cached_astronomy(release, extraction, primary=primary, extended=extended)
+    assert report == {"sets_extended": 3, "coefficients_added": 6}
+    for prior, after in zip(before["stations"], release["stations"]):
+        old_fes = next(cs for cs in prior["constant_sets"] if cs["source"] == "fes2022")
+        fes = next(cs for cs in after["constant_sets"] if cs["source"] == "fes2022")
+        added = [row for row in fes["constituents"] if row["name"] in {"MSQM", "MTM"}]
+        assert len(added) == 2
+        raw = {row["native_name"].upper(): row for row in extraction["items"][after["station_id"]]["native"]}
+        for row in added:
+            assert (row["amplitude_m"], row["phase_deg"]) == (raw[row["name"]]["amplitude_m"], raw[row["name"]]["phase_deg"])
+        restored = copy.deepcopy(fes)
+        restored["constituents"] = [row for row in restored["constituents"] if row["name"] not in {"MSQM", "MTM"}]
+        restored["dropped_constituents"] = old_fes["dropped_constituents"]
+        assert restored == old_fes
+        assert after["recommended_set_id"] == prior["recommended_set_id"]
+    convention = next(row for row in release["conventions"] if row["convention_id"] == "fes2022b-ocean-greenwich")
+    assert convention["astro_table_id"] == FES_TABLE_ID
+    assert release["astro_tables"][0] == before["astro_tables"][0]
+
+
+@pytest.mark.parametrize("corruption", ["amplitude", "phase", "input_hash", "missing_station"])
+def test_cached_fes_extra_terms_reject_changed_inputs_before_mutation(retained_fes_astro, corruption):
+    from otc_pipeline.adapters.fes2022 import extend_cached_astronomy
+
+    release, extraction, primary, extended = retained_fes_astro
+    before = copy.deepcopy(release)
+    sid = release["stations"][0]["station_id"]
+    item = extraction["items"][sid]
+    if corruption in {"amplitude", "phase"}:
+        item["native"][0][f"{corruption}_{'m' if corruption == 'amplitude' else 'deg'}"] += 1
+    elif corruption == "input_hash":
+        item["input_sha256"][0] = "0" * 64
+    else:
+        del extraction["items"][sid]
+    with pytest.raises(ValueError):
+        extend_cached_astronomy(release, extraction, primary=primary, extended=extended)
+    assert release == before
+
+
+def test_cached_fes_extra_terms_writer_requires_every_authenticated_table(retained_fes_astro, tmp_path):
+    from otc_pipeline.adapters.fes2022 import extend_cached_astronomy
+    from otc_pipeline.astro_tables import FES_TABLE_ID, TABLE_ID
+    from otc_pipeline.release_writer import write_release
+
+    release, extraction, primary, extended = retained_fes_astro
+    extend_cached_astronomy(release, extraction, primary=primary, extended=extended)
+    options = {"datestamp": release["release"]["datestamp"], "app_export": None}
+    with pytest.raises(ValueError, match="unbound"):
+        write_release(release, tmp_path / "bad", congen_run={TABLE_ID: primary}, **options)
+    with pytest.raises(ValueError, match="astro tables"):
+        write_release(release, tmp_path / "wrong", congen_run={TABLE_ID: primary, FES_TABLE_ID: primary}, **options)
+    files = write_release(release, tmp_path / "good", congen_run={TABLE_ID: primary, FES_TABLE_ID: extended}, **options)
+    assert files
+
+
+@pytest.mark.parametrize("target", ["ticon_set", "ticon_definition", "old_table", "unknown_binding"])
+def test_cached_fes_extra_terms_never_admit_unsupported_ticon(retained_fes_astro, target):
+    from otc_pipeline.adapters.fes2022 import extend_cached_astronomy
+    from otc_pipeline.astro_tables import FES_TABLE_ID
+    from otc_pipeline.release_writer import validate_release
+
+    release, extraction, primary, extended = retained_fes_astro
+    extend_cached_astronomy(release, extraction, primary=primary, extended=extended)
+    fes_table = next(row for row in release["astro_tables"] if row["astro_table_id"] == FES_TABLE_ID)
+    if target == "ticon_set":
+        station = release["stations"][1]
+        ticon = next(cs for cs in station["constant_sets"] if cs["source"] == "ticon-4")
+        fes = next(cs for cs in station["constant_sets"] if cs["source"] == "fes2022")
+        ticon["constituents"].append(copy.deepcopy(next(row for row in fes["constituents"] if row["name"] == "MTM")))
+    elif target == "ticon_definition":
+        release["constituents"].append({"name": "MTM", "constituent_table_version": "ticon-4", "speed_deg_per_hour": 1.6424078})
+    elif target == "old_table":
+        release["astro_tables"][0]["constituents"]["MTM"] = fes_table["constituents"]["MTM"]
+    else:
+        fes_table["tables_sha256"] = "0" * 64
+    assert any("unsupported original rows" in error for error in validate_release(release))

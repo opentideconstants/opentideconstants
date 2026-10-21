@@ -50,10 +50,26 @@ FIT_FIRST_YEAR=1900
 FIRST_YEAR=1700
 LAST_YEAR=2100
 
-[[ $# -eq 1 ]] || { echo "usage: $0 OUT_DIR" >&2; exit 2; }
+fes_base=""
+if [[ $# -eq 3 && "$1" == --fes ]]; then
+    fes_base="$2"
+    set -- "$3"
+fi
+[[ $# -eq 1 ]] || { echo "usage: $0 OUT_DIR | --fes ACCEPTED_BASE_RUN OUT_DIR" >&2; exit 2; }
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo="$(cd "$here/../../.." && pwd)"
 tcd="$repo/data/harmonics-dwf-20251228-free.tcd"
+source_tcd_path="data/harmonics-dwf-20251228-free.tcd"
+if [[ -n "$fes_base" ]]; then
+    # Extend the accepted table; do not replace its pins or alter existing rows.
+    tcd="$fes_base/$OTC_TCD_ID.tcd"
+    source_tcd_path="$OTC_TCD_ID.tcd"
+    SOURCE_TCD_SHA256="$OTC_TCD_SHA256"
+    OTC_TCD_ID=otc-tcd-20251228-ma2mb2-fes34
+    OTC_TCD_SHA256=7a88037bf941ab6d880cccd0565047a635d67a64dd05238a93c0a571a41995ac
+    OTC_TCD_STAMP="2026-10-21 00:00"
+    OTC_ADDED=(MTM MSQM)
+fi
 made=()   # the directories this run creates for OUT_DIR, deepest first (removed again on a refusal)
 d="$1"
 while [[ ! -e "$d" ]]; do made+=("$d"); d="$(dirname "$d")"; done
@@ -97,6 +113,10 @@ fetch() {   # URL SHA256 -> the checked tarball in $src
 got="$(sha256 "$tcd")"
 [[ "$got" == "$SOURCE_TCD_SHA256" ]] || { echo "$tcd: SHA-256 $got, expected $SOURCE_TCD_SHA256" >&2; exit 1; }
 defs="$here/otc_constituents.txt"
+if [[ -n "$fes_base" ]]; then
+    cat "$defs" "$here/fes_constituents.txt" >"$out/fes_definitions.txt"
+    defs="$out/fes_definitions.txt"
+fi
 fetch "$CONGEN_URL" "$CONGEN_SHA256"
 fetch "$LIBTCD_URL" "$LIBTCD_SHA256"
 tar -xJf "$src/congen-1.7-r2.tar.xz" -C "$src"
@@ -153,9 +173,9 @@ dump "$otc_tcd" "$FIRST_YEAR" "$LAST_YEAR" "$out/tcd-$FIRST_YEAR-$LAST_YEAR.json
 dump "$otc_tcd" "$FIT_FIRST_YEAR" "$LAST_YEAR" "$out/tcd-$FIT_FIRST_YEAR-$LAST_YEAR.json"
 
 python3 - "$out" "$FIRST_YEAR" "$LAST_YEAR" "$CONGEN_URL" "$CONGEN_SHA256" "$LIBTCD_URL" "$LIBTCD_SHA256" \
-    "$OTC_TCD_ID" "$SOURCE_TCD_SHA256" "$OTC_TCD_STAMP" "$FIT_FIRST_YEAR" "${OTC_ADDED[*]}" <<'EOF'
+    "$OTC_TCD_ID" "$SOURCE_TCD_SHA256" "$OTC_TCD_STAMP" "$FIT_FIRST_YEAR" "${OTC_ADDED[*]}" "$source_tcd_path" <<'EOF'
 import hashlib, json, os, sys
-out, first, last, curl, csha, lurl, lsha, otc_id, source_sha, stamp, fit_first, added = sys.argv[1:]
+out, first, last, curl, csha, lurl, lsha, otc_id, source_sha, stamp, fit_first, added, source_path = sys.argv[1:]
 sha = lambda p: hashlib.sha256(open(os.path.join(out, p), "rb").read()).hexdigest()
 names = {"congen_tcd": f"congen-{first}-{last}.tcd", "congen_dump": f"congen-{first}-{last}.json",
          "tcd_dump": f"tcd-{first}-{last}.json", "otc_tcd": f"{otc_id}.tcd", "fit_dump": f"tcd-{fit_first}-{last}.json",
@@ -163,7 +183,7 @@ names = {"congen_tcd": f"congen-{first}-{last}.tcd", "congen_dump": f"congen-{fi
 prov = {"tool": {"congen": {"url": curl, "sha256": csha}, "libtcd": {"url": lurl, "sha256": lsha}},
         "command": f"congen -b {first} -e {last} -tcd {names['congen_tcd']} < {names['congen_input']}",
         "years": [int(first), int(last)],
-        "otc_tcd": {"id": otc_id, "source_tcd": {"path": "data/harmonics-dwf-20251228-free.tcd", "sha256": source_sha},
+        "otc_tcd": {"id": otc_id, "source_tcd": {"path": source_path, "sha256": source_sha},
                     "added": added.split(), "last_modified": f"{stamp} UTC",
                     "definitions_sha256": sha(names["otc_definitions"]),
                     "how": "tools/tcd/tcd_merge.c: the source TCD unchanged, then the added constituents with the "
