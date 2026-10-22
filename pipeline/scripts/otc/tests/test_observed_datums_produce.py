@@ -10,6 +10,7 @@ import os
 import re
 import signal
 import subprocess
+import sys
 import time
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -27,6 +28,59 @@ from otc_pipeline.observed_datums import monthly, tabulate
 
 def test_producer_entry_point_exists():
     assert importlib.util.find_spec("otc_pipeline.observed_datums.produce") is not None
+
+
+@pytest.fixture(scope="module")
+def retained_export_replay(tmp_path_factory):
+    source = os.environ.get("OTC_RETAINED_EXPORT_PROOF")
+    if not source:
+        pytest.skip("requires actual held control reductions and matching completed checkpoints")
+    proof = Path(source)
+    temporary = tmp_path_factory.mktemp("retained-export-preserve")
+
+    def export(source_run, out):
+        completed = subprocess.run(
+            [sys.executable, "-m", "otc_pipeline.observed_datums.produce", "--retain-only",
+             "--release", "unused", "--gesla-root", "unused", "--fit-run", "unused", "--tcd", "unused",
+             "--measured-inputs", str(source_run), "--out", str(out)],
+            text=True, capture_output=True, check=True,
+        )
+        assert not completed.stderr
+        assert json.loads((out / "retention-counts.json").read_text())["new_measurements"] == 0
+        return [json.loads(line) for line in (out / "retained-observed.jsonl").read_text().splitlines()]
+
+    first = export(proof / "source", temporary / "first")
+    replay = temporary / "replay-source"
+    replay.mkdir()
+    (replay / "checkpoints").symlink_to(proof / "source/checkpoints", target_is_directory=True)
+    (replay / "observed-run.json").write_bytes((proof / "source/observed-run.json").read_bytes())
+    (replay / "observed-drafts.jsonl").write_bytes((temporary / "first/retained-observed.jsonl").read_bytes())
+    completion = json.loads((proof / "source/observed-completion.json").read_text())
+    completion["files"]["observed-drafts.jsonl"] = hashlib.sha256((replay / "observed-drafts.jsonl").read_bytes()).hexdigest()
+    (replay / "observed-completion.json").write_text(json.dumps(completion))
+    second = export(replay, temporary / "second")
+    (proof / "last-first-output.jsonl").write_bytes((temporary / "first/retained-observed.jsonl").read_bytes())
+    (proof / "last-replay-output.jsonl").write_bytes((temporary / "second/retained-observed.jsonl").read_bytes())
+    return json.loads((proof / "cases.json").read_text()), first, second
+
+
+@pytest.mark.parametrize("index", range(3))
+def test_actual_retention_export_preserves_existing_alternatives_and_replay(retained_export_replay, index):
+    cases, first, replay = retained_export_replay
+    case = cases[index]
+    row = next(row for row in first if row["set_id"] == case["set_id"])
+    again = next(row for row in replay if row["set_id"] == case["set_id"])
+    candidates = row["retained_observed"]
+    preserved = sum(candidate in candidates for candidate in case["existing_candidates"])
+    print(f"actual export {case['source_record_id']}: existing alternatives preserved={preserved}/2 "
+          f"candidates={len(candidates)} replay_equal={row == again}")
+    assert preserved == len(case["existing_candidates"])
+    assert candidates[:2] == case["existing_candidates"]
+    assert all(candidate in candidates for candidate in case["expected_recovered_candidates"])
+    assert any(candidate["method"] == "first_reduction" for candidate in candidates)
+    assert sum(candidate["method"] == "monthly_tabulation" for candidate in candidates) > 1
+    assert len({producer().canonical_hash(candidate) for candidate in candidates}) == len(candidates)
+    assert row == again
 
 
 def test_producer_has_explicit_resume_and_bounded_workers_without_selection():

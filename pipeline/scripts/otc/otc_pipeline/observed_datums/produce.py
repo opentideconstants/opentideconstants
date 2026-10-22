@@ -1212,7 +1212,15 @@ def export_retained(measured_inputs: Path, out: Path, *, source_records: set[str
                     actual_span = first_basis["data_span"]
                     candidate["window"] = {key: actual_span[key] for key in ("start", "end")}
                     candidates.append(candidate)
-                row["retained_observed"] = [candidate for candidate in candidates if candidate["values"]]
+                # Conflicting selected keys may survive only in these existing
+                # alternatives. Deduplicate complete candidates, never levels.
+                retained = {}
+                for candidate in row.get("retained_observed", []):
+                    retained.setdefault(canonical_hash(candidate), candidate)
+                for candidate in candidates:
+                    if candidate["values"]:
+                        retained.setdefault(canonical_hash(candidate), candidate)
+                row["retained_observed"] = list(retained.values())
                 output.write(json.dumps(row, sort_keys=True, allow_nan=False) + "\n")
                 output.flush()
                 outcome = {"station_id": row["station_id"], "set_id": row["set_id"],
