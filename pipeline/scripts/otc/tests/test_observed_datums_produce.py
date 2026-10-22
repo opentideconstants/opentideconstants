@@ -952,3 +952,53 @@ def test_actual_retained_own_record_aggregates(tmp_path):
         destination.mkdir(parents=True, exist_ok=True)
         (destination / f"aggregate-{row['source_record_id']}.json").write_text(json.dumps(row, sort_keys=True, allow_nan=False) + "\n")
     assert not missing, f"actual observed aggregates omitted at {len(missing)} distinct places"
+
+
+def test_actual_identical_measurement_reuse():
+    path = os.environ.get("OTC_OBSERVED_REUSE_WITNESSES")
+    if not path:
+        pytest.skip("requires three actual completed duplicate measurement pairs")
+    p = producer()
+    recipe = json.loads(Path(os.environ["OTC_OBSERVED_RETENTION_RECIPE"]).read_text())["native_execution"]["argv"]
+    arg = lambda flag: Path(recipe[recipe.index(flag) + 1])
+    p._initialize_measurement_worker(arg("--gesla-root"), arg("--fit-run"), arg("--tcd"),
+                                    Path(p.__file__).resolve().parents[4] / "data/gesla/contributor_roles.csv")
+    missing = []
+    for item in json.loads(Path(path).read_text()):
+        cache = Path(item["cache"])
+        source, target = [p.read_checkpoint(cache, row["key"], row["job_sha256"], require_complete=True)
+                          for row in item["targets"]]
+        assert source["mm"] == target["mm"]
+        target_job = json.loads((cache / f"{item['targets'][1]['key']}.job.json").read_text())
+        reuse = getattr(p, "reuse_measurement", lambda *args: None)(source, target_job, p._WORKER_CONTEXT)
+        print(f"actual reuse {item['source_record_id']}: measured_pair_months={len(source['mm'])} reused={reuse is not None}")
+        if reuse is None:
+            missing.append(item["source_record_id"])
+            continue
+        assert reuse["mm"] == source["mm"] == target["mm"]
+        assert reuse["binding"] == target["binding"] and reuse["cs"] == target["cs"]
+        assert reuse["report"]["measurement_reuse"]["origin_input_binding"] == source["binding"]
+        row, _ = p.reduce_profile(reuse, [], cache)
+        assert all(candidate["input_binding"] == target["binding"] for candidate in row["retained_observed"])
+        assert all(candidate["basis"]["measurement_reuse"]["origin_input_binding"] == source["binding"]
+                   for candidate in row["retained_observed"])
+        for key in ("member_sha256", "fit_sha256", "timebase_sha256", "tcd_sha256"):
+            changed = copy.deepcopy(target_job)
+            changed["binding"][key] = "different-input"
+            assert p.reuse_measurement(source, changed, p._WORKER_CONTEXT) is None
+    assert not missing, f"actual duplicate measurements not reusable at {len(missing)} places"
+    different = json.loads(Path(os.environ["OTC_OBSERVED_REUSE_DIFFERENT"]).read_text())
+    checked = 0
+    for item in different:
+        if not item["months"]:
+            continue
+        cache = Path(item["cache"])
+        profiles = [p.read_checkpoint(cache, target["key"], target["job_sha256"], require_complete=True)
+                    for target in item["targets"]]
+        source = next(profile for profile in profiles if profile.get("mm"))
+        other = next(target for target in item["targets"] if target["set_id"] != source["cs"]["set_id"])
+        job = json.loads((cache / f"{other['key']}.job.json").read_text())
+        assert p.reuse_measurement(source, job, p._WORKER_CONTEXT) is None
+        print(f"actual different coefficients {item['source_record_id']}: reuse_rejected=True")
+        checked += 1
+    assert checked >= 2

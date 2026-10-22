@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import calendar
+import copy
 import fcntl
 import hashlib
 import importlib
@@ -481,6 +482,8 @@ def retained_observation(profile: dict, values: dict, mm: dict, method: str, *, 
     basis = {"counted_months": [f"{year:04d}-{month:02d}" for year, month in sorted(mm)],
              "quality": detail.get("qc", {}), "actual_sample_window": detail.get("actual_qc_span"),
              "reconstruction": detail.get("reconstruction")}
+    if detail.get("measurement_reuse"):
+        basis["measurement_reuse"] = detail["measurement_reuse"]
     if counted_days is not None:
         basis["counted_days"] = counted_days
     return {"kind": "observed", "method": method,
@@ -1050,6 +1053,58 @@ def _produce(release_path: Path, gesla_root: Path, fit_run: Path, tcd: Path, out
     return {"counts": counts}
 
 
+def reuse_measurement(profile: dict, job: dict, context) -> dict | None:
+    """Reuse only identical measured inputs, retaining both target and origin bindings."""
+    if not profile.get("mm") or context is None:
+        return None
+    binding, previous = job["binding"], profile["binding"]
+    keys = ("source_record_id", "member_sha256", "member_size", "fit_sha256", "fit_manifest_sha256",
+            "fit_results_sha256", "tcd_sha256", "gesla_manifest_sha256", "timebase_sha256")
+    if any(binding.get(key) != previous.get(key) for key in keys):
+        return None
+    left, right = profile["cs"], job["cs"]
+    if left.get("quantity") != "water_level" or right.get("quantity") != "water_level":
+        return None
+    if left.get("fit_segment") != right.get("fit_segment"):
+        return None
+    steps = lambda cs: [row for row in cs.get("record_issues", []) if row.get("issue") == "datum_step"]
+    if steps(left) != steps(right):
+        return None
+    release, dump, fit_run, manifest, fit_rows, audit, _ = context
+    rid = binding["source_record_id"]
+    member = release.members.get(rid)
+    if member is None or member["sha256"] != binding["member_sha256"] or member["size"] != binding["member_size"]:
+        return None
+    if not binding["fit_sha256"] or manifest["fits_sha256"].get(rid) != binding["fit_sha256"] or fit_rows.get(rid, {}).get("outcome") != "fitted":
+        return None
+    fit_path = fit_run / "fits" / f"{rid}.json"
+    if sha256(fit_path) != binding["fit_sha256"]:
+        raise gesla_sets.FitIntegrityError(f"{rid}: original-record fit bytes changed")
+    fit = json.loads(fit_path.read_text())
+    corr = gesla_sets.published_correction(audit.rows.get(rid), gesla_sets.declared_hours(release.metadata()[rid]))
+    if any(cs.get("source") != ticon_sets.SOURCE and cs.get("time_base", {}).get("published") != corr.label
+           for cs in (left, right)):
+        return None
+    gesla_sets.check_stamp(rid, fit, corr.label, corr=corr, speed=lambda n: dump.table[n].speed,
+                          span=(fit["first_s"], fit["last_s"] + 3600))
+
+    def reconstruction(cs):
+        if cs.get("source") == ticon_sets.SOURCE or not cs.get("constituents"):
+            return ({name: (row["amp_m"], row["phase_deg"]) for name, row in fit["constituents"].items()}, fit["z0_m"])
+        return ({row["name"]: (row["amplitude_m"], row["phase_deg"]) for row in cs["constituents"]},
+                cs.get("datum", {}).get("msl_offset_m", fit["z0_m"]))
+
+    if reconstruction(left) != reconstruction(right):
+        return None
+    detail = copy.deepcopy(profile["report"])
+    detail.update(station_id=job["station"]["station_id"], set_id=right["set_id"],
+                  source_record_id=rid, input_binding=binding)
+    detail["measurement_reuse"] = {"origin_input_binding":
+        profile["report"].get("measurement_reuse", {}).get("origin_input_binding", previous),
+        "basis": "identical original samples, authenticated fit, published clock, QC, segmentation and tabulation"}
+    return {**job, "report": detail, "mm": profile["mm"]}
+
+
 def export_retained(measured_inputs: Path, out: Path, *, source_records: set[str] | None = None,
                     context=None, retained_cache: Path | None = None) -> dict:
     """Stream retained measurements without rerunning reference selection or replacing defaults."""
@@ -1065,6 +1120,13 @@ def export_retained(measured_inputs: Path, out: Path, *, source_records: set[str
     run = json.loads((measured_inputs / "observed-run.json").read_text())
     targets = {item["set_id"]: item for item in run["targets"]}
     cache = measured_inputs / "checkpoints"
+    related = {}
+    if source_records is not None:
+        with (measured_inputs / "observed-drafts.jsonl").open() as drafts:
+            for line in drafts:
+                row = json.loads(line)
+                if row["source_record_id"] in source_records:
+                    related.setdefault(row["source_record_id"], []).append(targets[row["set_id"]])
     counts = {"rows": 0, "candidates": 0, "monthly_candidates": 0, "new_measurements": 0, "empty_rows": 0}
     with destination.open("x") as output, (out / "retention-outcomes.jsonl").open("x") as outcomes:
         with (measured_inputs / "observed-drafts.jsonl").open() as drafts:
@@ -1092,6 +1154,23 @@ def export_retained(measured_inputs: Path, out: Path, *, source_records: set[str
                     job = json.loads((cache / f"{item['key']}.job.json").read_text())
                     if canonical_hash(job) != item["job_sha256"]:
                         raise ValueError(f"measurement job changed: {row['set_id']}")
+                    locations = [out / "checkpoints", cache]
+                    if retained_cache is not None:
+                        locations.insert(1, retained_cache / "checkpoints")
+                    for other in related[row["source_record_id"]]:
+                        if reused_measurement:
+                            break
+                        for location in locations:
+                            previous = read_checkpoint(location, other["key"], other["job_sha256"])
+                            reused = reuse_measurement(previous, job, context) if previous else None
+                            if reused is not None:
+                                profile, reused_measurement = reused, True
+                                fresh = out / "checkpoints"
+                                fresh.mkdir(exist_ok=True)
+                                write_json(fresh / f"{item['key']}.job.json", job)
+                                write_checkpoint(fresh, item["key"], item["job_sha256"], profile, None)
+                                break
+                if source_records is not None and not profile.get("mm") and not reused_measurement:
                     member = context[0].members.get(row["source_record_id"])
                     if member is not None and (member["sha256"] != job["binding"]["member_sha256"] or
                                                member["size"] != job["binding"]["member_size"]):
