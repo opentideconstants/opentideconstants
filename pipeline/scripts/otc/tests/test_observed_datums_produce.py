@@ -1135,3 +1135,30 @@ def test_held_control_provenance_survives_existing_observed_keys():
     for value in row["retained_observed"]:
         if value["method"] != item["method"]:
             assert "control" not in value["basis"] and "epoch" not in value["basis"]
+
+
+def test_actual_retained_cache_preserves_corrected_source_measurements(tmp_path):
+    root = os.environ.get("OTC_CACHE_COMPATIBILITY_PROOF")
+    if not root:
+        pytest.skip("requires three held corrected and legacy measurement checkpoints")
+    root = Path(root)
+    p = producer()
+    p.export_retained(root / "current", tmp_path / "baseline")
+    p.export_retained(root / "current", tmp_path / "cached", retained_cache=root / "legacy")
+    baseline = [json.loads(line) for line in (tmp_path / "baseline/retained-observed.jsonl").read_text().splitlines()]
+    cached = [json.loads(line) for line in (tmp_path / "cached/retained-observed.jsonl").read_text().splitlines()]
+    assert len(baseline) == len(cached) == 3
+    changed = []
+    for expected, actual in zip(baseline, cached, strict=True):
+        assert expected["set_id"] == actual["set_id"]
+        expected_months = [row for row in expected["retained_observed"] if row["method"] == "monthly_tabulation"]
+        actual_months = [row for row in actual["retained_observed"] if row["method"] == "monthly_tabulation"]
+        print(f"REAL {expected['station_id']}: corrected_mhw={expected_months[0]['values']['mhw']} "
+              f"cached_mhw={actual_months[0]['values']['mhw']} full_row_preserved={actual == expected}")
+        if actual != expected:
+            changed.append(expected["station_id"])
+    assert changed == [], f"incompatible retained cache replaced current measurements: {changed}"
+    assert (tmp_path / "baseline/retained-observed.jsonl").read_bytes() == (
+        tmp_path / "cached/retained-observed.jsonl").read_bytes()
+    outcomes = [json.loads(line) for line in (tmp_path / "cached/retention-outcomes.jsonl").read_text().splitlines()]
+    assert all(not row["measured"] and not row["reused_measurement"] for row in outcomes)

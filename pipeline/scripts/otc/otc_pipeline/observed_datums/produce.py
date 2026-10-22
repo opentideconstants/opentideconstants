@@ -1150,7 +1150,7 @@ def export_retained(measured_inputs: Path, out: Path, *, source_records: set[str
                 measured = False
                 reused_measurement = False
                 elapsed_s = None
-                if retained_cache is not None:
+                if retained_cache is not None and not profile.get("mm"):
                     previous = read_checkpoint(retained_cache / "checkpoints", item["key"], item["job_sha256"])
                     if previous is not None:
                         if previous["binding"] != row["input_binding"]:
