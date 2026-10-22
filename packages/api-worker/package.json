@@ -1,0 +1,18 @@
+{
+    "name": "otc-api-worker-qualification",
+    "private": true,
+    "version": "0.0.0",
+    "type": "module",
+    "scripts": {
+        "typecheck": "tsc --noEmit --strict --lib es2022,dom --target es2022 --module esnext --moduleResolution bundler src/qualification.ts",
+        "build": "wrangler deploy --dry-run --outdir dist/worker"
+    },
+    "devDependencies": {
+        "typescript": "6.0.3",
+        "workerd": "1.20261019.1",
+        "wrangler": "4.151.3"
+    },
+    "dependencies": {
+        "opentideconstants": "file:dist/sdk/opentideconstants-0.1.0.tgz"
+    }
+}
