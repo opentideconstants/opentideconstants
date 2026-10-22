@@ -24,6 +24,9 @@ def candidate_errors(candidate, record, own_sets):
     errors = []
     if candidate.get("source_record_id") != record.get("source_record_id"):
         errors.append("retained datum source_record_id differs from its original tuple")
+    chart = candidate.get("basis", {}).get("chart_datum")
+    if chart is not None and (not isinstance(chart, str) or not _finite(candidate.get("values", {}).get(chart))):
+        errors.append("retained datum chart_datum must name an existing finite value")
     sid = candidate.get("set_id")
     if candidate.get("kind") == "computed" and not sid:
         errors.append("computed retained datum requires its actual set_id")
@@ -252,15 +255,52 @@ def append_source_sets(release, source_release):
     return {"added_sets": added}
 
 
+def designate_noaa_published_charts(release):
+    """Name held published MLLW levels for the two datum-only NOAA references.
+
+    The pointer is a key in the same candidate's values, above its unchanged STND
+    zero. It does not select a prediction datum or establish independent accuracy.
+    """
+    targets = {"OTC-d14a171f": "8660754", "OTC-e48e302c": "9751388"}
+    pending, changed = [], set()
+    for station in release["stations"]:
+        rid = targets.get(station["station_id"])
+        if rid is None:
+            continue
+        for record in station.get("source_records", []):
+            if (record["source"], record["source_record_id"]) != ("noaa", rid):
+                continue
+            for candidate in record.get("retained_datums", []):
+                basis = candidate.get("basis", {})
+                original = basis.get("source_fields", {}).get("MLLW", {})
+                value = candidate.get("values", {}).get("MLLW")
+                if (candidate.get("source_record_id") != rid or candidate.get("kind") != "published"
+                        or candidate.get("method") != "source" or candidate.get("units") != "m"
+                        or candidate.get("frame") != {"kind": "gauge_zero", "name": "STND", "tie_status": "source_declared"}
+                        or not _finite(value) or original.get("name") != "MLLW" or original.get("value") != value):
+                    continue
+                pointer = basis.get("chart_datum")
+                if pointer is not None and pointer != "MLLW":
+                    raise ValueError(f"NOAA {rid}: existing retained chart pointer conflicts with published MLLW")
+                if pointer is None:
+                    pending.append(basis)
+                    changed.add(station["station_id"])
+    for basis in pending:
+        basis["chart_datum"] = "MLLW"
+    return {"changed_stations": len(changed), "changed_candidates": len(pending)}
+
+
 def finalize_datum_references(release):
     """Apply the ordinary source-frame helpers after additions are authenticated."""
     from otc_pipeline.datums import derive_chart_datums
     from otc_pipeline.lat_hat_subordinate import offset_chart_datum
 
+    noaa_chart = designate_noaa_published_charts(release)
     changed = 0
     for station in release["stations"]:
         datum = offset_chart_datum(station)
         if datum is not None and datum != station["subordinate_offsets"].get("datum"):
             station["subordinate_offsets"]["datum"] = datum
             changed += 1
-    return {"subordinate_chart_stations": changed, "chart_designation": derive_chart_datums(release)}
+    return {"subordinate_chart_stations": changed, "chart_designation": derive_chart_datums(release),
+            "published_noaa_chart": noaa_chart}
