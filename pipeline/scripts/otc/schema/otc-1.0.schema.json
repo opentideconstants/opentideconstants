@@ -717,10 +717,10 @@
           }
         },
         "datum": {
-          "description": "A constant set's levels. Method subordinate_offsets is for subordinate_offsets.datum only.",
+          "description": "A constant set's levels. Methods subordinate_offsets and subordinate_offset_zero are for subordinate_offsets.datum only.",
           "allOf": [
             { "$ref": "#/$defs/datum" },
-            { "properties": { "basis": { "additionalProperties": { "properties": { "method": { "not": { "const": "subordinate_offsets" } } } } } } }
+            { "properties": { "basis": { "additionalProperties": { "properties": { "method": { "not": { "enum": ["subordinate_offsets", "subordinate_offset_zero"] } } } } } } }
           ]
         },
         "convention_id": { "type": "string", "minLength": 1 },
@@ -1543,6 +1543,34 @@
                       }
                     }
                   }
+                }
+              }
+            },
+            {
+              "description": "The algebraic offset zero is only MLLW = 0 in the explicit subordinate MLLW chart frame. Other retained levels keep their own methods.",
+              "properties": {
+                "basis": {
+                  "patternProperties": {
+                    "^(?!mllw$)": { "properties": { "method": { "not": { "const": "subordinate_offset_zero" } } } }
+                  }
+                }
+              },
+              "if": {
+                "required": ["basis"],
+                "properties": {
+                  "basis": {
+                    "required": ["mllw"],
+                    "properties": { "mllw": { "required": ["method"], "properties": { "method": { "const": "subordinate_offset_zero" } } } }
+                  }
+                }
+              },
+              "then": {
+                "required": ["zero", "zero_name", "chart_datum", "named"],
+                "properties": {
+                  "zero": { "const": "chart_datum" },
+                  "zero_name": { "const": "MLLW" },
+                  "chart_datum": { "const": "mllw" },
+                  "named": { "required": ["mllw"], "properties": { "mllw": { "const": 0.0 } } }
                 }
               }
             }

@@ -37,6 +37,16 @@ def errors(station):
             for top in validator.iter_errors(station) for error in release_writer._leaf_errors(top)]
 
 
+@pytest.fixture(scope="module")
+def actual_reference_stations(actual_stations):
+    wanted = {row["subordinate_offsets"]["reference_station_id"] for row in actual_stations.values()}
+    with Path(os.environ["OTC_SUBORDINATE_SCHEMA_NATIVE"]).open() as stream:
+        stations = {row["station_id"]: row for line in stream
+                    if (row := json.loads(line))["station_id"] in wanted}
+    assert set(stations) == wanted
+    return stations
+
+
 @pytest.mark.parametrize("station_id", IDS)
 def test_actual_subordinate_offset_zero_station_schema(actual_stations, station_id):
     original = actual_stations[station_id]
@@ -69,3 +79,42 @@ def test_actual_subordinate_zero_restrictions_remain(actual_stations, change):
         basis["method"] = "harmonic_extremes"
         basis["epoch"] = {"start": "2020-01-01", "end": "2038-12-31", "name": "Not an offset method"}
     assert errors(station)
+
+
+@pytest.mark.parametrize("station_id", IDS)
+@pytest.mark.parametrize("change", ["nonzero", "other_level", "other_level_alongside_valid",
+                                   "wrong_zero", "wrong_zero_name", "wrong_chart",
+                                   "missing_zero", "missing_zero_name", "missing_chart", "constant_set"])
+def test_actual_subordinate_zero_is_only_its_mllw_frame(actual_stations, actual_reference_stations, station_id, change):
+    station = copy.deepcopy(actual_stations[station_id])
+    datum = lat_hat_subordinate.offset_chart_datum(station)
+    station["subordinate_offsets"]["datum"] = datum
+    assert errors(station) == []
+    if change == "nonzero":
+        datum["named"]["mllw"] = 1.25
+    elif change == "other_level":
+        datum["basis"]["hat"] = datum["basis"].pop("mllw")
+        datum["named"]["hat"] = datum["named"].pop("mllw")
+        datum["chart_datum"] = "hat"
+    elif change == "other_level_alongside_valid":
+        datum["basis"]["hat"] = copy.deepcopy(datum["basis"]["mllw"])
+    elif change == "wrong_zero":
+        datum["zero"] = "gauge_zero"
+    elif change == "wrong_zero_name":
+        datum["zero_name"] = "STND"
+    elif change == "wrong_chart":
+        datum["chart_datum"] = "hat"
+    elif change.startswith("missing_"):
+        del datum[{"missing_zero": "zero", "missing_zero_name": "zero_name", "missing_chart": "chart_datum"}[change]]
+    else:
+        # The actual subordinate's own model set has no constants, so exercise
+        # method placement on its actual reference's published NOAA constants.
+        station = copy.deepcopy(actual_reference_stations[station["subordinate_offsets"]["reference_station_id"]])
+        assert errors(station) == []
+        cs = next(cs for cs in station["constant_sets"] if cs["source"] == "noaa" and cs.get("constituents"))
+        cs["datum"] = copy.deepcopy(datum)
+        cs["datum"]["named"] = {"mllw": datum["named"]["mllw"]}
+        cs["datum"]["basis"] = {"mllw": datum["basis"]["mllw"]}
+    failures = errors(station)
+    print(f"REAL {station_id}: {change} rejected={bool(failures)}")
+    assert failures, f"subordinate_offset_zero accepted outside its identity: {station_id} {change}"
