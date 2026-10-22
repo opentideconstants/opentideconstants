@@ -1,0 +1,1678 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "OpenTideConstants existing SDK HTTP routes",
+    "version": "1.0.0",
+    "description": "Local Worker route contract. Responses use the existing SDK canonical runner serialization. This document does not claim a deployed or publicly available service."
+  },
+  "paths": {
+    "/openapi.json": {
+      "get": {
+        "operationId": "openapi",
+        "summary": "This OpenAPI document",
+        "responses": {
+          "200": {
+            "description": "OpenAPI 3.1 document.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stations": {
+      "get": {
+        "operationId": "stations",
+        "summary": "SDK station listing, name search, near or bounding-box discovery",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "SDK name search. Without a search, near or bbox selection, return SDK stations."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "lat",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "lon",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "radius_km",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "bbox",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Bounding box as west,south,east,north in degrees."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unchanged canonical SDK runner wire body. Attribution and release identity are HTTP headers.",
+            "headers": {
+              "Attribution": {
+                "description": "Percent-encoded UTF-8 SDK attribution for the returned station selection; decode with decodeURIComponent.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "DATESTAMP": {
+                "description": "The SDK release datestamp used for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Existing SDK error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Existing Worker rate limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "limit"
+                  ],
+                  "properties": {
+                    "limit": {
+                      "type": "string",
+                      "enum": [
+                        "minute",
+                        "day"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stations/{id}": {
+      "get": {
+        "operationId": "station",
+        "summary": "Existing SDK station metadata",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Canonical SDK station_id."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unchanged canonical SDK runner wire body. Attribution and release identity are HTTP headers.",
+            "headers": {
+              "Attribution": {
+                "description": "Percent-encoded UTF-8 SDK attribution for the returned station selection; decode with decodeURIComponent.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "DATESTAMP": {
+                "description": "The SDK release datestamp used for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Existing SDK error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Existing Worker rate limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "limit"
+                  ],
+                  "properties": {
+                    "limit": {
+                      "type": "string",
+                      "enum": [
+                        "minute",
+                        "day"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stations/{id}/extremes": {
+      "get": {
+        "operationId": "station_extremes",
+        "summary": "SDK extremes for a station",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Canonical SDK station_id."
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Inclusive prediction start; an ISO 8601 timestamp with offset."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Prediction stop; an ISO 8601 timestamp with offset."
+          },
+          {
+            "name": "set_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "datum",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Existing SDK datum selector, including mean_level, chart, lat and hat. Unavailable datums retain the SDK error."
+          },
+          {
+            "name": "units",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "meters",
+                "feet"
+              ]
+            },
+            "description": "meters or feet. Omit to retain the canonical runner body without units/getter fields."
+          },
+          {
+            "name": "offset_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Existing SDK historical offset selector."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unchanged canonical SDK runner wire body. Attribution and release identity are HTTP headers.",
+            "headers": {
+              "Attribution": {
+                "description": "Percent-encoded UTF-8 SDK attribution for the returned station selection; decode with decodeURIComponent.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "DATESTAMP": {
+                "description": "The SDK release datestamp used for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Existing SDK error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Existing Worker rate limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "limit"
+                  ],
+                  "properties": {
+                    "limit": {
+                      "type": "string",
+                      "enum": [
+                        "minute",
+                        "day"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/extremes": {
+      "get": {
+        "operationId": "position_extremes",
+        "summary": "SDK nearest-station selection then extremes",
+        "parameters": [
+          {
+            "name": "lat",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "lon",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "radius_km",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number"
+            },
+            "description": "Passed to existing SDK nearest selection as maxKm."
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Inclusive prediction start; an ISO 8601 timestamp with offset."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Prediction stop; an ISO 8601 timestamp with offset."
+          },
+          {
+            "name": "set_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "datum",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Existing SDK datum selector, including mean_level, chart, lat and hat. Unavailable datums retain the SDK error."
+          },
+          {
+            "name": "units",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "meters",
+                "feet"
+              ]
+            },
+            "description": "meters or feet. Omit to retain the canonical runner body without units/getter fields."
+          },
+          {
+            "name": "offset_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Existing SDK historical offset selector."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unchanged canonical SDK runner wire body. Attribution and release identity are HTTP headers.",
+            "headers": {
+              "Attribution": {
+                "description": "Percent-encoded UTF-8 SDK attribution for the returned station selection; decode with decodeURIComponent.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "DATESTAMP": {
+                "description": "The SDK release datestamp used for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Existing SDK error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Existing Worker rate limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "limit"
+                  ],
+                  "properties": {
+                    "limit": {
+                      "type": "string",
+                      "enum": [
+                        "minute",
+                        "day"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stations/{id}/timeline": {
+      "get": {
+        "operationId": "station_timeline",
+        "summary": "SDK heights for a station",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Canonical SDK station_id."
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Inclusive prediction start; an ISO 8601 timestamp with offset."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Prediction stop; an ISO 8601 timestamp with offset."
+          },
+          {
+            "name": "set_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "datum",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Existing SDK datum selector, including mean_level, chart, lat and hat. Unavailable datums retain the SDK error."
+          },
+          {
+            "name": "units",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "meters",
+                "feet"
+              ]
+            },
+            "description": "meters or feet. Omit to retain the canonical runner body without units/getter fields."
+          },
+          {
+            "name": "step",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number"
+            },
+            "description": "SDK stepS in seconds."
+          },
+          {
+            "name": "offset_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Existing SDK historical offset selector."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unchanged canonical SDK runner wire body. Attribution and release identity are HTTP headers.",
+            "headers": {
+              "Attribution": {
+                "description": "Percent-encoded UTF-8 SDK attribution for the returned station selection; decode with decodeURIComponent.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "DATESTAMP": {
+                "description": "The SDK release datestamp used for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Existing SDK error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Existing Worker rate limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "limit"
+                  ],
+                  "properties": {
+                    "limit": {
+                      "type": "string",
+                      "enum": [
+                        "minute",
+                        "day"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/timeline": {
+      "get": {
+        "operationId": "position_timeline",
+        "summary": "SDK nearest-station selection then heights",
+        "parameters": [
+          {
+            "name": "lat",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "lon",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "radius_km",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number"
+            },
+            "description": "Passed to existing SDK nearest selection as maxKm."
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Inclusive prediction start; an ISO 8601 timestamp with offset."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Prediction stop; an ISO 8601 timestamp with offset."
+          },
+          {
+            "name": "set_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "datum",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Existing SDK datum selector, including mean_level, chart, lat and hat. Unavailable datums retain the SDK error."
+          },
+          {
+            "name": "units",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "meters",
+                "feet"
+              ]
+            },
+            "description": "meters or feet. Omit to retain the canonical runner body without units/getter fields."
+          },
+          {
+            "name": "step",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "number"
+            },
+            "description": "SDK stepS in seconds."
+          },
+          {
+            "name": "offset_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Existing SDK historical offset selector."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unchanged canonical SDK runner wire body. Attribution and release identity are HTTP headers.",
+            "headers": {
+              "Attribution": {
+                "description": "Percent-encoded UTF-8 SDK attribution for the returned station selection; decode with decodeURIComponent.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "DATESTAMP": {
+                "description": "The SDK release datestamp used for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Existing SDK error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Existing Worker rate limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "limit"
+                  ],
+                  "properties": {
+                    "limit": {
+                      "type": "string",
+                      "enum": [
+                        "minute",
+                        "day"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stations/{id}/currents": {
+      "get": {
+        "operationId": "station_currents",
+        "summary": "SDK currents; existing unsupported-current errors remain unchanged",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Canonical SDK station_id."
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Inclusive prediction start; an ISO 8601 timestamp with offset."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Prediction stop; an ISO 8601 timestamp with offset."
+          },
+          {
+            "name": "set_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "units",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "m/s",
+                "knots"
+              ]
+            },
+            "description": "m/s or knots. Omit to retain the canonical runner body without units/getter fields."
+          },
+          {
+            "name": "step",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number"
+            },
+            "description": "SDK stepS in seconds."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unchanged canonical SDK runner wire body. Attribution and release identity are HTTP headers.",
+            "headers": {
+              "Attribution": {
+                "description": "Percent-encoded UTF-8 SDK attribution for the returned station selection; decode with decodeURIComponent.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "DATESTAMP": {
+                "description": "The SDK release datestamp used for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Existing SDK error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Existing Worker rate limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "limit"
+                  ],
+                  "properties": {
+                    "limit": {
+                      "type": "string",
+                      "enum": [
+                        "minute",
+                        "day"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stations/{id}/current-events": {
+      "get": {
+        "operationId": "station_current_events",
+        "summary": "SDK current-events; existing unsupported-current errors remain unchanged",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Canonical SDK station_id."
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Inclusive prediction start; an ISO 8601 timestamp with offset."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Prediction stop; an ISO 8601 timestamp with offset."
+          },
+          {
+            "name": "set_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bin",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "units",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "m/s",
+                "knots"
+              ]
+            },
+            "description": "m/s or knots. Omit to retain the canonical runner body without units/getter fields."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unchanged canonical SDK runner wire body. Attribution and release identity are HTTP headers.",
+            "headers": {
+              "Attribution": {
+                "description": "Percent-encoded UTF-8 SDK attribution for the returned station selection; decode with decodeURIComponent.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "DATESTAMP": {
+                "description": "The SDK release datestamp used for this response.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Existing SDK error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Existing Worker rate limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "limit"
+                  ],
+                  "properties": {
+                    "limit": {
+                      "type": "string",
+                      "enum": [
+                        "minute",
+                        "day"
+                      ]
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HeightPoint": {
+        "type": "object",
+        "properties": {
+          "time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "local_time": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "utc_offset_s": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "height_m": {
+            "type": "number"
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "meters",
+              "feet"
+            ]
+          },
+          "height": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "time",
+          "local_time",
+          "utc_offset_s",
+          "height_m"
+        ],
+        "additionalProperties": false,
+        "description": "Canonical SDK runner item. units and selected-unit getters appear only when units was supplied; canonical metric values remain present."
+      },
+      "Extreme": {
+        "type": "object",
+        "properties": {
+          "time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "local_time": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "utc_offset_s": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "height_m": {
+            "type": "number"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "high",
+              "low"
+            ]
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "meters",
+              "feet"
+            ]
+          },
+          "height": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "time",
+          "local_time",
+          "utc_offset_s",
+          "height_m",
+          "type"
+        ],
+        "additionalProperties": false,
+        "description": "Canonical SDK runner item. units and selected-unit getters appear only when units was supplied; canonical metric values remain present."
+      },
+      "CurrentPoint": {
+        "type": "object",
+        "properties": {
+          "time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "local_time": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "utc_offset_s": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "velocity_major_ms": {
+            "type": "number"
+          },
+          "velocity_minor_ms": {
+            "type": "number"
+          },
+          "speed_ms": {
+            "type": "number"
+          },
+          "direction_deg": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "m/s",
+              "knots"
+            ]
+          },
+          "velocity_major": {
+            "type": "number"
+          },
+          "velocity_minor": {
+            "type": "number"
+          },
+          "speed": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "time",
+          "local_time",
+          "utc_offset_s",
+          "velocity_major_ms",
+          "velocity_minor_ms",
+          "speed_ms",
+          "direction_deg"
+        ],
+        "additionalProperties": false,
+        "description": "Canonical SDK runner item. units and selected-unit getters appear only when units was supplied; canonical metric values remain present."
+      },
+      "CurrentEvent": {
+        "type": "object",
+        "properties": {
+          "time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "local_time": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "utc_offset_s": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "velocity_ms": {
+            "type": "number"
+          },
+          "direction_deg": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "max_flood",
+              "max_ebb",
+              "slack_before_flood",
+              "slack_before_ebb"
+            ]
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "m/s",
+              "knots"
+            ]
+          },
+          "velocity": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "time",
+          "local_time",
+          "utc_offset_s",
+          "velocity_ms",
+          "direction_deg",
+          "type"
+        ],
+        "additionalProperties": false,
+        "description": "Canonical SDK runner item. units and selected-unit getters appear only when units was supplied; canonical metric values remain present."
+      },
+      "Station": {
+        "type": "object",
+        "properties": {
+          "station_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "country": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "type": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "timezone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recommended_set_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lat": {
+            "type": "number"
+          },
+          "lon": {
+            "type": "number"
+          },
+          "aliases": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "is_reference": {
+            "type": "boolean"
+          },
+          "is_subordinate": {
+            "type": "boolean"
+          },
+          "is_tide": {
+            "type": "boolean"
+          },
+          "is_current": {
+            "type": "boolean"
+          },
+          "recommended_is_fallback": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "station_id",
+          "name",
+          "country",
+          "type",
+          "kind",
+          "timezone",
+          "status",
+          "recommended_set_id",
+          "lat",
+          "lon",
+          "aliases",
+          "is_reference",
+          "is_subordinate",
+          "is_tide",
+          "is_current"
+        ],
+        "additionalProperties": false
+      },
+      "Prediction": {
+        "type": "object",
+        "properties": {
+          "station_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "timezone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "method": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "set_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "convention_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "astro_table_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference_station_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference_bin": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "datum": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "datum_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "datum_kind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "datum_uncertainty_m": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "bin_number": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "omitted_event_types": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "tz": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tz_version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "release": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "algorithm": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "units": {
+            "type": "string",
+            "enum": [
+              "meters",
+              "feet",
+              "m/s",
+              "knots"
+            ],
+            "description": "Present only when the units query parameter is supplied, matching the SDK runner."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/HeightPoint"
+                },
+                {
+                  "$ref": "#/components/schemas/Extreme"
+                },
+                {
+                  "$ref": "#/components/schemas/CurrentPoint"
+                },
+                {
+                  "$ref": "#/components/schemas/CurrentEvent"
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "station_id",
+          "timezone",
+          "method",
+          "set_id",
+          "convention_id",
+          "astro_table_id",
+          "reference_station_id",
+          "reference_bin",
+          "datum",
+          "datum_name",
+          "datum_kind",
+          "datum_uncertainty_m",
+          "bin_number",
+          "omitted_event_types",
+          "tz",
+          "tz_version",
+          "release",
+          "algorithm",
+          "items"
+        ],
+        "additionalProperties": false
+      },
+      "StationIds": {
+        "type": "object",
+        "properties": {
+          "station_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "distance_km": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "required": [
+          "station_ids"
+        ],
+        "additionalProperties": false
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "const": false
+          },
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "ok",
+          "error"
+        ],
+        "additionalProperties": false
+      },
+      "StationResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "const": true
+          },
+          "result": {
+            "type": "object",
+            "properties": {
+              "station": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Station"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "station"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "ok",
+          "result"
+        ],
+        "additionalProperties": false
+      },
+      "StationsResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "const": true
+          },
+          "result": {
+            "$ref": "#/components/schemas/StationIds"
+          }
+        },
+        "required": [
+          "ok",
+          "result"
+        ],
+        "additionalProperties": false
+      },
+      "PredictionResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "const": true
+          },
+          "result": {
+            "type": "object",
+            "properties": {
+              "prediction": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Prediction"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "prediction"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "ok",
+          "result"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}
