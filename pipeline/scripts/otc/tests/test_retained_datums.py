@@ -1,5 +1,6 @@
 """Retained source values do not depend on predictive datum admission."""
 import copy
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -7,6 +8,58 @@ from pathlib import Path
 import pytest
 
 from otc_pipeline.release_writer import validate_release, write_release
+from otc_pipeline import build_otc
+from otc_pipeline.datums import derive_chart_datums
+
+
+@pytest.fixture(scope="module")
+def actual_observed_retention_only():
+    evidence = os.environ.get("OTC_OBSERVED_RECEIPT_PROOF")
+    if not evidence:
+        pytest.skip("requires actual held observed retention-only rows")
+    root = Path(evidence)
+    facts = json.loads((root / "input-binding.json").read_text())
+    raw = (root / "actual-input.json").read_bytes()
+    assert hashlib.sha256(raw).hexdigest() == facts["selected_input_sha256"]
+    return json.loads(raw)
+
+
+@pytest.mark.parametrize("index", range(3))
+def test_actual_observed_retention_only_publication_receipt(actual_observed_retention_only, index):
+    row = copy.deepcopy(actual_observed_retention_only["rows"][index])
+    station = next(s for s in actual_observed_retention_only["stations"]
+                   if s["station_id"] == row["station_id"])
+    release = {"stations": [copy.deepcopy(station)]}
+    assert row["draft_datum"] is None and row["observed_keys"] == []
+    assert row["retained_observed"]
+    # Settle existing chart designations first to isolate source retention.
+    derive_chart_datums(release)
+    before = copy.deepcopy(release)
+    staged = {"drafts": [], "staged_level_count": 0, "retained_rows": [row]}
+    receipt = build_otc._publish_observed_datum_stage(release, staged)
+    count = len(row["retained_observed"])
+    print(f"REAL {row['station_id']}: source_changed={release != before} "
+          f"retained_candidates={count} chart_changes={receipt['chart_datum_derivation']['changed_sets']} "
+          f"release_unchanged={receipt['release_unchanged']}")
+    assert receipt["chart_datum_derivation"]["changed_sets"] == 0
+    assert release != before
+    assert receipt["release_unchanged"] is False
+    assert receipt["retained_candidate_count"] == count
+    records = release["stations"][0]["source_records"]
+    assert all(any(candidate in record.get("retained_datums", []) for record in records)
+               for candidate in row["retained_observed"])
+    restored = copy.deepcopy(release)
+    for record, old in zip(restored["stations"][0]["source_records"], before["stations"][0]["source_records"], strict=True):
+        if "retained_datums" in old:
+            record["retained_datums"] = old["retained_datums"]
+        else:
+            record.pop("retained_datums", None)
+    assert restored == before
+    published = copy.deepcopy(release)
+    replay = build_otc._publish_observed_datum_stage(release, staged)
+    assert replay["release_unchanged"] is True and replay["retained_candidate_count"] == 0
+    assert release == published
+    print(f"REPLAY {row['station_id']}: added_candidates=0 release_unchanged=True full_payload_unchanged=True")
 
 
 @pytest.mark.skipif(not os.environ.get("OTC_RETENTION_NATIVE"), reason="requires actual held native/source cache")
