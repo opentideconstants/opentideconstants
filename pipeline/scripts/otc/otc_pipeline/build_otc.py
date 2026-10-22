@@ -392,7 +392,7 @@ def stage_observed_datums(release: dict, path: Path, sha256: str, *, source_rele
         raise ValueError("observed source release SHA-256 mismatch")
     rows = [json.loads(line) for line in data.decode().splitlines() if line.strip()]
     required = {"station_id", "set_id", "source_record_id", "input_binding", "draft_datum", "observed_keys"}
-    if any(not isinstance(row, dict) or set(row) != required for row in rows):
+    if any(not isinstance(row, dict) or not required <= set(row) or set(row) - required - {"retained_observed"} for row in rows):
         raise ValueError("observed datum row requires identity, binding, draft and observed keys")
     ids = [row["set_id"] for row in rows]
     if len(ids) != len(set(ids)):
@@ -429,7 +429,7 @@ def stage_observed_datums(release: dict, path: Path, sha256: str, *, source_rele
               "timebase_sha256": audit.csv_sha256}
     schema = pinned_schema()
     validator = Draft202012Validator({"$defs": schema["$defs"], "$ref": "#/$defs/datum"})
-    staged, unavailable, verified_members = [], [], set()
+    staged, unavailable, verified_members, retained_rows = [], [], set(), []
     for row in rows:
         sid, rid = row["set_id"], row["source_record_id"]
         if sid not in native or sid not in historical:
@@ -474,6 +474,15 @@ def stage_observed_datums(release: dict, path: Path, sha256: str, *, source_rele
         if member and rid not in verified_members:
             originals.read_member(rid)  # verifies actual original bytes, not only manifest identity
             verified_members.add(rid)
+        if row.get("retained_observed"):
+            from otc_pipeline.retained_datums import retain_candidates
+            for candidate in row["retained_observed"]:
+                if (candidate.get("input_binding") != bound or candidate.get("set_id") != sid
+                        or candidate.get("source_record_id") != rid or candidate.get("kind") != "observed"):
+                    raise ValueError(f"retained observed candidate binding mismatch: {sid}")
+            # Validate attachment without mutating the staging input or selecting a datum.
+            retain_candidates({"stations": [copy.deepcopy(station)]}, [row])
+            retained_rows.append(copy.deepcopy(row))
         if row["draft_datum"] is None:
             if row["observed_keys"] != []:
                 raise ValueError(f"unavailable observed draft has values: {sid}")
@@ -516,7 +525,8 @@ def stage_observed_datums(release: dict, path: Path, sha256: str, *, source_rele
             "input_path": str(path), "input_sha256": sha256, "source_release_path": str(source_release),
             "source_release_sha256": source_release_sha256, "staged_set_count": len(staged),
             "staged_level_count": sum(len(row["observed_keys"]) for row in staged),
-            "unavailable_set_count": len(unavailable), "unavailable": unavailable, "drafts": staged}
+            "unavailable_set_count": len(unavailable), "unavailable": unavailable, "drafts": staged,
+            **({"retained_rows": retained_rows} if retained_rows else {})}
 
 
 def apply_observed_datum_fallbacks(release: dict, path: Path, sha256: str, **inputs) -> dict:
@@ -526,6 +536,8 @@ def apply_observed_datum_fallbacks(release: dict, path: Path, sha256: str, **inp
 
 
 def _publish_observed_datum_stage(release: dict, staged: dict) -> dict:
+    from otc_pipeline.retained_datums import retain_candidates
+    retain_candidates(release, staged.get("retained_rows", []))
     from otc_pipeline.datums import derive_chart_datums, observed_companions
 
     by_id = {cs["set_id"]: cs for station in release["stations"] for cs in station.get("constant_sets", [])}
@@ -603,6 +615,59 @@ def apply_datum_drafts(release: dict, *, official: tuple | None = None, observed
     if publish_observed and observed_stage is not None:
         observed_stage = _publish_observed_datum_stage(release, observed_stage)
     return official_stage, observed_stage
+
+
+def cached_retained_datums_main(argv: list[str]) -> int:
+    """Retain source-bound alternatives without recomputing or selecting predictions."""
+    from otc_pipeline.retained_datums import append_source_sets, finalize_datum_references, retain_candidates, retain_source_datums
+
+    parser = argparse.ArgumentParser(prog="otc_pipeline.build_otc --cached-retained-datums", allow_abbrev=False)
+    for name in ("native", "congen-run", "out"):
+        parser.add_argument(f"--{name}", type=Path, required=True)
+    parser.add_argument("--fes-congen-run", type=Path)
+    parser.add_argument("--noaa-cache", type=Path)
+    parser.add_argument("--source-stations", type=Path, action="append", default=[])
+    parser.add_argument("--source-stations-sha256", action="append", default=[])
+    parser.add_argument("--candidate-rows", type=Path, action="append", default=[])
+    parser.add_argument("--candidate-rows-sha256", action="append", default=[])
+    for name in ("native-sha256", "native-meta-sha256"):
+        parser.add_argument(f"--{name}", required=True)
+    args = parser.parse_args(argv)
+    if args.out.exists() and any(args.out.iterdir()):
+        raise ValueError("cached retained datum output must be empty")
+    if len(args.candidate_rows) != len(args.candidate_rows_sha256):
+        raise ValueError("each retained candidate transport requires a SHA-256 binding")
+    meta = args.native.with_suffix(".meta.json")
+    inputs = [(args.native, args.native_sha256), (meta, args.native_meta_sha256)]
+    inputs += list(zip(args.candidate_rows, args.candidate_rows_sha256))
+    if len(args.source_stations) != len(args.source_stations_sha256):
+        raise ValueError("each retained source-set projection requires a SHA-256 binding")
+    inputs += list(zip(args.source_stations, args.source_stations_sha256))
+    if any(_sha256(path) != digest for path, digest in inputs):
+        raise ValueError("cached retained datum input SHA-256 mismatch")
+    release = json.loads(meta.read_text())
+    with args.native.open() as source:
+        release["stations"] = [json.loads(line) for line in source]
+    source_sets = [append_source_sets(release, json.loads(path.read_text())) for path in args.source_stations]
+    report = retain_source_datums(release, noaa_cache=args.noaa_cache)
+    report["source_set_projections"] = source_sets
+    report["producer_transports"] = []
+    for path in args.candidate_rows:
+        with path.open() as source:
+            rows = (json.loads(line) for line in source if line.strip())
+            report["producer_transports"].append(retain_candidates(release, rows))
+    report["reference_designation"] = finalize_datum_references(release)
+    if any(_sha256(path) != digest for path, digest in inputs):
+        raise ValueError("cached retained datum input changed during staging")
+    congen = load_congen_run(args.congen_run)
+    runs = ({TABLE_ID: congen, FES_TABLE_ID: load_congen_run(args.fes_congen_run, fes=True)}
+            if args.fes_congen_run is not None else congen)
+    files = write_release(release, args.out, datestamp=release["release"]["datestamp"],
+                          app_export=None, congen_run=runs)
+    report["files"] = [str(path) for path in files]
+    (args.out / "RETAINED_DATUM_STAGE.json").write_text(json.dumps(report, allow_nan=False, sort_keys=True) + "\n")
+    print(json.dumps(report, sort_keys=True))
+    return 0
 
 
 def cached_noaa_original_metadata_main(argv: list[str]) -> int:
@@ -767,6 +832,8 @@ def cached_fes_astronomy_main(argv: list[str]) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     argv = sys.argv[1:] if argv is None else list(argv)
+    if argv and argv[0] == "--cached-retained-datums":
+        return cached_retained_datums_main(argv[1:])
     if argv and argv[0] == "--cached-noaa-original-metadata":
         return cached_noaa_original_metadata_main(argv[1:])
     if argv and argv[0] == "--cached-subordinate":
@@ -934,6 +1001,9 @@ def main(argv: list[str] | None = None) -> int:
         log("noaa historical augmentation: " + json.dumps(
             {key: value for key, value in historical_augmentation.items() if key not in {"members", "input_roles"}},
             sort_keys=True))
+    from otc_pipeline.retained_datums import retain_source_datums
+    retained_datums = retain_source_datums(release, noaa_cache=a.agency_cache / "noaa")
+    log("retained original datums: " + json.dumps(retained_datums, sort_keys=True))
     datum_stage, observed_stage = apply_datum_drafts(release,
         official=(a.official_datum_drafts, a.official_datum_drafts_sha256) if a.official_datum_drafts is not None else None,
         observed=(a.observed_datum_drafts, a.observed_datum_drafts_sha256) if a.observed_datum_drafts is not None else None,
@@ -942,6 +1012,8 @@ def main(argv: list[str] | None = None) -> int:
                          "source_release_sha256": a.observed_datum_source_release_sha256,
                          "gesla_root": gs.GeslaRelease().root, "fit_run": a.fit_run, "tcd": tcd}
                         if a.observed_datum_drafts is not None else None)
+    from otc_pipeline.retained_datums import finalize_datum_references
+    log("retained datum references: " + json.dumps(finalize_datum_references(release), sort_keys=True))
     if datum_stage is not None:
         log(f"official datums: {datum_stage['staged_set_count']} sets; public_admission={datum_stage['public_admission']}")
     if observed_stage is not None:

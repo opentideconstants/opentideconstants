@@ -33,6 +33,181 @@
     }
   },
   "$defs": {
+    "retained_datum": {
+      "description": "An original numerical alternative, independent of recommended prediction datum selection. Conflicting frames, methods and values remain separate; null uncertainty makes no accuracy claim.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "method",
+        "values",
+        "units",
+        "frame",
+        "source_record_id",
+        "input_binding",
+        "reliability",
+        "uncertainty_m"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "published",
+            "observed",
+            "computed"
+          ]
+        },
+        "method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "values": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "number"
+          }
+        },
+        "units": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frame": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "name",
+            "tie_status"
+          ],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "minLength": 1
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "tie_status": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "source_record_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "set_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "input_binding": {
+          "type": "object",
+          "minProperties": 1
+        },
+        "reliability": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "limitations"
+          ],
+          "properties": {
+            "status": {
+              "type": "string",
+              "minLength": 1
+            },
+            "limitations": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "uncertainty_m": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "basis": {
+          "type": "object"
+        },
+        "window": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "start",
+            "end"
+          ],
+          "properties": {
+            "start": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/datum_date"
+                },
+                {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              ]
+            },
+            "end": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/datum_date"
+                },
+                {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "computed"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "set_id",
+              "window"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "observed"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "window"
+            ]
+          }
+        }
+      ]
+    },
     "meta": {
       "description": "OTC_{YYYYMMDD}.meta.json: the release document without stations.",
       "type": "object",
@@ -412,6 +587,7 @@
           "description": "Original named scalar values, without normalization or invented scientific fields. Numbers must be finite; the release checker verifies this.",
           "type": "object", "additionalProperties": { "type": ["string", "number", "boolean", "null"] }
         },
+        "retained_datums": {"type":"array","items":{"$ref":"#/$defs/retained_datum"},"description":"All held numerical alternatives with original frame, method and reliability. These do not replace or imply a recommended predictive datum."},
         "original_harmonics": { "$ref": "#/$defs/original_harmonics" }
       },
       "allOf": [
@@ -1897,8 +2073,8 @@
           ]
         },
         "method": {
-          "description": "source: as published. harmonic_extremes: the lowest or highest height of the set's harmonic prediction over epoch. subordinate_offsets: the lowest or highest of the reference station's predicted extremes over epoch with the subordinate station's offsets applied. first_reduction: means over data_span with no control. Without the flag no_qualified_control it is a 19-year determination over the OTC datum epoch 2002-01-01 to 2020-12-31: the schema checks at least 216 months and the epoch dates; the release build checks that data_span is inside the epoch and that every calendar month counts in at least 17 of the 19 years (build check 14). With no_qualified_control it is an average over the record's own months (at most 228 months, and never with a primary's coverage), and its epoch equals its data_span (build check 14). standard, modified_range_ratio, direct: comparison with the control station on common tidal days (NOAA CO-OPS methods).",
-          "enum": ["source", "harmonic_extremes", "subordinate_offsets", "first_reduction", "standard", "modified_range_ratio", "direct"]
+          "description": "subordinate_offset_zero: the algebraic zero of the source-declared subordinate MLLW prediction frame, not a surveyed datum or time-window computation; carries an explicit fallback finding and no invented epoch or uncertainty. source: as published. harmonic_extremes: the lowest or highest height of the set's harmonic prediction over epoch. subordinate_offsets: the lowest or highest of the reference station's predicted extremes over epoch with the subordinate station's offsets applied. first_reduction: means over data_span with no control. Without the flag no_qualified_control it is a 19-year determination over the OTC datum epoch 2002-01-01 to 2020-12-31: the schema checks at least 216 months and the epoch dates; the release build checks that data_span is inside the epoch and that every calendar month counts in at least 17 of the 19 years (build check 14). With no_qualified_control it is an average over the record's own months (at most 228 months, and never with a primary's coverage), and its epoch equals its data_span (build check 14). standard, modified_range_ratio, direct: comparison with the control station on common tidal days (NOAA CO-OPS methods).",
+          "enum": ["source", "harmonic_extremes", "subordinate_offsets", "subordinate_offset_zero", "first_reduction", "standard", "modified_range_ratio", "direct"]
         },
         "source_name": {
           "description": "The publisher's own name for this level: the source's (e.g. MThw, CD, STND), or the charting authority's for a Baltic or Kattegat chart datum (e.g. Traficom's MSL, Sjöfartsverket's RH 2000).",
@@ -1952,14 +2128,18 @@
         {
           "if": { "properties": { "kind": { "const": "computed" } } },
           "then": {
-            "required": ["epoch"],
+            "allOf": [{
+              "if": { "properties": { "method": { "const": "subordinate_offset_zero" } } },
+              "then": { "required": ["fallback"], "not": { "anyOf": [{ "required": ["epoch"] }, { "required": ["uncertainty_m"] }] } },
+              "else": { "required": ["epoch"] }
+            }],
             "if": {
               "required": ["fallback"],
               "properties": { "fallback": { "required": ["reason"], "properties": { "reason": { "const": "datum_gate_failed" } } } }
             },
             "else": { "required": ["uncertainty_m"] },
             "properties": {
-              "method": { "enum": ["harmonic_extremes", "subordinate_offsets"] },
+              "method": { "enum": ["harmonic_extremes", "subordinate_offsets", "subordinate_offset_zero"] },
               "uncertainty_basis": { "enum": ["calibrated", "propagated"] },
               "flags": { "items": { "enum": ["time_base_unverified", "time_base_disputed", "sampling_assumed", "short_record", "microtidal", "convention_unverified"] } }
             },
