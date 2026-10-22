@@ -726,15 +726,26 @@ def retain_ticon_sources(release: dict, report: BuildReport, *, ticon: ts.TiconC
         if row and not row["commercial_use"]:
             basis += " Underlying source terms retained: " + row["restriction"] + " " + row["terms_url"]
         tb = ticon.time_bases.get(rid)
+        source_phase_axis = tb is None
+        if source_phase_axis:
+            # TICON's phase axis is a source convention, not an OTC verdict on
+            # the clock of an underlying gauge absent from this GESLA capture.
+            tb = {"code": "unverified", "declared": "utc_instant", "published": "utc_instant",
+                  "decided_in": release["release"]["datestamp"],
+                  "reason": "Source convention derived: TICON-4's authors define Greenwich phase lags "
+                            "in Eq. (3), https://doi.org/10.5194/os-22-1681-2026. "
+                            "Only the published phase axis is interpreted as UTC; the original gauge "
+                            "clock is not independently audited. No phase correction is applied."}
         old_finding = previous_refusals.get(rid)
         findings = ["Original published list retained, including phase conventions OTC excludes from its preferred set."]
         if old_finding and old_finding.get("message"):
             findings.append(old_finding["message"])
         if tb:
-            findings.append("Actual OTC time-base finding: " + tb.get("reason", tb["code"]))
+            prefix = "Source phase-axis interpretation: " if source_phase_axis else "Actual OTC time-base finding: "
+            findings.append(prefix + tb.get("reason", tb["code"]))
         if record.quality != ts.NO_ISSUES:
             findings.append("Original TICON quality: " + record.quality)
-        reason = "published_full_list"
+        reason = "time_base_unresolved" if source_phase_axis else "published_full_list"
         if policy != ts.LICENCE_ID:
             reason = "time_base_disputed" if tb and tb["code"] == "disputed" else "licence_reading"
         elif tb and tb["code"] == "disputed":
@@ -789,6 +800,14 @@ def retain_ticon_sources(release: dict, report: BuildReport, *, ticon: ts.TiconC
             "provenance": {"input_sha256": sorted(set(original["input_sha256"])),
                            "inventory_sha256": inventory.provenance["sha256"]},
             "original_harmonics": payload}
+        if source_phase_axis:
+            identity["original_metadata"] = {
+                "time_base_status": "utc_by_source_convention",
+                "time_base_limitation": "Published Greenwich phase axis interpreted as UTC; "
+                                        "the original gauge clock is not independently audited.",
+                "phase_convention_source": "https://doi.org/10.5194/os-22-1681-2026; Eq. (3)",
+                "phase_convention_source_capture_sha256": "5cac7eebadd82d8793e4d785898dd40a982ea18fc94259373c92af3857d35b82",
+            }
         if source_licence != ts.LICENCE_ID:
             identity["upstream_licence_id"] = ts.LICENCE_ID
         station.setdefault("source_records", []).append(identity)
