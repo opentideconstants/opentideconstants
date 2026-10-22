@@ -553,7 +553,10 @@ def reduce_profile(profile: dict, primaries: list[dict], cache: Path) -> tuple[d
                 for ym, values in sorted((mm or {}).items())]
     if reduced_candidate:
         values, used, method = reduced_candidate
-        retained.append(retained_observation(profile, values, used, method))
+        candidate = retained_observation(profile, values, used, method)
+        if control:
+            candidate["basis"].update(control=dict(control), epoch=dict(EPOCH))
+        retained.append(candidate)
     own = retained_own_record(profile)
     if own:
         equivalent = next((candidate for candidate in retained

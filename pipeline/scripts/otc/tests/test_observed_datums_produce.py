@@ -1026,3 +1026,58 @@ def test_actual_reused_checkpoints_reopen():
             failures.append(key)
     assert len(sources) == 3
     assert not failures, f"actual reused checkpoints could not reopen: {len(failures)}"
+
+
+def test_actual_controlled_reductions_retain_control_and_epoch(tmp_path):
+    witnesses_path = os.environ.get("OTC_OBSERVED_CONTROL_WITNESSES")
+    if not witnesses_path:
+        pytest.skip("requires three held controlled reductions and their authenticated measurement cache")
+    p = producer()
+    cache = Path(os.environ["OTC_OBSERVED_RETENTION_CACHE"]) / "checkpoints"
+    witnesses = json.loads(Path(witnesses_path).read_text())
+    assert len({item["row"]["station_id"] for item in witnesses}) == 3
+    missing = []
+    destination = Path(os.environ.get("OTC_OBSERVED_CONTROL_PROOF", tmp_path))
+    destination.mkdir(parents=True, exist_ok=True)
+    for item in witnesses:
+        target, control = [p.read_checkpoint(cache, item[key]["key"], item[key]["job_sha256"], require_complete=True)
+                           for key in ("target", "control")]
+        row, report = p.reduce_profile(target, [p.primary_summary(control)], cache)
+        candidate = next(value for value in row["retained_observed"] if value["method"] == item["method"])
+        expected_basis = next(basis for basis in item["row"]["draft_datum"]["basis"].values() if basis.get("control"))
+        assert report["control"] == expected_basis["control"]
+        assert row["draft_datum"] == item["row"]["draft_datum"]
+        assert candidate["input_binding"] == item["row"]["input_binding"]
+        for name, value in item["row"]["draft_datum"]["named"].items():
+            assert candidate["values"][name.removeprefix("otc_")] == value
+        control_ok = candidate["basis"].get("control") == expected_basis["control"]
+        epoch_ok = candidate["basis"].get("epoch") == expected_basis["epoch"]
+        print(f"actual controlled {row['source_record_id']}: method={item['method']} "
+              f"control_retained={control_ok} epoch_retained={epoch_ok} values_unchanged=True")
+        (destination / f"{row['source_record_id']}.json").write_text(json.dumps(candidate, sort_keys=True, allow_nan=False) + "\n")
+        if not control_ok or not epoch_ok:
+            missing.append(row["station_id"])
+    assert not missing, f"control/epoch provenance omitted at {len(missing)} actual stations"
+
+
+def test_held_control_provenance_survives_existing_observed_keys():
+    witnesses_path = os.environ.get("OTC_OBSERVED_CONTROL_WITNESSES")
+    if not witnesses_path:
+        pytest.skip("requires held controlled reduction values for the existing-key regression")
+    p = producer()
+    cache = Path(os.environ["OTC_OBSERVED_RETENTION_CACHE"]) / "checkpoints"
+    item = json.loads(Path(witnesses_path).read_text())[0]
+    target, control = [p.read_checkpoint(cache, item[key]["key"], item[key]["job_sha256"], require_complete=True)
+                       for key in ("target", "control")]
+    # Reuse the actual held reduction as existing observed keys; do not invent a value.
+    target["cs"]["datum"] = copy.deepcopy(item["row"]["draft_datum"])
+    row, _ = p.reduce_profile(target, [p.primary_summary(control)], cache)
+    assert row["draft_datum"]["named"] == {}
+    candidate = next(value for value in row["retained_observed"] if value["method"] == item["method"])
+    expected = next(basis for basis in item["row"]["draft_datum"]["basis"].values() if basis.get("control"))
+    assert candidate["basis"]["control"] == expected["control"]
+    assert candidate["basis"]["epoch"] == expected["epoch"]
+    assert candidate["values"] == item["row"]["draft_datum"]["named"]
+    for value in row["retained_observed"]:
+        if value["method"] != item["method"]:
+            assert "control" not in value["basis"] and "epoch" not in value["basis"]
