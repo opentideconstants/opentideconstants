@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from otc_pipeline.harmonic_levels import retained_levels
+from otc_pipeline.retained_datums import retain_candidates
 
 
 def case():
@@ -25,6 +26,12 @@ def case():
             "input_binding": {"native_sha256": "a" * 64, "sdk_commit": "b" * 40}}
 
 
+def assert_event_extrema_limitations(datum):
+    limitations = datum["reliability"]["limitations"]
+    assert "LAT/HAT are event-sampled minima/maxima of the returned extreme-event heights." in limitations
+    assert "Window boundary heights were not evaluated; continuous-window extrema are not established." in limitations
+
+
 def test_event_weighted_levels_keep_relative_frame_and_source_flags():
     data = case()
     before = copy.deepcopy(data)
@@ -33,6 +40,7 @@ def test_event_weighted_levels_keep_relative_frame_and_source_flags():
     assert datum["values"] == {"mhw": 3, "mlw": -2, "mtl": 0.5, "mn": 5, "lat": -3, "hat": 4}
     assert datum["frame"] == {"kind": "harmonic_mean", "name": None, "tie_status": "unknown"}
     assert datum["uncertainty_m"] is None
+    assert_event_extrema_limitations(datum)
     assert datum["basis"]["qc_flags"] == data["station"]["constant_sets"][0]["qc_flags"]
     assert "msl" not in datum["values"] and "mhhw" not in datum["values"]
     assert row["source_record_id"] == "record"
@@ -95,3 +103,28 @@ def test_real_pilot_matches_independent_event_arithmetic():
     result = retained_levels(**data)["retained_datums"][0]
     assert result["values"] == pytest.approx(expected, abs=1e-12)
     assert result["set_id"] == "OTC-1df2efef/fes2022"
+
+
+@pytest.mark.skipif("OTC_HARMONIC_LEVELS_PROOF" not in os.environ, reason="actual held source/event proof")
+@pytest.mark.parametrize("pilot", ["", "akabane", "amami"], ids=["fes", "akabane", "amami"])
+def test_real_pilots_label_event_extrema_and_preserve_payload(pilot):
+    root = Path(os.environ["OTC_HARMONIC_LEVELS_PROOF"]) / pilot
+    data = json.loads((root / "pilot-input.json").read_text())
+    before = copy.deepcopy(data)
+    previous = json.loads((root / "candidate.jsonl").read_text())
+    result = retained_levels(**data)
+    datum = result["retained_datums"][0]
+    limitations = datum["reliability"]["limitations"]
+    assert_event_extrema_limitations(datum)
+    restored = copy.deepcopy(result)
+    restored["retained_datums"][0]["reliability"]["limitations"] = previous["retained_datums"][0]["reliability"]["limitations"]
+    assert restored == previous
+    assert data == before
+
+    station = copy.deepcopy(data["station"])
+    assert retain_candidates({"stations": [station]}, [result])["added_candidates"] == 1
+    record = next(record for record in station["source_records"]
+                  if datum in record.get("retained_datums", []))
+    assert record["retained_datums"][-1]["reliability"]["limitations"] == limitations
+    record.pop("retained_datums")
+    assert station == before["station"]

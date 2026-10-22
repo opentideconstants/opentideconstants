@@ -3,8 +3,10 @@
 MHW/MLW are arithmetic means of all predicted high/low events in the labelled
 window; MTL and MN follow the definitions also used by observed_datums.monthly.
 These are event-weighted harmonic predictions, not monthly-balanced observed
-tidal datums. LAT/HAT are the finite-window minimum/maximum. No day grouping,
-surveyed zero, observed epoch, or accuracy acceptance is inferred.
+tidal datums. LAT/HAT are the minimum/maximum among returned extreme events.
+Window boundary heights are not evaluated, so continuous-window extrema are
+not established. No day grouping, surveyed zero, observed epoch, or accuracy
+acceptance is inferred.
 """
 from __future__ import annotations
 
@@ -98,7 +100,9 @@ def retained_levels(*, station: dict, set_id: str, prediction: dict,
                     "Predicted harmonic-relative values; not observed or agency datums.",
                     "No surveyed MSL or chart-datum tie is established.",
                     "MHW/MLW weight each predicted event equally, not each month.",
-                    "LAT/HAT are finite-window extrema, not an official astronomical datum determination.",
+                    "LAT/HAT are event-sampled minima/maxima of the returned extreme-event heights.",
+                    "Window boundary heights were not evaluated; continuous-window extrema are not established.",
+                    "These are not official astronomical datum determinations.",
                     "MHHW/MLLW and observed MSL are not calculated; no tidal-day grouping is inferred.",
                     "Source quality and convention limitations remain applicable; uncertainty is unknown.",
                 ],
