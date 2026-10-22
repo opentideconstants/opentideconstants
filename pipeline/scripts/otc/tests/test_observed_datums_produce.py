@@ -1018,11 +1018,15 @@ def test_actual_identical_measurement_reuse():
     p._initialize_measurement_worker(arg("--gesla-root"), arg("--fit-run"), arg("--tcd"),
                                     Path(p.__file__).resolve().parents[4] / "data/gesla/contributor_roles.csv")
     missing = []
+    positive_sources = set()
     for item in json.loads(Path(path).read_text()):
         cache = Path(item["cache"])
         source, target = [p.read_checkpoint(cache, row["key"], row["job_sha256"], require_complete=True)
                           for row in item["targets"]]
-        assert source["mm"] == target["mm"]
+        assert len({row["key"] for row in item["targets"]}) == 2
+        assert source["cs"]["set_id"] != target["cs"]["set_id"]
+        assert source["binding"]["source_record_id"] == target["binding"]["source_record_id"] == item["source_record_id"]
+        assert source["mm"] and source["mm"] == target["mm"]
         target_job = json.loads((cache / f"{item['targets'][1]['key']}.job.json").read_text())
         reuse = getattr(p, "reuse_measurement", lambda *args: None)(source, target_job, p._WORKER_CONTEXT)
         print(f"actual reuse {item['source_record_id']}: measured_pair_months={len(source['mm'])} reused={reuse is not None}")
@@ -1040,6 +1044,8 @@ def test_actual_identical_measurement_reuse():
             changed = copy.deepcopy(target_job)
             changed["binding"][key] = "different-input"
             assert p.reuse_measurement(source, changed, p._WORKER_CONTEXT) is None
+        positive_sources.add(source["binding"]["source_record_id"])
+    assert len(positive_sources) >= 3, "requires at least three distinct successful source measurement pairs"
     assert not missing, f"actual duplicate measurements not reusable at {len(missing)} places"
     different = json.loads(Path(os.environ["OTC_OBSERVED_REUSE_DIFFERENT"]).read_text())
     checked = 0
