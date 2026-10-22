@@ -103,6 +103,43 @@ def datum_draft(payload: dict, raw: dict) -> dict:
     return datum
 
 
+def offset_chart_datum(station: dict) -> dict | None:
+    """Label NOAA's algebraic offset zero after authenticating cached extrema.
+
+    Keep datum_draft unchanged: historical cached drafts authenticate its exact
+    output before this additive chart designation is applied.
+    """
+    offsets = station.get("subordinate_offsets", {})
+    datum = copy.deepcopy(offsets.get("datum"))
+    noaa = station.get("aliases", {}).get("noaa")
+    noaa_ids = noaa if isinstance(noaa, list) else [noaa]
+    sources = [row for row in station.get("source_records", [])
+               if row.get("source") == "noaa" and row.get("source_record_id") in noaa_ids]
+    reference = offsets.get("reference_station_id")
+    if (station.get("type") != "subordinate" or not noaa or not sources or not reference
+            or offsets.get("licence_id") != "noaa-public-domain"):
+        return datum
+    if datum and (datum.get("chart_datum") or "mllw" in datum.get("named", {})
+                  or datum.get("zero") != "chart_datum" or datum.get("zero_name") != "MLLW"):
+        return datum
+    if not datum:
+        datum = {"zero": "chart_datum", "zero_name": "MLLW", "named": {}, "basis": {}}
+    datum["chart_datum"] = "mllw"
+    datum.setdefault("named", {})["mllw"] = 0.0
+    datum.setdefault("basis", {})["mllw"] = {
+        "kind": "computed", "method": "subordinate_offset_zero",
+        "fallback": {
+            "reason": "datum_gate_failed",
+            "basis": f"NOAA subordinate offsets for {sources[0]['source_record_id']} referencing {reference}; "
+                     "algebraic zero of the MLLW prediction frame",
+            "otc_finding": "DERIVED subordinate offset-zero chart reference, not a locally published or "
+                           "surveyed MLLW datum or an independent vertical tie. Uncertainty is unestablished; "
+                           "normal datum gate not accepted.",
+        },
+    }
+    return datum
+
+
 def tuning_summary(rows: list[dict]) -> dict:
     expected = {"8728464", "8728626", "8746819", "9414392", "9414767", "9414819"}
     if len(rows) != 6 or {r["source_record_id"] for r in rows} != expected:

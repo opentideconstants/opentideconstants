@@ -12,8 +12,28 @@ import pytest
 from otc_pipeline import datums
 from otc_pipeline.datums import datum_build_errors, period, published
 from otc_pipeline.gesla_sets import _published_stated_zero
-from otc_pipeline.release_writer import pinned_schema
+from otc_pipeline.release_writer import pinned_schema, validate_release
 from jsonschema import Draft202012Validator
+
+
+def _expected_computed_reference_basis(original):
+    expected = copy.deepcopy(original)
+    expected["fallback"]["basis"] += (
+        "; approximate chart-reference stand-in: existing computed LAT (nonofficial); convention unverified")
+    expected["fallback"]["otc_finding"] += (
+        "; approximate chart-reference stand-in; agency chart-datum convention, equivalence and vertical tie "
+        "are not established; convention unverified")
+    expected.setdefault("flags", []).append("convention_unverified")
+    return expected
+
+
+def _expected_single_set_computed_reference(original):
+    expected = copy.deepcopy(original)
+    assert len(expected["constant_sets"]) == 1
+    datum = expected["constant_sets"][0]["datum"]
+    datum["chart_datum"] = "lat"
+    datum["basis"]["lat"] = _expected_computed_reference_basis(datum["basis"]["lat"])
+    return expected
 
 
 @pytest.fixture(scope="session")
@@ -60,7 +80,7 @@ def test_native_convention_unverified_designation(native_convention_unverified_c
     before = copy.deepcopy(release)
     receipt = datums.derive_chart_datums(release, ticon_approximate_set_ids=ids,
                                        ticon_convention_unverified_set_ids=ids)
-    assert receipt["changed_sets"] == len(ids)
+    assert receipt["changed_sets"] >= len(ids)
     for station in release["stations"]:
         for cs in station["constant_sets"]:
             if cs["set_id"] not in ids:
@@ -77,20 +97,20 @@ def test_native_convention_unverified_designation(native_convention_unverified_c
                                     ticon_convention_unverified_set_ids=ids)["changed_sets"] == 0
     assert release == again
     unchanged = copy.deepcopy(before)
-    assert datums.derive_chart_datums(unchanged, ticon_approximate_set_ids=ids)["changed_sets"] == 0
-    assert unchanged == before
+    assert datums.derive_chart_datums(unchanged)["changed_sets"] >= len(ids)
+    assert unchanged == release
 
 
-@pytest.mark.parametrize("guard", ["unstaged", "existing_chart", "source_link", "nonfinite", "low_water", "agency"])
+@pytest.mark.parametrize("guard", ["existing_chart", "source_link", "nonfinite", "low_water", "agency"])
 def test_native_convention_unverified_guards(native_convention_unverified_case, guard):
     release, ids = native_convention_unverified_case
     station = release["stations"][0]
     cs = next(cs for cs in station["constant_sets"] if cs["set_id"] in ids)
+    # Other valid held sets now receive references independently of this set's guard.
+    station["constant_sets"] = [cs]
     ids = frozenset([cs["set_id"]])
     authenticated = ids
-    if guard == "unstaged":
-        authenticated = frozenset()
-    elif guard == "existing_chart":
+    if guard == "existing_chart":
         cs["datum"]["chart_datum"] = "hat"
     elif guard == "source_link":
         for record in station["source_records"]:
@@ -162,6 +182,8 @@ def test_native_d4_approximate_chart_labels_and_idempotence(native_d4_chart_case
     "bad_qc", "wrong_frame", "wrong_method", "empty_finding", "empty_basis", "nonfinite", "country_conflict"])
 def test_native_d4_chart_guards(native_d4_chart_case, monkeypatch, guard):
     station, cs = native_d4_chart_case
+    # Isolate this real target; other valid sets may now receive their own references.
+    station["constant_sets"] = [cs]
     ids = frozenset([cs["set_id"]])
     if guard == "unstaged":
         ids = frozenset()
@@ -209,8 +231,13 @@ def test_native_d4_chart_guards(native_d4_chart_case, monkeypatch, guard):
     elif guard == "country_conflict":
         station["source_records"][0].setdefault("original_metadata", {})["COUNTRY"] = "USA"
     before = copy.deepcopy(station)
-    assert datums.derive_chart_datums({"stations": [station]}, ticon_approximate_set_ids=ids)["changed_sets"] == 0
-    assert station == before
+    receipt = datums.derive_chart_datums({"stations": [station]}, ticon_approximate_set_ids=ids)
+    if guard in {"unstaged", "unknown", "mixed", "no_rows", "country_conflict"}:
+        assert receipt["changed_sets"] == receipt["approximate_changed_sets"] == 1
+        assert station == _expected_single_set_computed_reference(before)
+    else:
+        assert receipt["changed_sets"] == 0
+        assert station == before
 
 
 @pytest.fixture(scope="module")
@@ -262,9 +289,18 @@ def test_native_uhslc_fd_holdouts_preserve_payload(native_uhslc_fd_chart_evidenc
     rows = [r for r in facts["frozen_family_records_at_current_missing_stations"] if r["cached_guard_failures"]]
     for row in rows:
         station = copy.deepcopy(stations[row["set_id"]])
-        assert datums.derive_chart_datums({"stations": [station]})["changed_sets"] == 0
-        assert station == stations[row["set_id"]]
-        print(f"REAL UHSLC_FD HOLDOUT {row['set_id']}: unchanged; guards={row['cached_guard_failures']}")
+        target = next(cs for cs in station["constant_sets"] if cs["set_id"] == row["set_id"])
+        station["constant_sets"] = [target]
+        before = copy.deepcopy(station)
+        receipt = datums.derive_chart_datums({"stations": [station]})
+        if row["cached_guard_failures"] == ["COUNTRY_CONFLICT_OR_UNKNOWN"]:
+            assert receipt["approximate_changed_sets"] == 1
+            assert station == _expected_single_set_computed_reference(before)
+        else:
+            assert receipt["changed_sets"] == 0
+            assert station == before
+        print(f"REAL UHSLC_FD HOLDOUT {row['set_id']}: guards={row['cached_guard_failures']}; "
+              f"labelled_references={receipt['approximate_changed_sets']}")
 
 
 @pytest.mark.parametrize("defect", ["rq", "known_frame", "missing_mean", "boolean_mean", "nonfinite_mean",
@@ -273,6 +309,7 @@ def test_native_uhslc_fd_source_guards(native_uhslc_fd_chart_cases, defect):
     original, set_id = native_uhslc_fd_chart_cases[0]
     station = copy.deepcopy(original)
     cs = next(c for c in station["constant_sets"] if c["set_id"] == set_id)
+    station["constant_sets"] = [cs]
     own = next(r for r in station["source_records"] if r["source"] == "gesla"
                and r["source_record_id"] == cs["source_record_id"])
     if defect == "rq":
@@ -296,9 +333,33 @@ def test_native_uhslc_fd_source_guards(native_uhslc_fd_chart_cases, defect):
         station["country"] = country
         for row in station["source_records"]:
             row.setdefault("original_metadata", {})["COUNTRY"] = country
+    if defect in {"boolean_mean", "missing_identity"}:
+        # Malformed native types/identities fail the existing input schema;
+        # these are not examples of uncertain country or frame metadata.
+        schema = pinned_schema()
+        old = next(cs for cs in original["constant_sets"] if cs["set_id"] == set_id)
+        if defect == "boolean_mean":
+            validator = Draft202012Validator({"$ref": "#/$defs/datum", "$defs": schema["$defs"]})
+            assert validator.is_valid(old["datum"])
+            assert not validator.is_valid(cs["datum"])
+        else:
+            validator = Draft202012Validator(schema["$defs"]["constant_set"]["properties"]["source_record_id"])
+            assert validator.is_valid(old["source_record_id"])
+            assert not validator.is_valid(cs["source_record_id"])
+        return
+    if defect == "nonfinite_mean":
+        # The native writer rejects non-JSON numbers before schema/cross references.
+        assert any("msl_offset_m" in error and "not a finite number" in error
+                   for error in validate_release({"stations": [station]}))
+        return
     before = copy.deepcopy(station)
-    assert datums.derive_chart_datums({"stations": [station]})["changed_sets"] == 0
-    assert station == before
+    receipt = datums.derive_chart_datums({"stations": [station]})
+    if defect in {"rq", "known_frame", "missing_mean", "incomplete_country", "unknown_country"}:
+        assert receipt["approximate_changed_sets"] == 1
+        assert station == _expected_single_set_computed_reference(before)
+    else:
+        assert receipt["changed_sets"] == 0
+        assert station == before
 
 
 @pytest.fixture(scope="module")
@@ -389,7 +450,8 @@ def test_native_computed_approximate_chart(request, case_fixture, index):
     assert station == after
     del cs["datum"]["chart_datum"]
     old = next(c for c in original["constant_sets"] if c["set_id"] == set_id)
-    fallback.update(old["datum"]["basis"]["lat"]["fallback"])
+    assert cs["datum"]["basis"]["lat"] == _expected_computed_reference_basis(old["datum"]["basis"]["lat"])
+    cs["datum"]["basis"]["lat"] = copy.deepcopy(old["datum"]["basis"]["lat"])
     assert station == original
 
 
@@ -402,6 +464,7 @@ def test_native_computed_chart_controls_preserve_payload(request, case_fixture, 
     original, set_id = request.getfixturevalue(case_fixture)[0]
     station = copy.deepcopy(original)
     cs = next(c for c in station["constant_sets"] if c["set_id"] == set_id)
+    station["constant_sets"] = [cs]
     own = next(r for r in station["source_records"] if r["source"] == "gesla"
                and r["source_record_id"] == cs["source_record_id"])
     datum = cs["datum"]
@@ -442,8 +505,13 @@ def test_native_computed_chart_controls_preserve_payload(request, case_fixture, 
     else:
         datum["basis"]["lat"]["fallback"]["basis"] = "  "
     before = copy.deepcopy(station)
-    assert datums.derive_chart_datums({"stations": [station]})["changed_sets"] == 0
-    assert station == before
+    receipt = datums.derive_chart_datums({"stations": [station]})
+    if defect in {"country_conflict", "unknown_country", "other_contributor", "other_frame", "conflicting_filename"}:
+        assert receipt["approximate_changed_sets"] == 1
+        assert station == _expected_single_set_computed_reference(before)
+    else:
+        assert receipt["changed_sets"] == 0
+        assert station == before
 
 
 @pytest.fixture(scope="module")

@@ -18,6 +18,7 @@ from otc_pipeline.lat_hat import EPOCH, START, END, computation_input_sha256, da
 from otc_pipeline import lat_hat
 from otc_pipeline.observed_datums import produce as observed_produce
 from otc_pipeline.release_writer import pinned_schema
+from test_datums import _expected_computed_reference_basis
 from test_datums import native_observed_chart_cases as native_observed_chart_cases
 from test_datums import native_approximate_chart_cases as native_approximate_chart_cases
 from test_datums import native_convention_unverified_inputs as native_convention_unverified_inputs
@@ -117,13 +118,20 @@ def test_native_convention_unverified_producer(native_convention_unverified_inpu
     (root / "candidate.json").write_text(json.dumps(release) + "\n")
     assert staged["accepted"] is False and staged["normal_datum_gate_accepted"] is False
     native = {cs["set_id"]: cs for station in release["stations"] for cs in station["constant_sets"]}
+    qualified = {key for key, cs in native.items()
+                 if cs.get("datum", {}).get("chart_datum") == "lat"
+                 and "convention_unverified" in cs.get("datum", {}).get("basis", {}).get("lat", {}).get("flags", [])}
+    assert ids <= qualified, f"missing designated and qualified fixture sets: {sorted(ids - qualified)}"
+    positive_stations = {station["station_id"] for station in release["stations"]
+                         if any(cs["set_id"] in ids & qualified for cs in station["constant_sets"])}
+    assert len(positive_stations) >= 3, "requires positive chart witnesses at three distinct actual stations"
     for row in staged["drafts"]:
         assert row["datum"] == native[row["set_id"]]["datum"]
     restored = copy.deepcopy(release)
     original = {cs["set_id"]: cs for station in accepted["stations"] for cs in station["constant_sets"]}
     for station in restored["stations"]:
         for cs in station["constant_sets"]:
-            if cs["set_id"] not in ids:
+            if cs.get("datum") == original[cs["set_id"]].get("datum"):
                 continue
             datum = cs["datum"]
             print(f"GREEN {cs['set_id']}: chart={datum.get('chart_datum')}; LAT={datum['named']['lat']}")
@@ -158,7 +166,9 @@ def test_native_convention_unverified_full_profile():
     native = {cs["set_id"]: cs for station in release["stations"] for cs in station["constant_sets"]}
     qualified = {key for key, cs in native.items()
                  if "convention_unverified" in cs.get("datum", {}).get("basis", {}).get("lat", {}).get("flags", [])}
-    assert qualified == ids
+    # The historical scope is retained; existing source-linked LAT values outside
+    # that scope now also receive labelled references instead of a convention veto.
+    assert ids <= qualified
     for row in drafts:
         datum = native[row["set_id"]]["datum"]
         assert datum["named"] == row["draft_datum"]["named"]
@@ -166,7 +176,8 @@ def test_native_convention_unverified_full_profile():
             assert datum["chart_datum"] == "lat"
             assert "uncertainty_m" not in datum["basis"]["lat"]
     assert staged["staged_set_count"] == 760 and staged["normal_datum_gate_accepted"] is False
-    print("GREEN exact 658 qualified sets; all 760 cached LAT/HAT pairs unchanged")
+    print(f"GREEN all 658 historical sets retained; {len(qualified)} labelled references; "
+          "all 760 cached LAT/HAT pairs unchanged")
 
 
 @pytest.mark.skipif("OTC_D4_CHART_PROOF" not in os.environ, reason="actual source-bound D4 chart witnesses")
@@ -323,14 +334,6 @@ from test_datums import native_uhslc_fd_chart_cases as native_uhslc_fd_chart_cas
 from test_datums import native_uhslc_fd_chart_evidence as native_uhslc_fd_chart_evidence
 
 
-def _expected_computed_reference_basis(original):
-    expected = copy.deepcopy(original)
-    expected["fallback"]["basis"] += "; approximate chart-reference stand-in: existing computed LAT (nonofficial)"
-    expected["fallback"]["otc_finding"] += (
-        "; approximate chart-reference stand-in; agency chart-datum convention, equivalence and vertical tie are not established")
-    return expected
-
-
 @pytest.fixture
 def native_computed_chart_composition(native_computed_chart_cases, tmp_path, request):
     if getattr(request, "param", None) in ("nld", "uhslc_fd"):
@@ -431,7 +434,8 @@ def test_native_computed_chart_composition(native_computed_chart_composition, tm
             assert cs["datum"].pop("chart_datum") == "lat"
             original = next(c for s in postcomputed["stations"] for c in s["constant_sets"]
                             if c["set_id"] == cs["set_id"])
-            cs["datum"]["basis"]["lat"]["fallback"] = original["datum"]["basis"]["lat"]["fallback"]
+            assert cs["datum"]["basis"]["lat"] == _expected_computed_reference_basis(original["datum"]["basis"]["lat"])
+            cs["datum"]["basis"]["lat"] = copy.deepcopy(original["datum"]["basis"]["lat"])
     assert release == expected
 
 
@@ -467,7 +471,8 @@ def test_native_computed_chart_publication(request, case_fixture, tmp_path, comb
         fallback = cs["datum"]["basis"]["lat"]["fallback"]
         assert "existing computed LAT (nonofficial)" in fallback["basis"]
         assert "agency chart-datum convention, equivalence and vertical tie are not established" in fallback["otc_finding"]
-        fallback.update(old["datum"]["basis"]["lat"]["fallback"])
+        assert cs["datum"]["basis"]["lat"] == _expected_computed_reference_basis(old["datum"]["basis"]["lat"])
+        cs["datum"]["basis"]["lat"] = copy.deepcopy(old["datum"]["basis"]["lat"])
     assert release == before
 
 
@@ -506,7 +511,8 @@ def test_native_nld_computed_chart_composition(native_computed_chart_composition
                 fallback = cs["datum"]["basis"]["lat"]["fallback"]
                 assert "existing computed LAT (nonofficial)" in fallback["basis"]
                 assert "agency chart-datum convention, equivalence and vertical tie are not established" in fallback["otc_finding"]
-                fallback.update(old["datum"]["basis"]["lat"]["fallback"])
+                assert cs["datum"]["basis"]["lat"] == _expected_computed_reference_basis(old["datum"]["basis"]["lat"])
+                cs["datum"]["basis"]["lat"] = copy.deepcopy(old["datum"]["basis"]["lat"])
         assert output == baseline
     assert before != postcomputed  # Exact native pre-computed input was authenticated.
 

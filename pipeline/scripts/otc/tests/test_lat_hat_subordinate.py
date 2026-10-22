@@ -8,8 +8,110 @@ import sys
 
 import pytest
 
+from otc_pipeline.lat_hat_subordinate import datum_draft, offset_chart_datum
+
 
 INPUT = os.environ.get("OTC_SUBORDINATE_INPUT")
+CHART_INPUTS = os.environ.get("OTC_SUBORDINATE_CHART_INPUTS")
+
+
+@pytest.mark.parametrize("index", range(3))
+def test_retained_cached_subordinate_chart_origin(index):
+    if not CHART_INPUTS:
+        pytest.skip("set OTC_SUBORDINATE_CHART_INPUTS to the retained real cohort witnesses")
+    witness = json.loads(Path(CHART_INPUTS).read_text())[index]
+    payload, raw = witness["payload"], witness["raw"]
+    station = copy.deepcopy(payload["station"])
+    original = datum_draft(payload, raw)
+    station["subordinate_offsets"]["datum"] = original
+    datum = offset_chart_datum(station)
+    print(f"{payload['station']['station_id']}: zero={datum.get('zero_name')} "
+          f"chart={datum.get('chart_datum')} mllw={datum.get('named', {}).get('mllw')}")
+    assert datum["zero_name"] == "MLLW"
+    assert datum.get("chart_datum") == "mllw"
+    assert datum["named"]["mllw"] == 0.0
+    assert datum["named"]["lat"] == raw["lat_m"]
+    assert datum["named"]["hat"] == raw["hat_m"]
+    assert station["subordinate_offsets"]["datum"] == original
+    basis = datum["basis"]["mllw"]
+    assert basis["kind"] == "computed"
+    assert basis["method"] == "subordinate_offset_zero"
+    assert basis["fallback"]["reason"] == "datum_gate_failed"
+    assert station["subordinate_offsets"]["reference_station_id"] in basis["fallback"]["basis"]
+    assert not {"epoch", "uncertainty_m", "control"} & basis.keys()
+
+
+@pytest.fixture
+def offset_station():
+    return {"station_id": "OTC-subordinate", "type": "subordinate", "aliases": {"noaa": "123"},
+            "source_records": [{"source": "noaa", "source_record_id": "123"}],
+            "subordinate_offsets": {"reference_station_id": "OTC-reference", "licence_id": "noaa-public-domain"}}
+
+
+def test_offset_zero_without_extrema_preserves_source_and_unknown_uncertainty(offset_station):
+    before = copy.deepcopy(offset_station)
+    datum = offset_chart_datum(offset_station)
+    assert datum["chart_datum"] == "mllw"
+    assert datum["named"] == {"mllw": 0.0}
+    assert set(datum["basis"]["mllw"]) == {"kind", "method", "fallback"}
+    assert offset_station == before
+
+
+@pytest.mark.parametrize("datum", [
+    {"zero": "chart_datum", "zero_name": "MLLW", "chart_datum": "lat", "named": {"lat": -0.4}},
+    {"zero": "chart_datum", "zero_name": "MLLW", "named": {"mllw": 0.2}},
+    {"zero": "gauge_zero", "zero_name": "STND", "named": {}},
+])
+def test_offset_zero_keeps_existing_datum_conflicts(offset_station, datum):
+    offset_station["subordinate_offsets"]["datum"] = datum
+    result = offset_chart_datum(offset_station)
+    assert result == datum
+    assert result is not datum
+
+
+@pytest.mark.parametrize("mutation", ["reference", "noaa_alias", "source_record", "licence", "reference_id"])
+def test_offset_zero_requires_actual_noaa_offset_provenance(offset_station, mutation):
+    if mutation == "reference":
+        offset_station["type"] = "reference"
+    elif mutation == "noaa_alias":
+        offset_station["aliases"] = {}
+    elif mutation == "source_record":
+        offset_station["source_records"][0]["source"] = "gesla-fit"
+    elif mutation == "licence":
+        offset_station["subordinate_offsets"]["licence_id"] = "other"
+    else:
+        offset_station["subordinate_offsets"].pop("reference_station_id")
+    assert offset_chart_datum(offset_station) is None
+
+
+def test_actual_chart_cohort_preserves_held_material():
+    cohort = os.environ.get("OTC_SUBORDINATE_CHART_COHORT")
+    if not cohort:
+        pytest.skip("set OTC_SUBORDINATE_CHART_COHORT to the frozen 247-station native cohort")
+    stations = json.loads(Path(cohort).read_text())
+    assert len(stations) == 247
+    assert len({station["station_id"] for station in stations}) == 247
+    rows = []
+    for station in stations:
+        original = copy.deepcopy(station)
+        previous = station["subordinate_offsets"].get("datum", {})
+        assert not previous.get("chart_datum")
+        datum = offset_chart_datum(station)
+        assert datum["chart_datum"] == "mllw"
+        assert datum["named"]["mllw"] == 0.0
+        for key, value in previous.get("named", {}).items():
+            assert datum["named"][key] == value
+            assert datum["basis"][key] == previous["basis"][key]
+        basis = datum["basis"]["mllw"]
+        assert basis["method"] == "subordinate_offset_zero"
+        assert basis["fallback"]["reason"] == "datum_gate_failed"
+        assert not {"epoch", "uncertainty_m", "uncertainty_basis", "control"} & basis.keys()
+        assert station == original
+        rows.append({"station_id": station["station_id"], "datum": datum})
+    output = os.environ.get("OTC_SUBORDINATE_CHART_OUTPUT")
+    if output:
+        Path(output).write_text("".join(json.dumps(row, allow_nan=False) + "\n" for row in rows))
+    print("247 distinct listed stations: 0 -> 247 chart pointers; all retained levels, labels and source records preserved")
 
 
 @pytest.fixture

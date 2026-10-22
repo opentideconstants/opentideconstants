@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import calendar
+import copy
 import fcntl
 import hashlib
 import importlib
@@ -14,6 +15,8 @@ import json
 import math
 import multiprocessing
 import os
+import shutil
+import time
 from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -385,12 +388,6 @@ def measure_profile(job: dict, release, dump, fit_run, manifest, fit_rows, audit
     reason = None
     if member is None:
         reason = "original_member_unavailable"
-    elif cs.get("source") == ticon_sets.SOURCE:
-        reason = "ticon_original_zero_tie_unavailable"
-    elif cs.get("qc_status") == "no_constants" or not cs.get("constituents"):
-        reason = "no_constants"
-    elif any(r.get("issue") == "no_tide" for r in cs.get("record_issues", [])):
-        reason = "no_tide"
     elif cs.get("quantity") != "water_level":
         reason = "not_water_level"
     if reason:
@@ -399,10 +396,12 @@ def measure_profile(job: dict, release, dump, fit_run, manifest, fit_rows, audit
     try:
         if fit_sha != manifest["fits_sha256"].get(rid) or fit_rows.get(rid, {}).get("outcome") != "fitted":
             raise gesla_sets.FitIntegrityError(f"{rid}: fit bytes not bound to completed run")
+        if sha256(fit_path) != fit_sha:
+            raise gesla_sets.FitIntegrityError(f"{rid}: original-record fit bytes changed")
         fit = json.loads(fit_path.read_text())
         meta = release.metadata()[rid]
         corr = gesla_sets.published_correction(audit.rows.get(rid), gesla_sets.declared_hours(meta))
-        if corr.label != cs["time_base"]["published"]:
+        if cs.get("source") != ticon_sets.SOURCE and corr.label != cs["time_base"]["published"]:
             raise ValueError("published clock differs from bound fit-run correction")
         gesla_sets.check_stamp(rid, fit, corr.label, corr=corr, speed=lambda n: dump.table[n].speed,
                               span=(fit["first_s"], fit["last_s"] + 3600))
@@ -415,14 +414,22 @@ def measure_profile(job: dict, release, dump, fit_run, manifest, fit_rows, audit
         if not segments:
             detail["reason"] = "datum_step_segment_unavailable"
             return profile, None
-        predict = tabulate.predictor(dump.table, {c["name"]: (c["amplitude_m"], c["phase_deg"])
-            for c in cs["constituents"]}, cs.get("datum", {}).get("msl_offset_m", fit["z0_m"]))
+        if cs.get("source") == ticon_sets.SOURCE or not cs.get("constituents"):
+            # Reconstruct this original gauge record with its authenticated own fit.
+            # Never combine TICON phases/mean with an unrelated gauge-zero offset.
+            coefficients = {name: (c["amp_m"], c["phase_deg"]) for name, c in fit["constituents"].items()}
+            predict = tabulate.predictor(dump.table, coefficients, fit["z0_m"])
+            detail["reconstruction"] = {"source": "original_record_fit", "fit_sha256": fit_sha,
+                                        "published_clock": corr.label, "tie_to_harmonic_set": "unknown"}
+        else:
+            predict = tabulate.predictor(dump.table, {c["name"]: (c["amplitude_m"], c["phase_deg"])
+                for c in cs["constituents"]}, cs.get("datum", {}).get("msl_offset_m", fit["z0_m"]))
         sampling = "mean" if corr.kind == "utc_mean_start60" else "instantaneous"
         mm = {}
         for series in segments:
             hours = good_hours(series.times_s)
             duration_days = (int(series.times_s[-1]) - int(series.times_s[0])) / 86400 if len(series) else 0
-            if len(series) < 2 or hours < 4000 or duration_days < 365:
+            if len(series) < 2:
                 continue
             # QC centres hourly means; the tabulator consumes interval starts.
             samples = replace(series, times_s=series.times_s - 1800) if sampling == "mean" else series
@@ -431,9 +438,11 @@ def measure_profile(job: dict, release, dump, fit_run, manifest, fit_rows, audit
                 break
         detail.update(qc=series.stats, qc_good_hours=hours, original_span_days=duration_days,
                       original_zero=meta.get("DATUM INFORMATION"))
-        if len(series) < 2 or hours < 4000 or duration_days < 365:
-            detail["reason"] = "below_365_days_or_4000_qc_good_hours"
+        if len(series) < 2:
+            detail["reason"] = "insufficient_samples"
             return profile, None
+        if hours < 4000 or duration_days < 365:
+            detail.setdefault("limitations", []).append("below_365_days_or_4000_qc_good_hours")
         detail.update(counted_months=[f"{y:04d}-{m:02d}" for y, m in sorted(mm)],
                       monthly_inputs={f"{y:04d}-{m:02d}": row for (y, m), row in sorted(mm.items())},
                       actual_qc_span={"start": datetime.fromtimestamp(int(series.times_s[0]), timezone.utc).isoformat(),
@@ -443,7 +452,7 @@ def measure_profile(job: dict, release, dump, fit_run, manifest, fit_rows, audit
             detail["reason"] = "no_counted_month"
             return profile, None
         profile["mm"] = mm
-        if is_primary(mm):
+        if is_primary(mm) and cs.get("source") != ticon_sets.SOURCE and not detail.get("limitations"):
             primary_tab = replace(tab, complete_days=frozenset(
                 k for k in tab.complete_days if 2002 <= tab.days.month_of(k)[0] <= 2020))
             profile["primary"] = monthly.annual_from_gap_free(primary_tab)
@@ -453,10 +462,59 @@ def measure_profile(job: dict, release, dump, fit_run, manifest, fit_rows, audit
     return profile, None
 
 
+def retained_observation(profile: dict, values: dict, mm: dict, method: str, *, counted_days=None) -> dict:
+    """Preserve a measured candidate independently of predictive datum selection."""
+    cs, detail = profile["cs"], profile["report"]
+    limitations = ["datum_gate_failed", "high_low_labels_unverified", "station_accuracy_uncalibrated"]
+    limitations.extend(detail.get("limitations", []))
+    if detail.get("reason"):
+        limitations.append(detail["reason"])
+    if method == "monthly_tabulation":
+        limitations.append("monthly_intermediate")
+    if cut_off_lows(cs):
+        limitations.append("truncated_lows")
+    code = cs.get("time_base", {}).get("code")
+    if code in ("unverified", "disputed"):
+        limitations.append(f"time_base_{code}")
+    limitations.extend(row["issue"] for row in cs.get("record_issues", []) if row.get("issue"))
+    if detail.get("filled_gaps") or detail.get("unfilled_gaps"):
+        limitations.append("gaps")
+    span = span_of(mm)
+    basis = {"counted_months": [f"{year:04d}-{month:02d}" for year, month in sorted(mm)],
+             "quality": detail.get("qc", {}), "actual_sample_window": detail.get("actual_qc_span"),
+             "reconstruction": detail.get("reconstruction")}
+    if detail.get("measurement_reuse"):
+        basis["measurement_reuse"] = detail["measurement_reuse"]
+    if counted_days is not None:
+        basis["counted_days"] = counted_days
+    return {"kind": "observed", "method": method,
+            "values": {key.lower(): float(value) for key, value in values.items()
+                       if key in monthly.LEVELS and isinstance(value, (int, float)) and math.isfinite(value)},
+            "units": "m", "frame": {"kind": "gauge_zero", "name": detail.get("original_zero"), "tie_status": "unknown"},
+            "source_record_id": cs["source_record_id"], "set_id": cs["set_id"],
+            "input_binding": profile["binding"], "window": {key: span[key] for key in ("start", "end")},
+            "reliability": {"status": "limited", "limitations": list(dict.fromkeys(limitations))},
+            "uncertainty_m": None, "basis": basis}
+
+
+def retained_own_record(profile: dict) -> dict | None:
+    """Retain the existing own-record arithmetic without an epoch or tie claim."""
+    used = own_months(profile.get("mm", {}))
+    if not used:
+        return None
+    values = {key: float(np.mean([row[key] for row in used.values()])) for key in monthly.LEVELS}
+    candidate = retained_observation(profile, values, used, "first_reduction")
+    candidate["reliability"]["limitations"].extend([
+        "no_qualified_control", "own_record_window_not_official_epoch",
+        "counted_months_only_no_seasonal_correction"])
+    return candidate
+
+
 def reduce_profile(profile: dict, primaries: list[dict], cache: Path) -> tuple[dict, dict]:
     detail, cs, mm = profile["report"], profile["cs"], profile.get("mm")
     draft, components = None, {}
-    if mm and detail["reason"] is None:
+    reduced_candidate = None
+    if mm and detail["reason"] is None and cs.get("source") != ticon_sets.SOURCE and not detail.get("limitations"):
         control = None
         primary = bool(profile.get("primary"))
         method = "first_reduction"
@@ -473,6 +531,7 @@ def reduce_profile(profile: dict, primaries: list[dict], cache: Path) -> tuple[d
                 values = {key: float(np.mean([row[key] for row in used.values()]))
                           for key in monthly.LEVELS} if used else None
         if values and used:
+            reduced_candidate = (values, used, method)
             draft, components = draft_datum(cs, values, used, method=method, control=control, primary=primary,
                 gaps=bool(detail["filled_gaps"] or detail["unfilled_gaps"]))
             detail.update(disposition="reduced" if draft["named"] else "unavailable",
@@ -490,6 +549,24 @@ def reduce_profile(profile: dict, primaries: list[dict], cache: Path) -> tuple[d
     row = {"station_id": profile["station"]["station_id"], "set_id": cs["set_id"],
            "source_record_id": cs["source_record_id"], "input_binding": profile["binding"],
            "draft_datum": draft, "observed_keys": sorted(draft["named"]) if draft else []}
+    retained = [retained_observation(profile, values, {ym: values}, "monthly_tabulation", counted_days=values.get("n_days"))
+                for ym, values in sorted((mm or {}).items())]
+    if reduced_candidate:
+        values, used, method = reduced_candidate
+        candidate = retained_observation(profile, values, used, method)
+        if control:
+            candidate["basis"].update(control=dict(control), epoch=dict(EPOCH))
+        retained.append(candidate)
+    own = retained_own_record(profile)
+    if own:
+        equivalent = next((candidate for candidate in retained
+                           if candidate["method"] == own["method"] and candidate["values"] == own["values"]
+                           and candidate["window"] == own["window"]), None)
+        if equivalent is None:
+            retained.append(own)
+        else:
+            equivalent["reliability"]["limitations"] = own["reliability"]["limitations"]
+    row["retained_observed"] = [candidate for candidate in retained if candidate["values"]]
     return row, detail
 
 
@@ -503,10 +580,15 @@ def write_json(path: Path, value: dict) -> None:
     os.replace(temporary, path)
 
 
-def write_checkpoint(cache: Path, key: str, job_sha: str, profile: dict, tab) -> None:
+def write_checkpoint(cache: Path, key: str, job_sha: str, profile: dict, tab, *, retained_arrays: Path | None = None) -> None:
     """Publish the completion marker last; an interrupted write is never a hit."""
     files = {}
-    if tab is not None:
+    if retained_arrays is not None:
+        temporary = cache / f"{key}.part.npz"
+        shutil.copyfile(retained_arrays, temporary)
+        os.replace(temporary, cache / f"{key}.npz")
+        files[f"{key}.npz"] = sha256(cache / f"{key}.npz")
+    elif tab is not None:
         temporary = cache / f"{key}.part.npz"
         save_tab(temporary, tab)
         os.replace(temporary, cache / f"{key}.npz")
@@ -980,6 +1062,185 @@ def _produce(release_path: Path, gesla_root: Path, fit_run: Path, tcd: Path, out
     return {"counts": counts}
 
 
+def reuse_measurement(profile: dict, job: dict, context) -> dict | None:
+    """Reuse only identical measured inputs, retaining both target and origin bindings."""
+    if not profile.get("mm") or context is None:
+        return None
+    binding, previous = job["binding"], profile["binding"]
+    keys = ("source_record_id", "member_sha256", "member_size", "fit_sha256", "fit_manifest_sha256",
+            "fit_results_sha256", "tcd_sha256", "gesla_manifest_sha256", "timebase_sha256")
+    if any(binding.get(key) != previous.get(key) for key in keys):
+        return None
+    left, right = profile["cs"], job["cs"]
+    if left.get("quantity") != "water_level" or right.get("quantity") != "water_level":
+        return None
+    if left.get("fit_segment") != right.get("fit_segment"):
+        return None
+    steps = lambda cs: [row for row in cs.get("record_issues", []) if row.get("issue") == "datum_step"]
+    if steps(left) != steps(right):
+        return None
+    release, dump, fit_run, manifest, fit_rows, audit, _ = context
+    rid = binding["source_record_id"]
+    member = release.members.get(rid)
+    if member is None or member["sha256"] != binding["member_sha256"] or member["size"] != binding["member_size"]:
+        return None
+    if not binding["fit_sha256"] or manifest["fits_sha256"].get(rid) != binding["fit_sha256"] or fit_rows.get(rid, {}).get("outcome") != "fitted":
+        return None
+    fit_path = fit_run / "fits" / f"{rid}.json"
+    if sha256(fit_path) != binding["fit_sha256"]:
+        raise gesla_sets.FitIntegrityError(f"{rid}: original-record fit bytes changed")
+    fit = json.loads(fit_path.read_text())
+    corr = gesla_sets.published_correction(audit.rows.get(rid), gesla_sets.declared_hours(release.metadata()[rid]))
+    if any(cs.get("source") != ticon_sets.SOURCE and cs.get("time_base", {}).get("published") != corr.label
+           for cs in (left, right)):
+        return None
+    gesla_sets.check_stamp(rid, fit, corr.label, corr=corr, speed=lambda n: dump.table[n].speed,
+                          span=(fit["first_s"], fit["last_s"] + 3600))
+
+    def reconstruction(cs):
+        if cs.get("source") == ticon_sets.SOURCE or not cs.get("constituents"):
+            return ({name: (row["amp_m"], row["phase_deg"]) for name, row in fit["constituents"].items()}, fit["z0_m"])
+        return ({row["name"]: (row["amplitude_m"], row["phase_deg"]) for row in cs["constituents"]},
+                cs.get("datum", {}).get("msl_offset_m", fit["z0_m"]))
+
+    if reconstruction(left) != reconstruction(right):
+        return None
+    detail = copy.deepcopy(profile["report"])
+    detail.update(station_id=job["station"]["station_id"], set_id=right["set_id"],
+                  source_record_id=rid, input_binding=binding)
+    detail["measurement_reuse"] = {"origin_input_binding":
+        profile["report"].get("measurement_reuse", {}).get("origin_input_binding", previous),
+        "basis": "identical original samples, authenticated fit, published clock, QC, segmentation and tabulation"}
+    return {**job, "report": detail, "mm": profile["mm"]}
+
+
+def export_retained(measured_inputs: Path, out: Path, *, source_records: set[str] | None = None,
+                    context=None, retained_cache: Path | None = None) -> dict:
+    """Stream retained measurements without rerunning reference selection or replacing defaults."""
+    if out.resolve() == measured_inputs.resolve():
+        raise ValueError("retention requires a separate output directory")
+    out.mkdir(parents=True, exist_ok=True)
+    destination = out / "retained-observed.jsonl"
+    if destination.exists():
+        raise ValueError("retention output already exists")
+    completion = json.loads((measured_inputs / "observed-completion.json").read_text())
+    if sha256(measured_inputs / "observed-drafts.jsonl") != completion["files"]["observed-drafts.jsonl"]:
+        raise ValueError("retained draft bytes do not match the completed source run")
+    run = json.loads((measured_inputs / "observed-run.json").read_text())
+    targets = {item["set_id"]: item for item in run["targets"]}
+    cache = measured_inputs / "checkpoints"
+    related = {}
+    if source_records is not None:
+        with (measured_inputs / "observed-drafts.jsonl").open() as drafts:
+            for line in drafts:
+                row = json.loads(line)
+                if row["source_record_id"] in source_records:
+                    related.setdefault(row["source_record_id"], []).append(targets[row["set_id"]])
+    counts = {"rows": 0, "candidates": 0, "monthly_candidates": 0, "new_measurements": 0, "empty_rows": 0}
+    with destination.open("x") as output, (out / "retention-outcomes.jsonl").open("x") as outcomes:
+        with (measured_inputs / "observed-drafts.jsonl").open() as drafts:
+            for line in drafts:
+                row = json.loads(line)
+                if source_records is not None and row["source_record_id"] not in source_records:
+                    continue
+                item = targets[row["set_id"]]
+                profile = read_checkpoint(cache, item["key"], item["job_sha256"], require_complete=True)
+                if profile["binding"] != row["input_binding"]:
+                    raise ValueError(f"retention source binding mismatch: {row['set_id']}")
+                measured = False
+                reused_measurement = False
+                elapsed_s = None
+                if retained_cache is not None and not profile.get("mm"):
+                    previous = read_checkpoint(retained_cache / "checkpoints", item["key"], item["job_sha256"])
+                    if previous is not None:
+                        if previous["binding"] != row["input_binding"]:
+                            raise ValueError("completed retention checkpoint binding changed")
+                        profile = previous
+                        reused_measurement = True
+                if source_records is not None and not profile.get("mm") and not reused_measurement:
+                    if context is None:
+                        raise ValueError("original-record measurement context required")
+                    job = json.loads((cache / f"{item['key']}.job.json").read_text())
+                    if canonical_hash(job) != item["job_sha256"]:
+                        raise ValueError(f"measurement job changed: {row['set_id']}")
+                    locations = [out / "checkpoints", cache]
+                    if retained_cache is not None:
+                        locations.insert(1, retained_cache / "checkpoints")
+                    for other in related[row["source_record_id"]]:
+                        if reused_measurement:
+                            break
+                        for location in locations:
+                            previous = read_checkpoint(location, other["key"], other["job_sha256"])
+                            reused = reuse_measurement(previous, job, context) if previous else None
+                            if reused is not None:
+                                profile, reused_measurement = reused, True
+                                fresh = out / "checkpoints"
+                                fresh.mkdir(exist_ok=True)
+                                write_json(fresh / f"{item['key']}.job.json", job)
+                                write_checkpoint(fresh, item["key"], item["job_sha256"], profile, None,
+                                                 retained_arrays=location / f"{other['key']}.npz")
+                                break
+                if source_records is not None and not profile.get("mm") and not reused_measurement:
+                    member = context[0].members.get(row["source_record_id"])
+                    if member is not None and (member["sha256"] != job["binding"]["member_sha256"] or
+                                               member["size"] != job["binding"]["member_size"]):
+                        raise ValueError("original member binding changed")
+                    started = time.monotonic()
+                    profile, tab = measure_profile(job, *context)
+                    elapsed_s = time.monotonic() - started
+                    fresh = out / "checkpoints"
+                    fresh.mkdir(exist_ok=True)
+                    write_json(fresh / f"{item['key']}.job.json", job)
+                    write_checkpoint(fresh, item["key"], item["job_sha256"], profile, tab)
+                    measured = True
+                    counts["new_measurements"] += 1
+                mm = profile.get("mm", {})
+                if mm and not own_months(mm) and profile["report"].get("reason") is None:
+                    profile["report"]["reason"] = "no_whole_year_own_record_window"
+                candidates = [retained_observation(profile, values, {ym: values}, "monthly_tabulation",
+                                                   counted_days=values.get("n_days"))
+                              for ym, values in sorted(mm.items())]
+                own = retained_own_record(profile)
+                if own:
+                    candidates.append(own)
+                draft = row.get("draft_datum")
+                if draft and draft.get("named") and mm:
+                    first_basis = next(iter(draft["basis"].values()))
+                    candidate = retained_observation(profile, {}, mm, first_basis["method"])
+                    candidate["values"] = dict(draft["named"])
+                    candidate["basis"] = {"per_level": draft["basis"]}
+                    actual_span = first_basis["data_span"]
+                    candidate["window"] = {key: actual_span[key] for key in ("start", "end")}
+                    candidates.append(candidate)
+                # Conflicting selected keys may survive only in these existing
+                # alternatives. Deduplicate complete candidates, never levels.
+                retained = {}
+                for candidate in row.get("retained_observed", []):
+                    retained.setdefault(canonical_hash(candidate), candidate)
+                for candidate in candidates:
+                    if candidate["values"]:
+                        retained.setdefault(canonical_hash(candidate), candidate)
+                row["retained_observed"] = list(retained.values())
+                output.write(json.dumps(row, sort_keys=True, allow_nan=False) + "\n")
+                output.flush()
+                outcome = {"station_id": row["station_id"], "set_id": row["set_id"],
+                           "source_record_id": row["source_record_id"], "measured": measured, "reused_measurement": reused_measurement,
+                           "months": len(mm), "candidates": len(row["retained_observed"]),
+                           "measurement_elapsed_s": elapsed_s,
+                           "has_own_record_window": bool(own_months(mm)) if mm else False,
+                           "reason": profile["report"].get("reason")}
+                outcomes.write(json.dumps(outcome, sort_keys=True) + "\n")
+                outcomes.flush()
+                counts["rows"] += 1
+                counts["monthly_candidates"] += len(mm)
+                counts["candidates"] += len(row["retained_observed"])
+                counts["empty_rows"] += not bool(row["retained_observed"])
+                print(f"retained {row['set_id']} months={len(mm)} measured={measured} "
+                      f"reason={outcome['reason']} elapsed_s={elapsed_s}", flush=True)
+    write_json(out / "retention-counts.json", counts)
+    return {"counts": counts}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("release", "gesla-root", "fit-run", "tcd", "out"):
@@ -987,9 +1248,26 @@ def main() -> None:
     parser.add_argument("--resume", action="store_true", help="resume only authenticated identical run inputs")
     parser.add_argument("--workers", type=int, choices=range(1, 5), default=1, help="independent measurement/reduction processes (1–4)")
     parser.add_argument("--measured-inputs", type=Path, help="preserve frozen 1d0d487 measurements and refresh its 141 hourly means")
+    parser.add_argument("--retain-only", action="store_true", help="export all authenticated held numerical candidates")
+    parser.add_argument("--retained-cache", type=Path, help="reuse completed source-bound retention checkpoints")
+    parser.add_argument("--remeasure-source-records", type=Path, help="JSON source-ID array: measure missing original-record monthly values")
     args = parser.parse_args()
-    report = produce(args.release, args.gesla_root, args.fit_run, args.tcd, args.out, resume=args.resume,
-                     workers=args.workers, measured_inputs=args.measured_inputs)
+    if args.retain_only:
+        if args.measured_inputs is None or args.resume or args.workers != 1:
+            parser.error("retention requires --measured-inputs, one worker, and a fresh output")
+        records = None
+        context = None
+        if args.remeasure_source_records:
+            records = set(json.loads(args.remeasure_source_records.read_text()))
+            roles = Path(__file__).resolve().parents[4] / "data/gesla/contributor_roles.csv"
+            _initialize_measurement_worker(args.gesla_root, args.fit_run, args.tcd, roles)
+            context = _WORKER_CONTEXT
+        report = export_retained(args.measured_inputs, args.out, source_records=records, context=context, retained_cache=args.retained_cache)
+    else:
+        if args.remeasure_source_records:
+            parser.error("--remeasure-source-records requires --retain-only")
+        report = produce(args.release, args.gesla_root, args.fit_run, args.tcd, args.out, resume=args.resume,
+                         workers=args.workers, measured_inputs=args.measured_inputs)
     print(json.dumps(report["counts"], sort_keys=True))
 
 

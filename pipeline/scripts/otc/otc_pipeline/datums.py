@@ -122,8 +122,8 @@ def derive_chart_datums(release: dict, *, include_computed_approximate: bool = T
 
     Adds missing chart_datum pointers and appends stand-in findings where applicable.
     Receipt counts places separately from sets; withheld counts are sets.
-    Unresolved geographic conditions are unknown, including GBR without UK source facts.
-    Conflicting original COUNTRY identities leave new designations unresolved.
+    Unresolved or conflicting geographic conditions label a nonofficial stand-in; they
+    do not veto an existing source-linked computed LAT reference.
     Computed publication defers new approximate references until observed authentication finishes.
     """
     from otc_pipeline.lat_hat import low_water_suppressed
@@ -140,7 +140,7 @@ def derive_chart_datums(release: dict, *, include_computed_approximate: bool = T
         approximate_keys = {}
         computed_approximate_sets = set()
         for cs in sets:
-            if cs.get("set_id") in ticon_approximate_set_ids and cs.get("source") == "ticon-4":
+            if cs.get("source") == "ticon-4":
                 datum = cs.get("datum", {})
                 lat_basis = datum.get("basis", {}).get("lat", {})
                 fallback = lat_basis.get("fallback", {})
@@ -154,19 +154,25 @@ def derive_chart_datums(release: dict, *, include_computed_approximate: bool = T
                         and isinstance(fallback.get("basis"), str) and fallback["basis"].strip()
                         and isinstance(fallback.get("otc_finding"), str) and fallback["otc_finding"].strip()
                         and own_records and all(isinstance(r.get("published_set_ids"), list)
-                                                and cs["set_id"] in r["published_set_ids"] for r in own_records)
-                        and (cs["set_id"] in ticon_convention_unverified_set_ids
-                             or country_rows and all(r["LAT_evidence_status"] == "not_LAT" for r in country_rows))):
+                                                and cs["set_id"] in r["published_set_ids"] for r in own_records)):
                     computed_approximate_sets.add(cs["set_id"])
             if cs.get("source") != "gesla-fit":
                 continue
             own_records = [r for r in station.get("source_records", [])
                            if r.get("source") == "gesla" and r.get("source_record_id") == cs.get("source_record_id")]
             own = [r.get("original_metadata", {}) for r in own_records]
-            if not own or not all(m.get("COUNTRY") == station.get("country") for m in own):
-                continue
             lat_basis = cs.get("datum", {}).get("basis", {}).get("lat", {})
             lat_fallback = lat_basis.get("fallback", {})
+            # Source linkage establishes whose value it is, not an agency convention or tie.
+            if (own_records and all(isinstance(r.get("published_set_ids"), list)
+                                    and cs["set_id"] in r["published_set_ids"] for r in own_records)
+                    and lat_basis.get("kind") == "computed" and lat_basis.get("method") == "harmonic_extremes"
+                    and lat_fallback.get("reason") == "datum_gate_failed"
+                    and isinstance(lat_fallback.get("basis"), str) and lat_fallback["basis"].strip()
+                    and isinstance(lat_fallback.get("otc_finding"), str) and lat_fallback["otc_finding"].strip()):
+                computed_approximate_sets.add(cs["set_id"])
+            if not own or not all(m.get("COUNTRY") == station.get("country") for m in own):
+                continue
             # Match inspected native source/frame metadata, not a national chart convention.
             own_malin = all(m.get("COUNTRY") == "IRL" and m.get("CONTRIBUTOR (ABBREVIATED)") == "MI_C"
                             and m.get("DATUM INFORMATION") == "Malin Ordnance Datum"
@@ -263,7 +269,7 @@ def derive_chart_datums(release: dict, *, include_computed_approximate: bool = T
                                 and cs["set_id"] in ticon_convention_unverified_set_ids)
             computed_approximate = (include_computed_approximate and key == "lat"
                                     and cs["set_id"] in computed_approximate_sets
-                                    and (unverified_ticon or not convention and not excluded))
+                                    and (unverified_ticon or not convention))
             approximate = observed_approximate or computed_approximate
             kind = "observed" if key == "mllw" or observed_approximate else "computed"
             value = datum["named"][key]
@@ -272,7 +278,7 @@ def derive_chart_datums(release: dict, *, include_computed_approximate: bool = T
                 reason = f"not_finite_{kind}_{key}"
             elif published_chart:
                 reason = "published_chart_datum"
-            elif country_conflict and not (computed_approximate and unverified_ticon):
+            elif country_conflict and not computed_approximate:
                 reason = "unknown_convention_or_area"
             elif excluded and not approximate:
                 reason = "baltic_or_bscd2000"
@@ -290,7 +296,7 @@ def derive_chart_datums(release: dict, *, include_computed_approximate: bool = T
                                if computed_approximate else
                                "agency chart-datum equivalence and vertical tie are not established")
                     fallback["otc_finding"] += f"; {label}; {finding}"
-                if computed_approximate and unverified_ticon:
+                if computed_approximate and (unverified_ticon or not convention):
                     flags = datum["basis"][key].setdefault("flags", [])
                     if "convention_unverified" not in flags:
                         flags.append("convention_unverified")

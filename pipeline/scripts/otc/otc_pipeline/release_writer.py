@@ -168,7 +168,7 @@ FORMAT_VERSION = "1.0"
 SCHEMA_NAME = f"otc-{FORMAT_VERSION}.schema.json"
 # SHA-256 of the site's src/schema/otc-1.0.schema.json at the commit sync_schema.sh pins
 # (e2ae45a, approved source identities, original rows and restricted TICON policies). sync_schema.sh holds the same value; a test keeps the two equal.
-SCHEMA_SHA256 = "1faa9804cfee88ac082d98c5a473a3823013411953cdda44d20d611020ab4820"
+SCHEMA_SHA256 = "1dea238c62e91dc3d4df2377412c310335bdcaa452467fe59b794c6cbf0038f4"
 _MISSING = object()  # "key not present"; never equal to a value read from JSON
 _UNSUPPORTED_TICON_NAMES = {"3L2", "3N2", "MSQM", "MTM", "R3", "T3"}
 
@@ -332,6 +332,9 @@ def _source_record_errors(st: dict, where: str, own_sets: dict, licences: dict,
                 set_source = {"gesla": "gesla-fit", "ticon": "ticon-4"}.get(source, source)
                 if (cs.get("source"), cs.get("source_version"), cs.get("source_record_id")) != (set_source, version, record_id):
                     errors.append(f"{sw}: published_set_ids must come from the original source tuple")
+        from otc_pipeline.retained_datums import candidate_errors
+        for candidate in _dicts(record.get("retained_datums")):
+            errors.extend(f"{sw}: {error}" for error in candidate_errors(candidate, record, own_sets))
         raw = record.get("original_harmonics")
         if not isinstance(raw, dict):
             continue
