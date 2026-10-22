@@ -123,7 +123,7 @@ def test_native_convention_unverified_producer(native_convention_unverified_inpu
     original = {cs["set_id"]: cs for station in accepted["stations"] for cs in station["constant_sets"]}
     for station in restored["stations"]:
         for cs in station["constant_sets"]:
-            if cs["set_id"] not in ids:
+            if cs.get("datum") == original[cs["set_id"]].get("datum"):
                 continue
             datum = cs["datum"]
             print(f"GREEN {cs['set_id']}: chart={datum.get('chart_datum')}; LAT={datum['named']['lat']}")
@@ -158,7 +158,9 @@ def test_native_convention_unverified_full_profile():
     native = {cs["set_id"]: cs for station in release["stations"] for cs in station["constant_sets"]}
     qualified = {key for key, cs in native.items()
                  if "convention_unverified" in cs.get("datum", {}).get("basis", {}).get("lat", {}).get("flags", [])}
-    assert qualified == ids
+    # The historical scope is retained; existing source-linked LAT values outside
+    # that scope now also receive labelled references instead of a convention veto.
+    assert ids <= qualified
     for row in drafts:
         datum = native[row["set_id"]]["datum"]
         assert datum["named"] == row["draft_datum"]["named"]
@@ -166,7 +168,8 @@ def test_native_convention_unverified_full_profile():
             assert datum["chart_datum"] == "lat"
             assert "uncertainty_m" not in datum["basis"]["lat"]
     assert staged["staged_set_count"] == 760 and staged["normal_datum_gate_accepted"] is False
-    print("GREEN exact 658 qualified sets; all 760 cached LAT/HAT pairs unchanged")
+    print(f"GREEN all 658 historical sets retained; {len(qualified)} labelled references; "
+          "all 760 cached LAT/HAT pairs unchanged")
 
 
 @pytest.mark.skipif("OTC_D4_CHART_PROOF" not in os.environ, reason="actual source-bound D4 chart witnesses")

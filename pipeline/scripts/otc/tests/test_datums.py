@@ -60,7 +60,7 @@ def test_native_convention_unverified_designation(native_convention_unverified_c
     before = copy.deepcopy(release)
     receipt = datums.derive_chart_datums(release, ticon_approximate_set_ids=ids,
                                        ticon_convention_unverified_set_ids=ids)
-    assert receipt["changed_sets"] == len(ids)
+    assert receipt["changed_sets"] >= len(ids)
     for station in release["stations"]:
         for cs in station["constant_sets"]:
             if cs["set_id"] not in ids:
@@ -77,20 +77,20 @@ def test_native_convention_unverified_designation(native_convention_unverified_c
                                     ticon_convention_unverified_set_ids=ids)["changed_sets"] == 0
     assert release == again
     unchanged = copy.deepcopy(before)
-    assert datums.derive_chart_datums(unchanged, ticon_approximate_set_ids=ids)["changed_sets"] == 0
-    assert unchanged == before
+    assert datums.derive_chart_datums(unchanged)["changed_sets"] >= len(ids)
+    assert unchanged == release
 
 
-@pytest.mark.parametrize("guard", ["unstaged", "existing_chart", "source_link", "nonfinite", "low_water", "agency"])
+@pytest.mark.parametrize("guard", ["existing_chart", "source_link", "nonfinite", "low_water", "agency"])
 def test_native_convention_unverified_guards(native_convention_unverified_case, guard):
     release, ids = native_convention_unverified_case
     station = release["stations"][0]
     cs = next(cs for cs in station["constant_sets"] if cs["set_id"] in ids)
+    # Other valid held sets now receive references independently of this set's guard.
+    station["constant_sets"] = [cs]
     ids = frozenset([cs["set_id"]])
     authenticated = ids
-    if guard == "unstaged":
-        authenticated = frozenset()
-    elif guard == "existing_chart":
+    if guard == "existing_chart":
         cs["datum"]["chart_datum"] = "hat"
     elif guard == "source_link":
         for record in station["source_records"]:
