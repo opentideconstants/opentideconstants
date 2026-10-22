@@ -806,3 +806,149 @@ def test_actual_mean_refresh_rejects_stale_and_partial_inputs(actual_mean_refres
     with pytest.raises(ValueError, match="invalid checkpoint"):
         p.prepare_mean_refresh(partial, target, previous["targets"], identity, tmp_path / "reference.json")
     print("actual stale mean markers/arrays and partial corrected/original checkpoints REFUSED; no raw fallback")
+
+
+@pytest.mark.parametrize("source_record_id", (
+    "beaver_dam_creek-8532715-usa-noaa",
+    "bethany_beach_canal_at_bethany_beach_de-1484689-usa-usgs",
+    "clipperton-391c-fra-uhslc_rq",
+))
+def test_actual_retained_monthly_values_survive_without_whole_year(source_record_id, tmp_path):
+    root_value = os.environ.get("OTC_OBSERVED_RETENTION_CACHE")
+    if not root_value:
+        pytest.skip("requires authenticated retained original-record monthly checkpoints")
+    p = producer()
+    root = Path(root_value)
+    run = json.loads((root / "observed-run.json").read_text())
+    item = next(item for item in run["targets"] if item["set_id"].endswith("/gesla-fit/" + source_record_id))
+    profile = p.read_checkpoint(root / "checkpoints", item["key"], item["job_sha256"], require_complete=True)
+    assert profile["mm"] and not p.own_months(profile["mm"])
+    original = copy.deepcopy(profile)
+    row, detail = p.reduce_profile(profile, [], root / "checkpoints")
+    candidates = row.get("retained_observed", [])
+    monthly_candidates = [candidate for candidate in candidates if candidate["method"] == "monthly_tabulation"]
+    print(f"actual {source_record_id}: held_months={len(original['mm'])} emitted_months={len(monthly_candidates)} "
+          f"legacy_reason={detail['reason']}")
+    assert len(monthly_candidates) == len(original["mm"])
+    for candidate, ((year, month), values) in zip(monthly_candidates, sorted(original["mm"].items())):
+        assert candidate["values"] == {key.lower(): values[key] for key in monthly.LEVELS}
+        assert candidate["kind"] == "observed" and candidate["units"] == "m"
+        assert candidate["frame"] == {"kind": "gauge_zero", "name": original["report"]["original_zero"], "tie_status": "unknown"}
+        assert candidate["window"] == {key: p.span_of({(year, month): values})[key] for key in ("start", "end")}
+        assert candidate["input_binding"] == original["binding"]
+        assert candidate["source_record_id"] == source_record_id
+        assert candidate["set_id"] == original["cs"]["set_id"]
+        assert candidate["uncertainty_m"] is None
+        assert candidate["basis"]["counted_days"] == values["n_days"]
+        assert "monthly_intermediate" in candidate["reliability"]["limitations"]
+        assert "no_whole_year_own_record_window" in candidate["reliability"]["limitations"]
+    assert profile["mm"] == original["mm"]
+    assert profile["cs"] == original["cs"]
+    assert row["draft_datum"] is None
+    destination = Path(os.environ.get("OTC_OBSERVED_RETENTION_PROOF", tmp_path))
+    destination.mkdir(parents=True, exist_ok=True)
+    (destination / f"{source_record_id}.json").write_text(json.dumps(row, sort_keys=True, allow_nan=False) + "\n")
+
+
+@pytest.fixture(scope="module")
+def actual_observed_measurement_context():
+    root_value = os.environ.get("OTC_OBSERVED_RETENTION_CACHE")
+    if not root_value:
+        pytest.skip("requires held immutable original observations and fit inputs")
+    p = producer()
+    root = Path(root_value)
+    identity = json.loads((root / "observed-run.json").read_text())["identity"]
+    return root, identity
+
+
+@pytest.mark.parametrize("source_record_id", (
+    "beaver_dam_creek-8532715-usa-noaa",
+    "bethany_beach_canal_at_bethany_beach_de-1484689-usa-usgs",
+    "clipperton-391c-fra-uhslc_rq",
+))
+def test_actual_ticon_measurement_preserves_gauge_months(actual_observed_measurement_context, source_record_id, tmp_path):
+    root, _ = actual_observed_measurement_context
+    p = producer()
+    run = json.loads((root / "observed-run.json").read_text())
+    item = next(item for item in run["targets"] if "/ticon-4/" + source_record_id + "/" in item["set_id"])
+    job = json.loads((root / "checkpoints" / f"{item['key']}.job.json").read_text())
+    assert p.canonical_hash(job) == item["job_sha256"]
+    recipe = json.loads(Path(os.environ["OTC_OBSERVED_RETENTION_RECIPE"]).read_text())["native_execution"]["argv"]
+    arg = lambda flag: Path(recipe[recipe.index(flag) + 1])
+    if p._WORKER_CONTEXT is None:
+        p._initialize_measurement_worker(arg("--gesla-root"), arg("--fit-run"), arg("--tcd"),
+                                        Path(p.__file__).resolve().parents[4] / "data/gesla/contributor_roles.csv")
+    context = p._WORKER_CONTEXT
+    member = context[0].members[source_record_id]
+    assert member["sha256"] == job["binding"]["member_sha256"]
+    started = time.monotonic()
+    profile, tab = p.measure_profile(job, *context)
+    print(f"actual TICON {source_record_id}: measured_months={len(profile.get('mm', {}))} "
+          f"reason={profile['report']['reason']} elapsed_s={time.monotonic() - started:.3f}")
+    assert profile.get("mm")
+    row, _ = p.reduce_profile(profile, [], tmp_path)
+    assert row["retained_observed"]
+    assert all(candidate["frame"]["kind"] == "gauge_zero" for candidate in row["retained_observed"])
+    destination = Path(os.environ.get("OTC_OBSERVED_RETENTION_PROOF", tmp_path))
+    destination.mkdir(parents=True, exist_ok=True)
+    (destination / f"ticon-{source_record_id}.json").write_text(json.dumps(row, sort_keys=True, allow_nan=False) + "\n")
+
+
+def test_retained_candidates_keep_conflicts_and_low_quality_values():
+    p = producer()
+    mm = {(2022, 1): {**{key: index / 10 for index, key in enumerate(monthly.LEVELS)}, "n_days": 27}}
+    cs = {"set_id": "source/set", "source_record_id": "source-record", "constituents": [],
+          "time_base": {"code": "disputed"}, "record_issues": [{"issue": "flatline", "reason": "cut off low water"}],
+          "datum": {"named": {"mhw": 99, "mlw": 98}, "basis": {"mhw": {"kind": "observed"}, "mlw": {"kind": "computed"}}}}
+    profile = {"cs": cs, "binding": {"member_sha256": "held-source"},
+               "report": {"original_zero": "Unspecified", "reason": "no_whole_year_own_record_window"}}
+    before = copy.deepcopy(profile)
+    candidate = p.retained_observation(profile, mm[(2022, 1)], mm, "monthly_tabulation", counted_days=27)
+    assert candidate["values"] == {key.lower(): mm[(2022, 1)][key] for key in monthly.LEVELS}
+    assert {"truncated_lows", "time_base_disputed"} <= set(candidate["reliability"]["limitations"])
+    assert candidate["frame"]["tie_status"] == "unknown"
+    assert candidate["uncertainty_m"] is None
+    assert profile == before
+
+
+def test_retained_candidates_do_not_invent_missing_numeric_values():
+    p = producer()
+    profile = {"cs": {"set_id": "set", "source_record_id": "record"}, "binding": {}, "report": {}}
+    candidate = p.retained_observation(profile, {"MHW": 1.25}, {(2022, 1): {"MHW": 1.25}}, "monthly_tabulation")
+    assert candidate["values"] == {"mhw": 1.25}
+    assert candidate["frame"]["name"] is None
+    assert "counted_days" not in candidate["basis"]
+
+
+def test_actual_retained_own_record_aggregates(tmp_path):
+    path = os.environ.get("OTC_OBSERVED_AGGREGATE_WITNESSES")
+    if not path:
+        pytest.skip("requires three actual completed gauge-month measurement checkpoints")
+    p = producer()
+    witnesses = json.loads(Path(path).read_text())
+    assert len({item["station_id"] for item in witnesses}) == 3
+    missing = []
+    for item in witnesses:
+        profile = p.read_checkpoint(Path(item["cache"]), item["key"], item["job_sha256"], require_complete=True)
+        used = p.own_months(profile["mm"])
+        assert used
+        row, _ = p.reduce_profile(profile, [], Path(item["cache"]))
+        aggregates = [candidate for candidate in row.get("retained_observed", []) if candidate["method"] == "first_reduction"]
+        print(f"actual aggregate {row['source_record_id']}: used_months={len(used)} emitted_aggregates={len(aggregates)}")
+        if not aggregates:
+            missing.append(row["station_id"])
+            continue
+        assert len(aggregates) == 1
+        candidate = aggregates[0]
+        for name in monthly.LEVELS:
+            expected = sum(month[name] for month in used.values()) / len(used)
+            assert candidate["values"][name.lower()] == pytest.approx(expected, abs=1e-12)
+        assert candidate["window"] == {key: p.span_of(used)[key] for key in ("start", "end")}
+        assert candidate["basis"]["counted_months"] == [f"{y:04d}-{m:02d}" for y, m in sorted(used)]
+        assert "no_qualified_control" in candidate["reliability"]["limitations"]
+        assert candidate["frame"]["tie_status"] == "unknown" and candidate["uncertainty_m"] is None
+        assert row["draft_datum"] is None
+        destination = Path(os.environ.get("OTC_OBSERVED_RETENTION_PROOF", tmp_path))
+        destination.mkdir(parents=True, exist_ok=True)
+        (destination / f"aggregate-{row['source_record_id']}.json").write_text(json.dumps(row, sort_keys=True, allow_nan=False) + "\n")
+    assert not missing, f"actual observed aggregates omitted at {len(missing)} distinct places"
