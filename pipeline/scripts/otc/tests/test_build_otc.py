@@ -118,6 +118,13 @@ def test_native_convention_unverified_producer(native_convention_unverified_inpu
     (root / "candidate.json").write_text(json.dumps(release) + "\n")
     assert staged["accepted"] is False and staged["normal_datum_gate_accepted"] is False
     native = {cs["set_id"]: cs for station in release["stations"] for cs in station["constant_sets"]}
+    qualified = {key for key, cs in native.items()
+                 if cs.get("datum", {}).get("chart_datum") == "lat"
+                 and "convention_unverified" in cs.get("datum", {}).get("basis", {}).get("lat", {}).get("flags", [])}
+    assert ids <= qualified, f"missing designated and qualified fixture sets: {sorted(ids - qualified)}"
+    positive_stations = {station["station_id"] for station in release["stations"]
+                         if any(cs["set_id"] in ids & qualified for cs in station["constant_sets"])}
+    assert len(positive_stations) >= 3, "requires positive chart witnesses at three distinct actual stations"
     for row in staged["drafts"]:
         assert row["datum"] == native[row["set_id"]]["datum"]
     restored = copy.deepcopy(release)
