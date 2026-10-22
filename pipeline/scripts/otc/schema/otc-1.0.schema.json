@@ -1524,7 +1524,7 @@
           "type": "string"
         },
         "datum": {
-          "description": "The subordinate station's own levels: the levels its source publishes for it (method source), and LAT and HAT computed by the offsets (method subordinate_offsets). The offsets carry no constants or gauge record, so no other method is allowed here; a constant set of the same station has its own datum. Its zero is the subordinate station's chart datum as the offsets define it (for NOAA, the subordinate station's MLLW).",
+          "description": "The subordinate station's own levels: the levels its source publishes for it (method source), LAT and HAT computed by the offsets (method subordinate_offsets), and the explicitly labelled algebraic offset zero (method subordinate_offset_zero). The offsets carry no constants or gauge record, so no other method is allowed here; a constant set of the same station has its own datum. Its zero is the subordinate station's chart datum as the offsets define it (for NOAA, the subordinate station's MLLW).",
           "allOf": [
             {
               "$ref": "#/$defs/datum"
@@ -1537,7 +1537,8 @@
                       "method": {
                         "enum": [
                           "source",
-                          "subordinate_offsets"
+                          "subordinate_offsets",
+                          "subordinate_offset_zero"
                         ]
                       }
                     }
