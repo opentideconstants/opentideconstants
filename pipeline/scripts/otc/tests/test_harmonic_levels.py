@@ -95,6 +95,165 @@ def test_rejects_missing_or_mismatched_harmonic_convention(invalid):
         retained_levels(**data)
 
 
+def tidal_day_case():
+    data = case()
+    data["window"] = {"start": "2020-01-01T00:00:00+00:00", "end": "2020-02-01T00:00:00+00:00"}
+    data["prediction"]["items"] = [
+        {"time": "2020-01-01T06:00:00+00:00", "type": "high", "height_m": 2.0},
+        {"time": "2020-01-01T12:00:00+00:00", "type": "low", "height_m": -1.0},
+        {"time": "2020-01-31T06:00:00+00:00", "type": "high", "height_m": 2.0},
+        {"time": "2020-01-31T12:00:00+00:00", "type": "low", "height_m": 0.4},
+        {"time": "2020-01-31T18:00:00+00:00", "type": "high", "height_m": 2.1},
+    ]
+    padded = copy.deepcopy(data["prediction"])
+    padded["items"] = [
+        {"time": "2020-02-01T00:30:00+00:00", "type": "low", "height_m": 0.1},
+        {"time": "2020-02-01T06:00:00+00:00", "type": "high", "height_m": 2.2},
+    ]
+    data["tidal_day_padding"] = {
+        "prediction": padded,
+        "window": {"start": data["window"]["end"], "end": "2020-02-02T00:50:29+00:00"},
+        "input_binding": {**data["input_binding"], "request_sha256": "c" * 64, "results_sha256": "d" * 64},
+    }
+    return data
+
+
+def hourly_case():
+    data = case()
+    data["window"]["end"] = "2020-01-01T04:00:00+00:00"
+    series = copy.deepcopy(data["prediction"])
+    series["items"] = [{"time": event["time"], "height_m": height}
+                       for event, height in zip(series["items"], [2.0, -1.0, 1.0, 0.0])]
+    data["hourly_heights"] = {
+        "prediction": series, "window": copy.deepcopy(data["window"]),
+        "input_binding": {**data["input_binding"], "request_sha256": "c" * 64, "results_sha256": "d" * 64},
+    }
+    return data
+
+
+def test_hourly_mean_is_computed_in_its_actual_frame_and_preserves_default():
+    data = hourly_case()
+    before = copy.deepcopy(data)
+    original = retained_levels(**{key: value for key, value in data.items() if key != "hourly_heights"})
+    result = retained_levels(**data)
+    assert result["retained_datums"][0] == original["retained_datums"][0]
+    mean = result["retained_datums"][1]
+    assert mean["values"] == {"msl": 0.5}
+    assert mean["frame"]["kind"] == "harmonic_mean"
+    assert mean["uncertainty_m"] is None
+    assert mean["basis"]["hourly_sample_count"] == 4
+    assert data == before
+
+
+@pytest.mark.parametrize("change", ["convention", "native", "missing_hour", "nonfinite", "window"])
+def test_hourly_mean_requires_complete_bound_same_source_series(change):
+    data = hourly_case()
+    hourly = data["hourly_heights"]
+    if change == "convention":
+        hourly["prediction"]["convention_id"] = "other"
+    elif change == "native":
+        hourly["input_binding"]["native_sha256"] = "other"
+    elif change == "missing_hour":
+        hourly["prediction"]["items"].pop(1)
+    elif change == "nonfinite":
+        hourly["prediction"]["items"][0]["height_m"] = float("nan")
+    else:
+        hourly["window"]["end"] = "2020-01-01T05:00:00+00:00"
+    with pytest.raises(ValueError, match="Hourly"):
+        retained_levels(**data)
+
+
+def test_opt_in_spring_convention_uses_bound_hourly_mean_and_own_amplitudes():
+    data = hourly_case()
+    data["station"]["constant_sets"][0]["constituents"].append({"name": "S2", "amplitude_m": 0.25})
+    original = retained_levels(**data)
+    result = retained_levels(**data, spring_convention=True)
+    assert result["retained_datums"][:-1] == original["retained_datums"]
+    spring = result["retained_datums"][-1]
+    assert spring["values"] == {"mhws": 1.75, "mlws": -0.75}
+    assert spring["units"] == "m"
+    assert "No station-local spring definition is evidenced; this is not an agency datum." in spring["reliability"]["limitations"]
+    data.pop("hourly_heights")
+    with pytest.raises(ValueError, match="Spring"):
+        retained_levels(**data, spring_convention=True)
+
+
+def lunitidal_case():
+    data = case()
+    data["station"]["lon"] = -70.0
+    data["station"]["constant_sets"][0]["constituents"][0].update({"phase_deg": 200.0, "speed_deg_per_hour": 28.9841042})
+    data["lunitidal_convention"] = {
+        "convention_id": "model-convention", "phase_reference": "greenwich_utc",
+        "nodal_handling": "f_u_at_prediction", "astro_table_id": "table", "v0_model": "schureman_tcd",
+    }
+    return data
+
+
+def test_approximate_intervals_are_hours_with_explicit_greenwich_reference():
+    data = lunitidal_case()
+    result = retained_levels(**data)["retained_datums"][-1]
+    assert result["values"] == pytest.approx({"hwi": 200 / 28.9841042, "lwi": 20 / 28.9841042})
+    assert result["units"] == "h"
+    assert result["frame"] == {"kind": "elapsed_time", "name": "Greenwich lunar transit", "tie_status": "not_applicable"}
+    assert result["basis"]["local_hwi_hours"] == pytest.approx(60 / 28.9841042)
+    assert result["basis"]["local_lwi_hours"] == pytest.approx(240 / 28.9841042)
+    assert result["uncertainty_m"] is None
+
+
+@pytest.mark.parametrize("change", ["phase", "convention", "longitude", "speed"])
+def test_intervals_reject_unverified_phase_or_invalid_m2(change):
+    data = lunitidal_case()
+    if change == "phase":
+        data["lunitidal_convention"]["phase_reference"] = "local_standard"
+    elif change == "convention":
+        data["lunitidal_convention"]["convention_id"] = "other"
+    elif change == "longitude":
+        data["station"]["lon"] = None
+    else:
+        data["station"]["constant_sets"][0]["constituents"][0]["speed_deg_per_hour"] = 0
+    with pytest.raises(ValueError, match="Lunitidal"):
+        retained_levels(**data)
+
+
+def test_opt_in_uses_existing_monthly_labels_and_preserves_original_candidate():
+    data = tidal_day_case()
+    before = copy.deepcopy(data)
+    original = retained_levels(**{key: value for key, value in data.items() if key != "tidal_day_padding"})
+    result = retained_levels(**data)
+    assert result["retained_datums"][0] == original["retained_datums"][0]
+    extra = result["retained_datums"][1]
+    # February's lower low participates in January's last label window, but is
+    # not itself averaged into January. This is the existing label_events rule.
+    assert extra["values"]["mhhw"] == 2.05
+    assert extra["values"]["mllw"] == -1.0
+    assert extra["values"]["dtl"] == pytest.approx(0.525)
+    assert extra["values"]["gt"] == pytest.approx(3.05)
+    assert extra["values"]["dhq"] == pytest.approx(2.05 - (2.0 + 2.0 + 2.1) / 3)
+    assert extra["values"]["dlq"] == pytest.approx(0.7)
+    assert extra["basis"]["higher_high_count"] == 2
+    assert extra["basis"]["lower_low_count"] == 1
+    assert extra["basis"]["tidal_day_mode"] == "monthly"
+    assert extra["frame"]["kind"] == "harmonic_mean"
+    assert extra["uncertainty_m"] is None
+    assert data == before
+
+
+@pytest.mark.parametrize("change", ["convention", "native", "short_window", "outside_event"])
+def test_opt_in_rejects_unbound_or_insufficient_padding(change):
+    data = tidal_day_case()
+    padding = data["tidal_day_padding"]
+    if change == "convention":
+        padding["prediction"]["convention_id"] = "other"
+    elif change == "native":
+        padding["input_binding"]["native_sha256"] = "other"
+    elif change == "short_window":
+        padding["window"]["end"] = "2020-02-01T12:00:00+00:00"
+    else:
+        padding["prediction"]["items"][0]["time"] = "2020-01-31T23:59:59+00:00"
+    with pytest.raises(ValueError, match="padding"):
+        retained_levels(**data)
+
+
 @pytest.mark.skipif("OTC_HARMONIC_LEVELS_PROOF" not in os.environ, reason="actual held source/event proof")
 def test_real_pilot_matches_independent_event_arithmetic():
     root = Path(os.environ["OTC_HARMONIC_LEVELS_PROOF"])
@@ -128,3 +287,23 @@ def test_real_pilots_label_event_extrema_and_preserve_payload(pilot):
     assert record["retained_datums"][-1]["reliability"]["limitations"] == limitations
     record.pop("retained_datums")
     assert station == before["station"]
+
+
+@pytest.mark.skipif("OTC_HARMONIC_LAST_NINE" not in os.environ, reason="actual nine-place derived payload")
+def test_actual_nine_candidates_attach_without_changing_original_records():
+    root = Path(os.environ["OTC_HARMONIC_LAST_NINE"])
+    rows = [json.loads(line) for line in (root / "derived-datums.jsonl").read_text().splitlines()]
+    assert len(rows) == 9
+    for row in rows:
+        station = json.loads((root / f"{row['station_id']}-input.json").read_text())["station"]
+        before = copy.deepcopy(station)
+        count = len(row["retained_datums"])
+        assert retain_candidates({"stations": [station]}, [row])["added_candidates"] == count
+        record = next(record for record in station["source_records"]
+                      if record["source"] == row["source"] and record["source_record_id"] == row["source_record_id"]
+                      and record.get("source_version") == row.get("source_version"))
+        assert record["retained_datums"][-count:] == row["retained_datums"]
+        del record["retained_datums"][-count:]
+        if not record["retained_datums"]:
+            record.pop("retained_datums")
+        assert station == before
