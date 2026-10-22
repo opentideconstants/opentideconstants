@@ -1,0 +1,186 @@
+{
+  "title": "Station location annotations from retained GeoNames, CLDR and native source geography",
+  "delivery_date": "2026-10-21",
+  "status": "Committed data sidecar; no native-format, SDK/runtime, site or release integration implied.",
+  "sidecar": {
+    "file": "location-metadata.jsonl",
+    "format": "UTF-8 JSON Lines, one object per native station_id",
+    "join_key": "station_id",
+    "records": 16039,
+    "unique_station_ids": 16039,
+    "sha256": "01d5d17562047e5dedb9a44984d1266801263c9223bf0d79fbcdfc0d3626a479",
+    "copy_policy": "Byte-identical copy of the accepted full measurement; no reprocessing."
+  },
+  "native": {
+    "file": "OTC_20261011.jsonl",
+    "sha256": "7695d765a6787fb21c51d41cb6449b6699f019489c25e7a3dbbb6aa2aad7d1e5",
+    "cohort_rule": "Every station record in the pinned native candidate, with no country, status or prediction-quality exclusions.",
+    "station_ids_preserved": 16039,
+    "release_status": "Unreleased candidate; this sidecar does not approve publication or release."
+  },
+  "approved_predicate": {
+    "date": "2026-10-21",
+    "rule": "All required station IDs have a machine-readable location annotation: nearest same-country city within 40 km; otherwise sourced admin1 plus canonical country name, else country name alone; AQ Antarctica; unresolved country candidates shown together as explicitly unresolved region, or explicit unresolved region when none exist. Region-level fallbacks do not assert a locality or jurisdiction.",
+    "city_radius_km": 40,
+    "comparison_limit": "TIE records complete annotation availability under this dated owner-approved rule. It is not a result for the earlier strict locality/region/country requirement or an SDK rendering comparison."
+  },
+  "counts": {
+    "nearest_same_country_city_within_40km": 13331,
+    "country_only_region": 2340,
+    "source_bound_admin1_region": 349,
+    "antarctica_region": 18,
+    "unresolved_country_region": 1
+  },
+  "label_levels": {
+    "locality": 13331,
+    "region": 2708
+  },
+  "measurement": {
+    "measured_local": "2026-10-21 06:40:45 PM PDT",
+    "city_input_records": 236560,
+    "country_codes_mapped": 148,
+    "maximum_selected_city_distance_km": 39.99923472217617,
+    "nonempty_labels": 16039,
+    "exact_cohort_ids": true
+  },
+  "fields": {
+    "station_id": "Exact native station identity. Join by this value; sidecar row order is not a public identifier.",
+    "label": "Display annotation. Its specificity and uncertainty are carried by label_level, method and resolved_jurisdiction; do not treat every label as a locality.",
+    "label_level": "locality means nearest same-country city within40km; region includes source-bound admin1, country-only, Antarctica and explicitly unresolved regional context.",
+    "resolved_jurisdiction": "False on all delivered rows. A proximity or source-derived display label does not establish station jurisdiction.",
+    "country_code": "Unchanged native country value, normally a three-letter code; null remains null for unresolved country. No jurisdiction is selected from city proximity.",
+    "country_name": "Canonical English CLDR display name for the existing native country code; null remains null when unresolved. Native source territory names/aliases are not rewritten.",
+    "locality": "Present only for a selected GeoNames city within40km in the same source-bound country. This is nearby-city context, not a verified station address.",
+    "method": "Explicit choice among the five approved methods listed below.",
+    "country_candidates": "For unresolved country, all retained sourced country candidates with their existing codes and display names; no candidate is preferred.",
+    "source_binding": "Object for resolved source inputs, or array retaining all unresolved source bindings. Carries native field/value or source/source_record_id, GeoNames IDs/coordinates/country/admin1/distance, or CLDR territory/subdivision identifiers. Source metadata is evidence, not a station-jurisdiction assertion."
+  },
+  "methods": {
+    "nearest_same_country_city_within_40km": "Nearest retained GeoNames cities500 record in the native country, with measured great-circle distance <=40km. The GeoNames admin1 describes that city; it is not used to infer station admin1.",
+    "source_bound_admin1_region": "Outside the city rule, use an existing source-bound native region_code with its matching CLDR subdivision name and canonical country name.",
+    "country_only_region": "If no sourced admin1 binding exists, use the existing country code and canonical CLDR country name only.",
+    "antarctica_region": "Native ATA maps to CLDR AQ and displays Antarctica. No city, research-base or jurisdiction inference.",
+    "unresolved_country_region": "Retain all sourced candidates together in an explicitly unresolved region label; if none exist, use an explicit unresolved region label. No forced country or jurisdiction choice."
+  },
+  "source_inputs": {
+    "acquired_local": "2026-10-21 03:17:30 PM PDT",
+    "geonames_and_cldr_files": [
+      {
+        "file": "cities500.zip",
+        "source": "https://download.geonames.org/export/dump/cities500.zip",
+        "license": "CC-BY-4.0",
+        "bytes": 13898025,
+        "sha256": "f1cc7e34c7a3a65195a545221521b8e11c63b2c473d6d01c72158ce33a9611e6"
+      },
+      {
+        "file": "admin1CodesASCII.txt",
+        "source": "https://download.geonames.org/export/dump/admin1CodesASCII.txt",
+        "license": "CC-BY-4.0",
+        "bytes": 151583,
+        "sha256": "b577baa3476bbe94f0454545e517e1835401d79c5b1105c8e02cf1d4a505e8ec"
+      },
+      {
+        "file": "geonames-readme.txt",
+        "source": "https://download.geonames.org/export/dump/readme.txt",
+        "license": "CC-BY-4.0",
+        "bytes": 8843,
+        "sha256": "b1957379b6c1242c700c98ac9a8aa0a09f56c3c0a50ee72175527005f48ef2c5"
+      },
+      {
+        "file": "CC-BY-4.0-legalcode.txt",
+        "source": "https://creativecommons.org/licenses/by/4.0/legalcode.txt",
+        "license": "CC-BY-4.0",
+        "bytes": 18657,
+        "sha256": "9ba9550ad48438d0836ddab3da480b3b69ffa0aac7b7878b5a0039e7ab429411"
+      },
+      {
+        "file": "cldr-subdivisions-en.xml",
+        "source": "https://raw.githubusercontent.com/unicode-org/cldr/11299982335beb974c1c63c45265184e759c0f41/common/subdivisions/en.xml",
+        "license": "Unicode-3.0",
+        "bytes": 337007,
+        "sha256": "997a14da1144bb66f36a829db1783afe41f7529e33070afbe964bdd8e387b1d2"
+      },
+      {
+        "file": "cldr-subdivision-containment.xml",
+        "source": "https://raw.githubusercontent.com/unicode-org/cldr/11299982335beb974c1c63c45265184e759c0f41/common/supplemental/subdivisions.xml",
+        "license": "Unicode-3.0",
+        "bytes": 41941,
+        "sha256": "63095a3b5bd4e0a00d9e1cf96853808cacd0ec7c826dbcbfd31755c6cb9b6c55"
+      },
+      {
+        "file": "CLDR-LICENSE.txt",
+        "source": "https://raw.githubusercontent.com/unicode-org/cldr/11299982335beb974c1c63c45265184e759c0f41/LICENSE",
+        "license": "Unicode-3.0",
+        "bytes": 2033,
+        "sha256": "b49d0e9f8ead51ca8b7df6fec89cc3ae6809198b4b9d43c74216da0118f23f5b"
+      },
+      {
+        "file": "cities500.txt",
+        "source_archive": "cities500.zip",
+        "license": "CC-BY-4.0",
+        "bytes": 41708216,
+        "sha256": "6a0eefe627468d5aa19f5a6e1e0ec74a50bf84ffc330593917a1068ffe2bfe9d"
+      }
+    ],
+    "country_display_acquired_local": "2026-10-21 06:38:24 PM PDT",
+    "country_display_files": [
+      {
+        "file": "cldr-territories-en.json",
+        "source_url": "https://raw.githubusercontent.com/unicode-org/cldr/11299982335beb974c1c63c45265184e759c0f41/common/main/en.xml",
+        "source_sha256": "67607f4c9cf57157e70564987d8ae92a9ddcd73c00a2f1cd6abf79524a969cbd",
+        "extraction_xpath": "/ldml/localeDisplayNames/territories/territory[not(@alt)]",
+        "sha256": "d742a993fa0b87e908649f6fc1d740783201c2647d8287219695be17f1dd1537",
+        "entries": 295,
+        "license": "Unicode-3.0",
+        "license_file": "CLDR-LICENSE.txt",
+        "attribution_file": "ATTRIBUTION.txt"
+      },
+      {
+        "file": "cldr-territory-aliases.json",
+        "source_url": "https://raw.githubusercontent.com/unicode-org/cldr/11299982335beb974c1c63c45265184e759c0f41/common/supplemental/supplementalMetadata.xml",
+        "source_sha256": "36e807ce72b15304dd993f132216f408351be1c4376edaa2fe9e9547e2efcac1",
+        "extraction_xpath": "/supplementalData/metadata/alias/territoryAlias",
+        "sha256": "9608ed0fdc78579713330b616bc342673c993ec51c1235fd080fa7314d0c3ec4",
+        "entries": 640,
+        "license": "Unicode-3.0",
+        "license_file": "CLDR-LICENSE.txt",
+        "attribution_file": "ATTRIBUTION.txt"
+      }
+    ],
+    "cldr_release": "48.2",
+    "cldr_commit": "11299982335beb974c1c63c45265184e759c0f41",
+    "pin_semantics": "SHA256 pins identify the exact retained inputs. CLDR URLs are commit-pinned; GeoNames download URLs are mutable upstream locations whose captured bytes are pinned here. Listed source inputs are attribution/provenance references, not additional files bundled in this directory."
+  },
+  "licenses_and_attribution": {
+    "geonames": {
+      "attribution": "Location annotations derived from GeoNames, https://www.geonames.org/, licensed under Creative Commons Attribution4.0 International.",
+      "license": "CC-BY-4.0",
+      "license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "changes": "Selected nearest same-country city records within40km and combined names with source-bound native geography and CLDR display names; derived annotations retain source IDs and distances."
+    },
+    "cldr": {
+      "attribution": "Unicode CLDR48.2, Copyright ©2004–2026 Unicode, Inc.",
+      "license": "Unicode-3.0",
+      "license_notice": "UNICODE LICENSE V3\n\nCOPYRIGHT AND PERMISSION NOTICE\n\nCopyright © 2004-2026 Unicode, Inc.\n\nNOTICE TO USER: Carefully read the following legal agreement. BY\nDOWNLOADING, INSTALLING, COPYING OR OTHERWISE USING DATA FILES, AND/OR\nSOFTWARE, YOU UNEQUIVOCALLY ACCEPT, AND AGREE TO BE BOUND BY, ALL OF THE\nTERMS AND CONDITIONS OF THIS AGREEMENT. IF YOU DO NOT AGREE, DO NOT\nDOWNLOAD, INSTALL, COPY, DISTRIBUTE OR USE THE DATA FILES OR SOFTWARE.\n\nPermission is hereby granted, free of charge, to any person obtaining a\ncopy of data files and any associated documentation (the \"Data Files\") or\nsoftware and any associated documentation (the \"Software\") to deal in the\nData Files or Software without restriction, including without limitation\nthe rights to use, copy, modify, merge, publish, distribute, and/or sell\ncopies of the Data Files or Software, and to permit persons to whom the\nData Files or Software are furnished to do so, provided that either (a)\nthis copyright and permission notice appear with all copies of the Data\nFiles or Software, or (b) this copyright and permission notice appear in\nassociated Documentation.\n\nTHE DATA FILES AND SOFTWARE ARE PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY\nKIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF\nMERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT OF\nTHIRD PARTY RIGHTS.\n\nIN NO EVENT SHALL THE COPYRIGHT HOLDER OR HOLDERS INCLUDED IN THIS NOTICE\nBE LIABLE FOR ANY CLAIM, OR ANY SPECIAL INDIRECT OR CONSEQUENTIAL DAMAGES,\nOR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,\nWHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,\nARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THE DATA\nFILES OR SOFTWARE.\n\nExcept as contained in this notice, the name of a copyright holder shall\nnot be used in advertising or otherwise to promote the sale, use or other\ndealings in these Data Files or Software without prior written\nauthorization of the copyright holder.\n\nSPDX-License-Identifier: Unicode-3.0\n"
+    },
+    "native": "Existing native source records, territory/country aliases, source licences and attribution remain unchanged. This sidecar does not grant new permissions for the native dataset."
+  },
+  "historical_no_go": [
+    {
+      "predicate": "Strict nearest same-country locality within40km, including the AQ-only research-base proposal.",
+      "verdict": "NO_GO",
+      "witness": "Rae Island OTC-0012a4f2: nearest same-country city Tuktoyaktuk81.72686551048034km away, beyond40km. The delivered label is Canada, not Tuktoyaktuk or inferred Northwest Territories."
+    },
+    {
+      "predicate": "Region fallback requiring a unique country.",
+      "verdict": "NO_GO_UNRESOLVED_COUNTRY",
+      "witness": "Phipi Reef OTC-1f91a5ad has retained PNG and AUS candidates. The approved dated rule labels them together as unresolved; it does not resolve jurisdiction."
+    }
+  ],
+  "limitations": [
+    "Historical strict NO_GO results remain valid under their earlier predicates; no retrospective strict-locality pass is claimed.",
+    "Region-level labels are not localities. All resolved_jurisdiction flags remain false; unresolved source candidates are preserved.",
+    "No nearest-city administrative-region inference beyond40km is applied.",
+    "The sidecar is actual machine-readable data joined by station_id. SDK/native-reader consumption, runtime display, accuracy, site publication and release are outside this delivery."
+  ]
+}

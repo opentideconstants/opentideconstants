@@ -16,8 +16,8 @@
   },
   "counts": {
     "WIN": 3,
-    "TIE": 12,
-    "BLOCKED": 15,
+    "TIE": 13,
+    "BLOCKED": 14,
     "LOSS": 9
   },
   "milestone_verdict_changes": [
@@ -38,6 +38,12 @@
       "before": "BLOCKED",
       "after": "TIE",
       "reason": "Dated owner-approved method-neutral tide target coverage: 2,196/2,196 targets, 2,194 distinct actual predicting native places. Historical offset counts remain unchanged; current inventory clause still passes."
+    },
+    {
+      "id": "37",
+      "before": "BLOCKED",
+      "after": "TIE",
+      "reason": "Delivered all16,039 station annotations under the dated owner-approved label rule; strict-locality NO_GO history and unresolved-jurisdiction limits retained. Data sidecar only; no SDK/runtime claim."
     }
   ],
   "rows": [
@@ -1193,11 +1199,11 @@
       "dimension": "Location metadata",
       "checked": true,
       "historical_label": "LOSS",
-      "label": "BLOCKED",
+      "label": "TIE",
       "historical_predicate": "Every place has locality, region and country code; no ODbL-derived field is shipped (true/false)",
-      "comparison_predicate": "Availability of equivalent locality, region and country information under each schema, using documented mappings and actual values; identical property names are not required.",
+      "comparison_predicate": "All required station IDs have a machine-readable location annotation: nearest same-country city within 40 km; otherwise sourced admin1 plus canonical country name, else country name alone; AQ Antarctica; unresolved country candidates shown together as explicitly unresolved region, or explicit unresolved region when none exist. Region-level fallbacks do not assert a locality or jurisdiction.",
       "predicate_changed": true,
-      "comparison_and_limit": "Retained OTC census proves missing explicit locality/region/country_code properties, while native country and 3,003 source-backed region_code values exist. Comparator snapshot has region in 11,586/12,015, country_code in 12,015/12,015 and no explicit locality property. These field-name differences do not measure equivalent semantic information. No retained complete cross-schema semantic mapping/value census supports a comparative LOSS or TIE; keep relative metadata availability unproved. Internal completeness and no-ODbL obligations remain unchanged.",
+      "comparison_and_limit": "Under the dated2026-10-21 owner-approved annotation rule, the delivered station-ID sidecar labels all16,039 required native records:13,331 nearby-city locality labels,349 sourced admin1/country labels,2,340 country-only labels,18 Antarctica labels and1 explicitly unresolved region label retaining all country candidates. This is TIE for complete data-annotation availability under the new rule, not proof of the earlier strict-locality predicate, resolved jurisdiction or SDK/runtime rendering parity. The city rule remains same-country and<=40km; source/native records, country uncertainty and earlier strict NO_GO history are preserved.",
       "historical_measured_result": {
         "locality": 16039,
         "region": 16039,
@@ -1209,6 +1215,56 @@
       "source_evidence": {
         "description": "post-ticon/population/rows.json (historical evidence retained locally; unbundled)",
         "bundled": false
+      },
+      "current_counts": {
+        "required_station_records": 16039,
+        "delivered_station_annotations": 16039,
+        "unique_station_ids": 16039,
+        "locality_labels": 13331,
+        "region_level_labels": 2708,
+        "by_method": {
+          "nearest_same_country_city_within_40km": 13331,
+          "country_only_region": 2340,
+          "source_bound_admin1_region": 349,
+          "antarctica_region": 18,
+          "unresolved_country_region": 1
+        },
+        "unresolved_country_records": 1,
+        "resolved_jurisdiction_claims": 0
+      },
+      "predicate_history": [
+        {
+          "date": "2026-10-21",
+          "reason": "Owner approved sourced region/country and explicitly unresolved labels as fallbacks while retaining the40km city rule. Earlier strict requirements did not pass retroactively.",
+          "prior_row": {
+            "id": "37",
+            "dimension": "Location metadata",
+            "checked": true,
+            "historical_label": "LOSS",
+            "label": "BLOCKED",
+            "historical_predicate": "Every place has locality, region and country code; no ODbL-derived field is shipped (true/false)",
+            "comparison_predicate": "Availability of equivalent locality, region and country information under each schema, using documented mappings and actual values; identical property names are not required.",
+            "predicate_changed": true,
+            "comparison_and_limit": "Retained OTC census proves missing explicit locality/region/country_code properties, while native country and 3,003 source-backed region_code values exist. Comparator snapshot has region in 11,586/12,015, country_code in 12,015/12,015 and no explicit locality property. These field-name differences do not measure equivalent semantic information. No retained complete cross-schema semantic mapping/value census supports a comparative LOSS or TIE; keep relative metadata availability unproved. Internal completeness and no-ODbL obligations remain unchanged.",
+            "historical_measured_result": {
+              "locality": 16039,
+              "region": 16039,
+              "country_code": 16039,
+              "region_code": 13036
+            },
+            "retained_product_or_scientific_requirement": "Every place has locality, region and country code; no ODbL-derived field is shipped (true/false)",
+            "source_evidence_packet_sha256": "2da6f0bfaf5603ca8482c4069d00bf81fdf6e26ff5d68bf3cefd3e7121d50701",
+            "source_evidence": {
+              "description": "post-ticon/population/rows.json (historical evidence retained locally; unbundled)",
+              "bundled": false
+            }
+          }
+        }
+      ],
+      "current_evidence": {
+        "data": "pipeline/data/otc/supplements/geonames-location-metadata/location-metadata.jsonl",
+        "provenance": "pipeline/data/otc/supplements/geonames-location-metadata/location-metadata.provenance.json",
+        "measurement": "Accepted full16039-record measurement copied byte-for-byte; exact station membership/value comparison and four real witnesses pass. No geographic reprocessing or prediction run."
       }
     },
     {
