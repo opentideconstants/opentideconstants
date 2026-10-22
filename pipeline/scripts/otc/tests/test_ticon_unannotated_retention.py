@@ -59,7 +59,6 @@ def actual_retention():
     )
     output = {record["source_record_id"]: record for station in release["stations"]
               for record in station.get("source_records", []) if record["source"] == "ticon"}
-    Path(source).with_name("producer-output.json").write_text(json.dumps(release, indent=2) + "\n")
     return originals, output, release, records
 
 
