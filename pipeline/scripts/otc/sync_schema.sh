@@ -19,7 +19,7 @@
 # same schema SHA-256 (SCHEMA_SHA256) and refuses a copy that does not match it.
 set -euo pipefail
 
-SITE_COMMIT=e2a07d84214e26b50bce1c92ca9a080772940534   # explicit harmonic mean frame and computed fallback uncertainty
+SITE_COMMIT=6530360e40d839bbbcdb0e529de75d1ccac067d2   # retained source datum alternatives and subordinate offset zero
 SCHEMA_SRC=src/schema/otc-1.0.schema.json
 SCHEMA_SHA256=7887fa714a1ba9cd533ba25494b7305fda8f4c27967ff979d2bac8fedc7268f1
 EXAMPLE_SRC=src/schema/example.json
