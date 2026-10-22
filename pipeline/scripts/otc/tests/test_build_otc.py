@@ -18,6 +18,7 @@ from otc_pipeline.lat_hat import EPOCH, START, END, computation_input_sha256, da
 from otc_pipeline import lat_hat
 from otc_pipeline.observed_datums import produce as observed_produce
 from otc_pipeline.release_writer import pinned_schema
+from test_datums import _expected_computed_reference_basis
 from test_datums import native_observed_chart_cases as native_observed_chart_cases
 from test_datums import native_approximate_chart_cases as native_approximate_chart_cases
 from test_datums import native_convention_unverified_inputs as native_convention_unverified_inputs
@@ -326,14 +327,6 @@ from test_datums import native_uhslc_fd_chart_cases as native_uhslc_fd_chart_cas
 from test_datums import native_uhslc_fd_chart_evidence as native_uhslc_fd_chart_evidence
 
 
-def _expected_computed_reference_basis(original):
-    expected = copy.deepcopy(original)
-    expected["fallback"]["basis"] += "; approximate chart-reference stand-in: existing computed LAT (nonofficial)"
-    expected["fallback"]["otc_finding"] += (
-        "; approximate chart-reference stand-in; agency chart-datum convention, equivalence and vertical tie are not established")
-    return expected
-
-
 @pytest.fixture
 def native_computed_chart_composition(native_computed_chart_cases, tmp_path, request):
     if getattr(request, "param", None) in ("nld", "uhslc_fd"):
@@ -434,7 +427,8 @@ def test_native_computed_chart_composition(native_computed_chart_composition, tm
             assert cs["datum"].pop("chart_datum") == "lat"
             original = next(c for s in postcomputed["stations"] for c in s["constant_sets"]
                             if c["set_id"] == cs["set_id"])
-            cs["datum"]["basis"]["lat"]["fallback"] = original["datum"]["basis"]["lat"]["fallback"]
+            assert cs["datum"]["basis"]["lat"] == _expected_computed_reference_basis(original["datum"]["basis"]["lat"])
+            cs["datum"]["basis"]["lat"] = copy.deepcopy(original["datum"]["basis"]["lat"])
     assert release == expected
 
 
@@ -470,7 +464,8 @@ def test_native_computed_chart_publication(request, case_fixture, tmp_path, comb
         fallback = cs["datum"]["basis"]["lat"]["fallback"]
         assert "existing computed LAT (nonofficial)" in fallback["basis"]
         assert "agency chart-datum convention, equivalence and vertical tie are not established" in fallback["otc_finding"]
-        fallback.update(old["datum"]["basis"]["lat"]["fallback"])
+        assert cs["datum"]["basis"]["lat"] == _expected_computed_reference_basis(old["datum"]["basis"]["lat"])
+        cs["datum"]["basis"]["lat"] = copy.deepcopy(old["datum"]["basis"]["lat"])
     assert release == before
 
 
@@ -509,7 +504,8 @@ def test_native_nld_computed_chart_composition(native_computed_chart_composition
                 fallback = cs["datum"]["basis"]["lat"]["fallback"]
                 assert "existing computed LAT (nonofficial)" in fallback["basis"]
                 assert "agency chart-datum convention, equivalence and vertical tie are not established" in fallback["otc_finding"]
-                fallback.update(old["datum"]["basis"]["lat"]["fallback"])
+                assert cs["datum"]["basis"]["lat"] == _expected_computed_reference_basis(old["datum"]["basis"]["lat"])
+                cs["datum"]["basis"]["lat"] = copy.deepcopy(old["datum"]["basis"]["lat"])
         assert output == baseline
     assert before != postcomputed  # Exact native pre-computed input was authenticated.
 
