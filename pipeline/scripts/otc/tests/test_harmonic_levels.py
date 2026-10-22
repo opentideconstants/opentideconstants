@@ -11,13 +11,13 @@ from otc_pipeline.harmonic_levels import retained_levels
 
 def case():
     cs = {"set_id": "s/model", "source": "model", "source_record_id": "record",
-          "source_version": "v1", "quantity": "water_level", "qc_status": "flagged",
+          "source_version": "v1", "quantity": "water_level", "qc_status": "flagged", "convention_id": "model-convention",
           "qc_flags": [{"flag": "accuracy_unverified"}], "constituents": [{"name": "M2", "amplitude_m": 1}]}
     station = {"id": "s", "constant_sets": [cs], "source_records": [
         {"source": "model", "source_record_id": "record", "source_version": "v1",
          "published_set_ids": ["s/model"]}]}
     prediction = {"station_id": "s", "set_id": "s/model", "method": "harmonic",
-                  "datum": "mean_level", "astro_table_id": "table", "algorithm": "otc-predict-1",
+                  "datum": "mean_level", "convention_id": "model-convention", "astro_table_id": "table", "algorithm": "otc-predict-1",
                   "items": [{"type": kind, "height_m": height, "time": f"2020-01-01T0{i}:00:00+00:00"}
                             for i, (kind, height) in enumerate([("high", 2), ("low", -1), ("high", 4), ("low", -3)])]}
     return {"station": station, "set_id": "s/model", "prediction": prediction,
@@ -67,6 +67,24 @@ def test_derived_sets_bind_their_publishing_source_not_the_first_record(set_sour
     result = retained_levels(**data)
     assert result["source"] == record_source
     assert result["source_record_id"] == "record"
+
+
+@pytest.mark.parametrize("invalid", ["different", "missing_prediction", "null_prediction", "missing_both", "empty_both"])
+def test_rejects_missing_or_mismatched_harmonic_convention(invalid):
+    data = case()
+    cs = data["station"]["constant_sets"][0]
+    if invalid == "different":
+        data["prediction"]["convention_id"] = "other-convention"
+    elif invalid == "null_prediction":
+        data["prediction"]["convention_id"] = None
+    elif invalid == "empty_both":
+        cs["convention_id"] = data["prediction"]["convention_id"] = ""
+    else:
+        del data["prediction"]["convention_id"]
+        if invalid == "missing_both":
+            del cs["convention_id"]
+    with pytest.raises(ValueError, match="convention"):
+        retained_levels(**data)
 
 
 @pytest.mark.skipif("OTC_HARMONIC_LEVELS_PROOF" not in os.environ, reason="actual held source/event proof")

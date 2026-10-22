@@ -43,6 +43,8 @@ def retained_levels(*, station: dict, set_id: str, prediction: dict,
             or prediction.get("method") != "harmonic" or prediction.get("datum") != "mean_level"
             or cs.get("quantity") != "water_level" or not prediction.get("astro_table_id")):
         raise ValueError("Events must use the same water-level set and harmonic-mean frame")
+    if not cs.get("convention_id") or prediction.get("convention_id") != cs["convention_id"]:
+        raise ValueError("Events must use the selected harmonic set's convention_id")
     if not input_binding.get("native_sha256") or not input_binding.get("sdk_commit"):
         raise ValueError("Native and SDK input bindings are required")
     start, end = _instant(window["start"]), _instant(window["end"])
