@@ -1002,3 +1002,27 @@ def test_actual_identical_measurement_reuse():
         print(f"actual different coefficients {item['source_record_id']}: reuse_rejected=True")
         checked += 1
     assert checked >= 2
+
+
+def test_actual_reused_checkpoints_reopen():
+    path = os.environ.get("OTC_OBSERVED_REUSE_EXPORT")
+    if not path:
+        pytest.skip("requires the real three-pair reuse exporter output")
+    p = producer()
+    cache = Path(path) / "checkpoints"
+    failures, sources = [], set()
+    for marker in sorted(cache.glob("*.done.json")):
+        done = json.loads(marker.read_text())
+        key = marker.name.removesuffix(".done.json")
+        job = json.loads((cache / f"{key}.job.json").read_text())
+        sources.add(job["cs"]["source_record_id"])
+        try:
+            profile = p.read_checkpoint(cache, key, done["job_sha256"], require_complete=True)
+            assert profile["binding"] == job["binding"] and profile["mm"]
+            assert profile["report"]["measurement_reuse"]["origin_input_binding"] != profile["binding"]
+            print(f"actual checkpoint {job['cs']['source_record_id']}: reopened=True")
+        except ValueError as exc:
+            print(f"actual checkpoint {job['cs']['source_record_id']}: reopened=False reason={exc}")
+            failures.append(key)
+    assert len(sources) == 3
+    assert not failures, f"actual reused checkpoints could not reopen: {len(failures)}"

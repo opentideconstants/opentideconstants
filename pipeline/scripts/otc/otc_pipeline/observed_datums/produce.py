@@ -15,6 +15,7 @@ import json
 import math
 import multiprocessing
 import os
+import shutil
 import time
 from concurrent.futures import FIRST_COMPLETED, ProcessPoolExecutor, wait
 from dataclasses import replace
@@ -576,10 +577,15 @@ def write_json(path: Path, value: dict) -> None:
     os.replace(temporary, path)
 
 
-def write_checkpoint(cache: Path, key: str, job_sha: str, profile: dict, tab) -> None:
+def write_checkpoint(cache: Path, key: str, job_sha: str, profile: dict, tab, *, retained_arrays: Path | None = None) -> None:
     """Publish the completion marker last; an interrupted write is never a hit."""
     files = {}
-    if tab is not None:
+    if retained_arrays is not None:
+        temporary = cache / f"{key}.part.npz"
+        shutil.copyfile(retained_arrays, temporary)
+        os.replace(temporary, cache / f"{key}.npz")
+        files[f"{key}.npz"] = sha256(cache / f"{key}.npz")
+    elif tab is not None:
         temporary = cache / f"{key}.part.npz"
         save_tab(temporary, tab)
         os.replace(temporary, cache / f"{key}.npz")
@@ -1168,7 +1174,8 @@ def export_retained(measured_inputs: Path, out: Path, *, source_records: set[str
                                 fresh = out / "checkpoints"
                                 fresh.mkdir(exist_ok=True)
                                 write_json(fresh / f"{item['key']}.job.json", job)
-                                write_checkpoint(fresh, item["key"], item["job_sha256"], profile, None)
+                                write_checkpoint(fresh, item["key"], item["job_sha256"], profile, None,
+                                                 retained_arrays=location / f"{other['key']}.npz")
                                 break
                 if source_records is not None and not profile.get("mm") and not reused_measurement:
                     member = context[0].members.get(row["source_record_id"])
