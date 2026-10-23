@@ -19,16 +19,148 @@ def _finite(value):
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
-def candidate_errors(candidate, record, own_sets):
+_NOAA_SUBORDINATE_METHOD = "noaa_subordinate_reference_datums_v1"
+_OFFSET_FIELDS = ("reference_station_id", "height_adjusted_type", "height_offset_high", "height_offset_low",
+                  "time_offset_high_min", "time_offset_low_min")
+
+
+def _published_body(binding):
+    raw = binding["response_json"]
+    if hashlib.sha256(raw.encode("utf-8")).hexdigest() != binding["sha256"]:
+        raise ValueError("published response SHA-256 mismatch")
+    body = json.loads(raw)
+    if not isinstance(body, dict):
+        raise ValueError("published response must be a JSON object")
+    json.dumps(body, allow_nan=False)
+    return body
+
+
+def _noaa_subordinate_errors(candidate, record, station, reference_station):
+    """Check published reference algebra against both actual native source records."""
+    shape = [error.message for error in _candidate_validator().iter_errors(candidate)]
+    if shape:
+        return ["invalid NOAA subordinate proof shape: " + message for message in shape]
+    if not isinstance(station, dict) or not isinstance(reference_station, dict):
+        return ["NOAA subordinate derivation requires actual own and reference stations"]
+    try:
+        if record.get("source") != "noaa" or record not in station.get("source_records", []):
+            raise ValueError("NOAA subordinate derivation requires its actual own NOAA source record")
+        binding, basis = candidate["input_binding"], candidate["basis"]
+        own, ref = binding["published_offsets"], binding["published_reference"]
+        if (own["source_record_id"], own["source_version"]) != (record["source_record_id"], record["source_version"]):
+            raise ValueError("published offsets differ from the exact own source tuple")
+        offsets = station.get("subordinate_offsets", {})
+        if not isinstance(offsets, dict):
+            raise ValueError("NOAA subordinate derivation requires actual native height offsets")
+        if (basis["native_offsets"] != {key: offsets.get(key) for key in _OFFSET_FIELDS}
+                or ref["native_station_id"] != offsets.get("reference_station_id")
+                or reference_station.get("station_id") != ref["native_station_id"]):
+            raise ValueError("published derivation differs from actual native offsets or reference station")
+        ref_id = ref["source_record_id"]
+        metadata = record.get("original_metadata")
+        if not isinstance(metadata, dict):
+            raise ValueError("NOAA subordinate derivation requires original source metadata")
+        rows = json.loads(metadata.get("raw_metadata_rows_json", "[]"))
+        if not isinstance(rows, list) or not any(isinstance(row, dict) and row.get("id") == record["source_record_id"]
+                                               and row.get("reference_id") == ref_id for row in rows):
+            raise ValueError("published reference differs from the original own source metadata")
+        endpoint = "https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations/"
+        if own["source_url"] != endpoint + record["source_record_id"] + "/tidepredoffsets.json":
+            raise ValueError("published offset URL differs from the exact own source")
+        ref_endpoint = endpoint + ref_id + "/datums.json"
+        if ref["source_url"] != ref_endpoint + "?units=metric":
+            raise ValueError("published reference URL must identify exact metric datums")
+        published, reference = _published_body(own), _published_body(ref)
+        if (own["reference_source_record_id"] != ref_id or published.get("refStationId") != ref_id
+                or reference.get("self") != ref_endpoint or reference.get("units") != "meters"):
+            raise ValueError("published reference identity or metre units differ")
+        if basis["reference_epoch"] != reference.get("epoch"):
+            raise ValueError("reference epoch differs from the published response")
+        operation = published.get("heightAdjustedType")
+        if operation not in ("R", "F") or basis["operation"] != operation:
+            raise ValueError("unsupported or conflicting published height operation")
+        if (basis["offset_height_units"] != ("ratio" if operation == "R" else "feet")
+                or offsets.get("height_adjusted_type") != ("R" if operation == "R" else "A")):
+            raise ValueError("published height units differ from native normalization")
+        high, low = published["heightOffsetHighTide"], published["heightOffsetLowTide"]
+        if not all(_finite(value) for value in (high, low)) or (operation == "R" and min(high, low) <= 0):
+            raise ValueError("height adjustments require finite differences or positive ratios")
+        for native, value in (("height_offset_high", high * (0.3048 if operation == "F" else 1)),
+                              ("height_offset_low", low * (0.3048 if operation == "F" else 1)),
+                              ("time_offset_high_min", published.get("timeOffsetHighTide")),
+                              ("time_offset_low_min", published.get("timeOffsetLowTide"))):
+            if not isinstance(value, (int, float)) or not _finite(value) or not _finite(offsets.get(native)) or not math.isclose(
+                    value, offsets[native], rel_tol=0, abs_tol=1e-12):
+                raise ValueError("published adjustments differ from actual native offsets")
+        values = {}
+        for row in reference.get("datums", []):
+            name, value = row["name"], row["value"]
+            if name in values:
+                raise ValueError("ambiguous duplicate published reference datum")
+            values[name] = value
+        for name in ("LAT", "HAT"):
+            if _finite(reference.get(name)):
+                values[name] = reference[name]
+        if "published_values" in basis and basis["published_values"] != values:
+            raise ValueError("copied reference values differ from the hashed published body")
+        references = [r for r in reference_station.get("source_records", [])
+                      if isinstance(r, dict) and (r.get("source"), r.get("source_record_id")) == ("noaa", ref_id)]
+        if len(references) != 1:
+            raise ValueError("published reference requires one actual native NOAA source record")
+        supported = {key: value for key, value in values.items()
+                     if key in ("MLLW", "MHHW", "MHW", "MLW", "MSL", "LAT", "HAT") and _finite(value)}
+        if not any(isinstance(c, dict) and c.get("kind") == "published" and c.get("method") == "source"
+                   and c.get("source_record_id") == ref_id and c.get("units") == "m"
+                   and isinstance(c.get("input_binding"), dict) and isinstance(c.get("values"), dict)
+                   and c.get("frame") == {"kind": "gauge_zero", "name": "STND", "tie_status": "source_declared"}
+                   and c.get("input_binding", {}).get("sha256") == ref["sha256"]
+                   and c.get("input_binding", {}).get("source_url") == ref["source_url"]
+                   and all(c.get("values", {}).get(key) == value for key, value in supported.items())
+                   for c in references[0].get("retained_datums", [])):
+            raise ValueError("published reference body is not bound to retained native source values")
+        if not _finite(values.get("MLLW")):
+            raise ValueError("published reference requires a finite MLLW baseline")
+        zero = values["MLLW"]
+        mapped = {}
+        for name, adjustment in (("MHHW", high), ("MHW", high), ("MLW", low), ("MLLW", low),
+                                 ("LAT", low), ("HAT", high)):
+            if _finite(values.get(name)):
+                height = values[name] - zero
+                mapped[name.lower()] = height * adjustment if operation == "R" else height + adjustment * 0.3048
+        for key, first, second, factor, subtract in (
+                ("mtl", "mhw", "mlw", 0.5, False), ("dtl", "mhhw", "mllw", 0.5, False),
+                ("mn", "mhw", "mlw", 1, True), ("gt", "mhhw", "mllw", 1, True),
+                ("dhq", "mhhw", "mhw", 1, True), ("dlq", "mlw", "mllw", 1, True)):
+            if first in mapped and second in mapped:
+                mapped[key] = (mapped[first] - mapped[second] if subtract else mapped[first] + mapped[second]) * factor
+        if high == low and published["timeOffsetHighTide"] == published["timeOffsetLowTide"] and _finite(values.get("MSL")):
+            mapped["msl"] = (values["MSL"] - zero) * high if operation == "R" else values["MSL"] - zero + high * 0.3048
+        for key, value in candidate["values"].items():
+            if key not in mapped or not _finite(value) or not math.isclose(value, mapped[key], rel_tol=0, abs_tol=1e-12):
+                raise ValueError("derived value does not follow the authenticated published reference algebra")
+            if key in ("lat", "hat") and basis.get("extrema_period", {}).get(key) != {"date": reference.get(key.upper() + "date")}:
+                raise ValueError("published extrema require their own exact source date or explicit unknown date")
+        for key, period in basis.get("extrema_period", {}).items():
+            if period != {"date": reference.get(key.upper() + "date")}:
+                raise ValueError("copied extrema date differs from the published response")
+    except (KeyError, TypeError, ValueError, UnicodeError) as error:
+        return [f"invalid NOAA subordinate derivation: {error}"]
+    return []
+
+
+def candidate_errors(candidate, record, own_sets, *, station=None, reference_station=None):
     """Identity and interval checks additional to the independent carrier schema."""
     errors = []
+    source_computed = candidate.get("method") == _NOAA_SUBORDINATE_METHOD
+    if source_computed:
+        errors.extend(_noaa_subordinate_errors(candidate, record, station, reference_station))
     if candidate.get("source_record_id") != record.get("source_record_id"):
         errors.append("retained datum source_record_id differs from its original tuple")
     chart = candidate.get("basis", {}).get("chart_datum")
     if chart is not None and (not isinstance(chart, str) or not _finite(candidate.get("values", {}).get(chart))):
         errors.append("retained datum chart_datum must name an existing finite value")
     sid = candidate.get("set_id")
-    if candidate.get("kind") == "computed" and not sid:
+    if candidate.get("kind") == "computed" and not sid and not source_computed:
         errors.append("computed retained datum requires its actual set_id")
     if sid is not None:
         cs = own_sets.get(sid)
@@ -37,7 +169,7 @@ def candidate_errors(candidate, record, own_sets):
                 source, record.get("source_version"), record.get("source_record_id")):
             errors.append("retained datum set_id must resolve to the same station and original source tuple")
     window = candidate.get("window")
-    if candidate.get("kind") in ("observed", "computed") and not isinstance(window, dict):
+    if candidate.get("kind") in ("observed", "computed") and not source_computed and not isinstance(window, dict):
         errors.append("observed/computed retained datum requires its actual calculation window")
     if isinstance(window, dict):
         try:
@@ -64,9 +196,9 @@ def _candidate_validator():
     return Draft202012Validator({"$ref": "#/$defs/retained_datum", "$defs": schema["$defs"]})
 
 
-def _append(record, candidate, own_sets):
+def _append(record, candidate, own_sets, *, station=None, reference_station=None):
     errors = [error.message for error in _candidate_validator().iter_errors(candidate)]
-    errors += candidate_errors(candidate, record, own_sets)
+    errors += candidate_errors(candidate, record, own_sets, station=station, reference_station=reference_station)
     # Nested binding/basis facts must also be representable, without NaN/Infinity.
     json.dumps(candidate, allow_nan=False)
     if errors:
@@ -196,16 +328,19 @@ def retain_candidates(release, rows):
         if station is None:
             raise ValueError("retained datum station_id does not resolve")
         own_sets = {cs["set_id"]: cs for cs in station.get("constant_sets", [])}
+        offsets = station.get("subordinate_offsets")
+        reference_station = stations.get(offsets.get("reference_station_id")) if isinstance(offsets, dict) else None
         candidates = row.get("retained_datums", row.get("retained_observed", []))
         for candidate in candidates:
             matching = [record for record in station.get("source_records", [])
                         if record["source_record_id"] == candidate["source_record_id"]
                         and (row.get("source") is None or record["source"] == row["source"])
                         and (row.get("source_version") is None or record["source_version"] == row["source_version"])
-                        and not candidate_errors(candidate, record, own_sets)]
+                        and not candidate_errors(candidate, record, own_sets, station=station,
+                                                 reference_station=reference_station)]
             if len(matching) != 1:
                 raise ValueError("retained datum requires one exact original source tuple")
-            count += _append(matching[0], candidate, own_sets)
+            count += _append(matching[0], candidate, own_sets, station=station, reference_station=reference_station)
     return {"added_candidates": count}
 
 
