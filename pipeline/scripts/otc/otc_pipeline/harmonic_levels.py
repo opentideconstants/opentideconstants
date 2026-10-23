@@ -36,7 +36,8 @@ def retained_levels(*, station: dict, set_id: str, prediction: dict,
                     window: dict, input_binding: dict, tidal_day_padding: dict | None = None,
                     hourly_heights: dict | None = None, spring_convention: bool = False,
                     lunitidal_convention: dict | None = None, nllw_convention: bool = False,
-                    llwlt_convention: bool = False, tlt_projection: dict | None = None) -> dict:
+                    llwlt_convention: bool = False, tlt_projection: dict | None = None,
+                    neap_proxy: bool = False) -> dict:
     """Build a source-bound candidate; leave all original source/set data intact."""
     station_id = station.get("id", station.get("station_id"))
     sets = [cs for cs in station["constant_sets"] if cs["set_id"] == set_id]
@@ -132,6 +133,10 @@ def retained_levels(*, station: dict, set_id: str, prediction: dict,
         if hourly_heights is None:
             raise ValueError("Spring convention requires the bound same-frame hourly mean")
         result["retained_datums"].append(_spring_levels(result["retained_datums"][-1], cs))
+    if neap_proxy:
+        if mean is None:
+            raise ValueError("Neap proxy requires the bound same-frame hourly mean")
+        result["retained_datums"].append(_neap_plane_proxy(mean, cs))
     if nllw_convention:
         if mean is None:
             raise ValueError("NLLW convention requires the bound same-frame hourly mean")
@@ -314,6 +319,32 @@ def _spring_levels(mean: dict, cs: dict) -> dict:
         "No station-local spring definition is evidenced; this is not an agency datum.",
         "No surveyed datum tie or numeric uncertainty is established.",
         "Original source quality and convention limitations remain applicable.",
+    ]
+    return candidate
+
+
+def _neap_plane_proxy(mean: dict, cs: dict) -> dict:
+    """Low-reliability two-constituent envelope planes, not mean neap tides."""
+    try:
+        candidate = _spring_levels(mean, cs)
+    except ValueError as error:
+        raise ValueError(f"Neap proxy: {error}") from error
+    amplitudes = candidate["basis"]["amplitudes_m"]
+    amplitude = abs(amplitudes["M2"] - amplitudes["S2"])
+    msl = candidate["basis"]["computed_msl_m"]
+    candidate["method"] = "harmonic_m2_s2_neap_plane_proxy_v1"
+    candidate["values"] = {"mhwn": msl + amplitude, "mlwn": msl - amplitude}
+    candidate["basis"].pop("spring_convention")
+    candidate["basis"].update({"neap_plane_proxy": "approximation: two-constituent neap-plane proxy",
+                               "analytic_basis": "hourly MSL +/- abs(H_M2 - H_S2)",
+                               "neap_envelope_amplitude_m": amplitude, "not_selected_for_prediction": True})
+    candidate["reliability"]["status"] = "low"
+    candidate["reliability"]["limitations"] = [
+        "LOW-reliability two-constituent neap-plane proxy using this model's actual hourly mean.",
+        "Not formal mean high/low water neaps: no neap-event averaging or surveyed datum is established.",
+        "Other constituents and time-varying nodal modulation are omitted from the plane amplitude.",
+        "No chart-datum tie is established; these alternatives are not selected for prediction.",
+        "Original source quality and convention limitations remain applicable; uncertainty is unknown.",
     ]
     return candidate
 

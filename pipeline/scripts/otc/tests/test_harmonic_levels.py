@@ -180,6 +180,52 @@ def test_opt_in_spring_convention_uses_bound_hourly_mean_and_own_amplitudes():
         retained_levels(**data, spring_convention=True)
 
 
+@pytest.mark.parametrize("m2,s2,expected", [(1.0, 0.25, {"mhwn": 1.25, "mlwn": -0.25}),
+                                            (0.25, 1.0, {"mhwn": 1.25, "mlwn": -0.25}),
+                                            (1.0, 1.0, {"mhwn": 0.5, "mlwn": 0.5})])
+def test_opt_in_neap_plane_proxy_is_low_and_uses_own_mean_and_unsigned_envelope(m2, s2, expected):
+    data = hourly_case()
+    cs = data["station"]["constant_sets"][0]
+    cs["constituents"][0]["amplitude_m"] = m2
+    cs["constituents"].append({"name": "S2", "amplitude_m": s2})
+    before = copy.deepcopy(data)
+    original = retained_levels(**data, spring_convention=True)
+    result = retained_levels(**data, spring_convention=True, neap_proxy=True)
+    assert result["retained_datums"][:-1] == original["retained_datums"]
+    proxy = result["retained_datums"][-1]
+    assert proxy["values"] == expected
+    assert proxy["basis"]["amplitudes_m"] == {"M2": m2, "S2": s2}
+    assert proxy["basis"]["computed_msl_m"] == 0.5
+    assert proxy["basis"]["not_selected_for_prediction"] is True
+    assert proxy["basis"]["neap_plane_proxy"] == "approximation: two-constituent neap-plane proxy"
+    assert "spring_convention" not in proxy["basis"]
+    assert proxy["basis"]["qc_flags"] == cs["qc_flags"]
+    assert proxy["frame"] == {"kind": "harmonic_mean", "name": None, "tie_status": "unknown"}
+    assert proxy["uncertainty_m"] is None
+    assert proxy["reliability"]["status"] == "low"
+    assert "Not formal mean high/low water neaps: no neap-event averaging or surveyed datum is established." in proxy["reliability"]["limitations"]
+    assert proxy["window"] == data["window"]
+    assert proxy["input_binding"]["hourly_heights"]["input_binding"] == data["hourly_heights"]["input_binding"]
+    assert data == before
+
+
+@pytest.mark.parametrize("change", ["hourly", "missing", "duplicate", "negative", "nonfinite", "boolean"])
+def test_neap_plane_proxy_rejects_missing_bound_mean_or_invalid_own_amplitudes(change):
+    data = hourly_case()
+    rows = data["station"]["constant_sets"][0]["constituents"]
+    rows.append({"name": "S2", "amplitude_m": 0.25})
+    if change == "hourly":
+        del data["hourly_heights"]
+    elif change == "missing":
+        rows.pop()
+    elif change == "duplicate":
+        rows.append(copy.deepcopy(rows[-1]))
+    else:
+        rows[-1]["amplitude_m"] = {"negative": -0.1, "nonfinite": float("nan"), "boolean": True}[change]
+    with pytest.raises(ValueError, match="Neap"):
+        retained_levels(**data, neap_proxy=True)
+
+
 def nllw_case():
     data = hourly_case()
     data["station"]["constant_sets"][0]["constituents"].extend([
