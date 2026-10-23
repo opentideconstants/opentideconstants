@@ -616,3 +616,318 @@ def test_actual_all_subordinate_reference_bindings():
             count += 1
     print(f"ACTUAL FULL SOURCE AUDIT: candidates={count} rejected={len(failures)}")
     assert failures == []
+
+
+@pytest.fixture
+def noaa_time_proxy_case(subordinate_reference_case, request):
+    actual = os.environ.get("OTC_NOAA_TIME_PROXY_PROOF")
+    if actual:
+        root = Path(actual)
+        native = root / "pilots-native.jsonl"
+        packets = root / "pilots-candidates.jsonl"
+        for path, expected in (
+                (native, "14a214b64e9fe339f766621ec59e0d1f9cc225fd5c999598d866aac0f1fe6a4b"),
+                (packets, "43aa2f94b0de096f57fd79f1d2473e4c357c6afc1d281657c65bc4052c0d938a")):
+            with path.open("rb") as source:
+                assert hashlib.file_digest(source, "sha256").hexdigest() == expected
+        release = json.loads(native.with_suffix(".meta.json").read_text())
+        with native.open() as source:
+            release["stations"] = list(map(json.loads, source))
+        index = {"ratio": 0, "feet": 1, "uniform_msl": 2, "extrema": 2}[
+            request.node.callspec.params["subordinate_reference_case"]]
+        with packets.open() as source:
+            return release, list(map(json.loads, source))[index]
+    release, row = subordinate_reference_case
+    station, old, record, reference = _subordinate_context(release, row)
+    own, ref = old["input_binding"]["published_offsets"], old["input_binding"]["published_reference"]
+    offsets = json.loads(own["response_json"])
+    offsets["timeOffsetLowTide"] = offsets["timeOffsetHighTide"] + 2
+    own["response_json"] = json.dumps(offsets)
+    own["sha256"] = hashlib.sha256(own["response_json"].encode()).hexdigest()
+    station["subordinate_offsets"]["time_offset_low_min"] = offsets["timeOffsetLowTide"]
+    old["basis"]["native_offsets"]["time_offset_low_min"] = offsets["timeOffsetLowTide"]
+    body = json.loads(ref["response_json"])
+    body["datums"].extend([
+        {"name": "HWI", "value": 2.25, "description": "Greenwich High Water Interval (in hours)"},
+        {"name": "LWI", "value": 8.5, "description": "Greenwich Low Water Interval (in hours)"}])
+    ref["response_json"] = json.dumps(body)
+    ref["sha256"] = hashlib.sha256(ref["response_json"].encode()).hexdigest()
+    original = next(r for r in reference["source_records"] if r["source_record_id"] == ref["source_record_id"])
+    original["retained_datums"] = noaa_candidates(original, body, ref)
+    base = {key: copy.deepcopy(old[key]) for key in ("kind", "source_record_id", "input_binding", "uncertainty_m")}
+    time = {**copy.deepcopy(base), "method": "noaa_subordinate_reference_time_offsets_v1", "units": "h",
+            "values": {"hwi": 2.25 + offsets["timeOffsetHighTide"] / 60,
+                       "lwi": 8.5 + offsets["timeOffsetLowTide"] / 60},
+            "frame": {"kind": "elapsed_time", "name": "Greenwich lunar transit", "tie_status": "not_applicable"},
+            "basis": {key: copy.deepcopy(old["basis"][key]) for key in
+                      ("native_offsets", "reference_epoch", "operation", "offset_height_units")},
+            "reliability": {"status": "unverified", "limitations": [
+                "derived NOAA subordinate time offsets from REF",
+                "carried published Greenwich reference; not a newly evaluated own local lunar-transit/event average",
+                "source reference hours and published minute-offset precision preserved",
+                "not_selected_for_prediction", "accuracy_unverified"]}}
+    time["basis"].update({"derivation_operation": "published_interval_plus_time_offset",
+                          "reference_interval_basis": "published_greenwich", "reference_interval_units": "h",
+                          "published_time_offset_units": "min", "output_interval_units": "h",
+                          "time_offset_precision": "Sourcepublishedminutevalues; nofalsegreaterclockaccuracy",
+                          "reference_meridian_policy": "CarryactualpublishedGreenwichreference; noextraownlongitude/localtransitcorrection",
+                          "cycle_policy": "Noadditionalmoduloorcyclecorrectionintroducedbeyondownerapprovedstraightaddition"})
+    label = "approximation: MTL used as MSL proxy, subordinate-derived"
+    values = {r["name"]: r["value"] for r in body["datums"]}
+    high = values["MHW"] - values["MLLW"]
+    low = values["MLW"] - values["MLLW"]
+    if offsets["heightAdjustedType"] == "R":
+        high *= offsets["heightOffsetHighTide"]
+        low *= offsets["heightOffsetLowTide"]
+    else:
+        high += offsets["heightOffsetHighTide"] * 0.3048
+        low += offsets["heightOffsetLowTide"] * 0.3048
+    proxy = {**copy.deepcopy(base), "method": "noaa_subordinate_mtl_msl_proxy_v1", "units": "m",
+             "values": {"msl": (high + low) / 2},
+             "frame": {"kind": "unknown", "name": "NOAA subordinate MLLW", "tie_status": "unknown"},
+             "basis": {key: copy.deepcopy(old["basis"][key]) for key in (
+                 "native_offsets", "reference_epoch", "operation", "offset_height_units", "reference_zero", "output_height_units")},
+             "reliability": {"status": "low", "limitations": [label, "not_selected_for_prediction",
+                 "accuracy_unverified", "not_locally_observed_or_surveyed"]}}
+    proxy["basis"].update({"derivation_operation": "derived_mtl_as_msl_proxy", "approximation": label,
+                           "proxy_of": "derived_mtl", "reference_statistic_origin": "published", "never_default": True})
+    row["retained_datums"] = [time, proxy]
+    return release, row
+
+
+def test_noaa_time_proxy_native_writer(noaa_time_proxy_case, tmp_path):
+    release, row = noaa_time_proxy_case
+    station, candidate, record, reference = _subordinate_context(release, row)
+    assert (row["source"], row["source_version"]) == (record["source"], record["source_version"])
+    all_errors = []
+    for candidate in row["retained_datums"]:
+        assert "set_id" not in candidate and "window" not in candidate
+        errors = candidate_errors(candidate, record, {}, station=station, reference_station=reference)
+        print(f"EXACT NEW SOURCE {record['source_record_id']} {candidate['method']}: {errors}")
+        all_errors.extend(errors)
+    assert all_errors == []
+    before = copy.deepcopy(release)
+    assert retain_candidates(release, [row])["added_candidates"] == 2
+    assert validate_release(release) == []
+    write_release(release, tmp_path, datestamp=release["release"]["datestamp"], app_export=None, congen_run=None)
+    published = copy.deepcopy(release)
+    assert retain_candidates(release, [row])["added_candidates"] == 0 and release == published
+    for prior, current in zip(before["stations"], release["stations"], strict=True):
+        restored = copy.deepcopy(current)
+        if current["station_id"] == row["station_id"]:
+            for old_record, new_record in zip(prior["source_records"], restored["source_records"], strict=True):
+                if "retained_datums" in old_record:
+                    new_record["retained_datums"] = old_record["retained_datums"]
+                else:
+                    new_record.pop("retained_datums", None)
+        assert restored == prior
+
+
+@pytest.mark.parametrize("defect", ["hash", "own_version", "reference_url", "native_offset", "epoch", "unknown_method"])
+def test_noaa_time_proxy_require_exact_source_proof(noaa_time_proxy_case, defect):
+    release, row = noaa_time_proxy_case
+    station, first, record, reference = _subordinate_context(release, row)
+    for candidate in row["retained_datums"]:
+        if defect == "hash":
+            candidate["input_binding"]["published_reference"]["sha256"] = "0" * 64
+        elif defect == "own_version":
+            candidate["input_binding"]["published_offsets"]["source_version"] = "foreign"
+        elif defect == "reference_url":
+            candidate["input_binding"]["published_reference"]["source_url"] = "https://example.invalid/"
+        elif defect == "native_offset":
+            candidate["basis"]["native_offsets"]["time_offset_low_min"] += 1
+        elif defect == "epoch":
+            candidate["basis"]["reference_epoch"] = "invented"
+        else:
+            candidate["method"] += "_unapproved"
+        assert candidate_errors(candidate, record, {}, station=station, reference_station=reference)
+    before = copy.deepcopy(release)
+    with pytest.raises(ValueError):
+        retain_candidates(release, [row])
+    assert release == before
+
+
+@pytest.mark.parametrize("defect", ["value", "units", "frame", "key", "meridian", "source_hours", "native_hours", "precision"])
+def test_noaa_time_intervals_require_greenwich_hours_and_minute_conversion(noaa_time_proxy_case, defect):
+    release, row = noaa_time_proxy_case
+    station, candidate, record, reference = _subordinate_context(release, row)
+    if defect == "value":
+        candidate["values"]["hwi"] += 1
+    elif defect == "units":
+        candidate["units"] = "m"
+    elif defect == "frame":
+        candidate["frame"]["name"] = "local lunar transit"
+    elif defect == "key":
+        candidate["values"]["msl"] = 0.0
+    elif defect == "precision":
+        candidate["basis"].pop("time_offset_precision")
+    elif defect == "native_hours":
+        binding = candidate["input_binding"]["published_reference"]
+        original = next(r for r in reference["source_records"] if r["source_record_id"] == binding["source_record_id"])
+        published = next(c for c in original["retained_datums"] if c["units"] == "h")
+        published["values"]["HWI"] += 1
+    else:
+        binding = candidate["input_binding"]["published_reference"]
+        body = json.loads(binding["response_json"])
+        for item in body["datums"]:
+            if item["name"] == "HWI":
+                item["description"] = "Local High Water Interval (in hours)" if defect == "meridian" else "Greenwich High Water Interval (in minutes)"
+        binding["response_json"] = json.dumps(body)
+        binding["sha256"] = hashlib.sha256(binding["response_json"].encode()).hexdigest()
+        original = next(r for r in reference["source_records"] if r["source_record_id"] == binding["source_record_id"])
+        original["retained_datums"] = noaa_candidates(original, body, binding)
+    assert candidate_errors(candidate, record, {}, station=station, reference_station=reference)
+
+
+@pytest.mark.parametrize("defect", ["value", "status", "label", "limitation", "default", "key", "origin", "uniform"])
+def test_noaa_msl_proxy_requires_low_label_and_mapped_levels(noaa_time_proxy_case, defect):
+    release, row = noaa_time_proxy_case
+    station, first, record, reference = _subordinate_context(release, row)
+    candidate = row["retained_datums"][1]
+    if defect == "value":
+        candidate["values"]["msl"] += 1
+    elif defect == "status":
+        candidate["reliability"]["status"] = "unverified"
+    elif defect == "label":
+        candidate["basis"]["approximation"] = "official MSL"
+    elif defect == "limitation":
+        candidate["reliability"]["limitations"] = ["accuracy_unverified"]
+    elif defect == "default":
+        candidate["basis"]["never_default"] = False
+    elif defect == "key":
+        candidate["values"]["mtl"] = candidate["values"]["msl"]
+    elif defect == "origin":
+        candidate["basis"]["reference_statistic_origin"] = "computed_harmonic_reference"
+    else:
+        own = candidate["input_binding"]["published_offsets"]
+        body = json.loads(own["response_json"])
+        body["heightOffsetLowTide"] = body["heightOffsetHighTide"]
+        body["timeOffsetLowTide"] = body["timeOffsetHighTide"]
+        own["response_json"] = json.dumps(body)
+        own["sha256"] = hashlib.sha256(own["response_json"].encode()).hexdigest()
+        for offsets in (station["subordinate_offsets"], candidate["basis"]["native_offsets"]):
+            offsets["height_offset_low"] = offsets["height_offset_high"]
+            offsets["time_offset_low_min"] = offsets["time_offset_high_min"]
+    assert candidate_errors(candidate, record, {}, station=station, reference_station=reference)
+
+
+def test_noaa_time_values_do_not_use_height_adjustments(noaa_time_proxy_case):
+    release, row = noaa_time_proxy_case
+    station, candidate, record, reference = _subordinate_context(release, row)
+    own = candidate["input_binding"]["published_offsets"]
+    body = json.loads(own["response_json"])
+    body["heightOffsetHighTide"] += 1
+    own["response_json"] = json.dumps(body)
+    own["sha256"] = hashlib.sha256(own["response_json"].encode()).hexdigest()
+    normalized = body["heightOffsetHighTide"] * (0.3048 if body["heightAdjustedType"] == "F" else 1)
+    station["subordinate_offsets"]["height_offset_high"] = normalized
+    candidate["basis"]["native_offsets"]["height_offset_high"] = normalized
+    assert candidate_errors(candidate, record, {}, station=station, reference_station=reference) == []
+
+
+@pytest.fixture
+def noaa_computed_proxy_case(noaa_time_proxy_case):
+    release, row = noaa_time_proxy_case
+    station, first, record, reference = _subordinate_context(release, row)
+    candidate = copy.deepcopy(row["retained_datums"][1])
+    binding = candidate["input_binding"]["published_reference"]
+    body = json.loads(binding["response_json"])
+    body["datums"] = [value for value in body["datums"] if value["name"] not in ("MHW", "MLW")]
+    binding["response_json"] = json.dumps(body)
+    binding["sha256"] = hashlib.sha256(binding["response_json"].encode()).hexdigest()
+    original = next(r for r in reference["source_records"] if r["source_record_id"] == binding["source_record_id"])
+    original["retained_datums"] = noaa_candidates(original, body, binding)
+    model = reference["constant_sets"][0]
+    model["source_record_id"] = original["source_record_id"]
+    model["source_version"] = original["source_version"]
+    model_json = json.dumps(model, sort_keys=True, separators=(",", ":"))
+    model_sha = hashlib.sha256(model_json.encode()).hexdigest()
+    window = {"start": "2020-01-01", "end": "2038-12-31"}
+    common = {"kind": "computed", "units": "m", "source_record_id": original["source_record_id"],
+              "set_id": model["set_id"], "window": window, "uncertainty_m": None,
+              "frame": {"kind": "harmonic_mean", "name": None, "tie_status": "unknown"},
+              "input_binding": {"constant_set_sha256": model_sha, "set_id": model["set_id"],
+                  "convention_id": model["convention_id"], "source_provenance": copy.deepcopy(model["provenance"]),
+                  "request_sha256": "c" * 64, "results_sha256": "d" * 64},
+              "reliability": {"status": "unverified", "limitations": ["accuracy_unverified"]}}
+    events = {**copy.deepcopy(common), "method": "sdk_harmonic_extremes_event_means_v1", "values": {"mhw": 1.8, "mlw": -0.3}}
+    hourly = {**copy.deepcopy(common), "method": "sdk_harmonic_hourly_mean_v1", "values": {"msl": 0.7}}
+    hourly["input_binding"]["hourly_heights"] = {"window": copy.deepcopy(window),
+        "input_binding": {"request_sha256": "b" * 64, "results_sha256": "e" * 64}}
+    original["retained_datums"].extend([events, hourly])
+    transport = {"station_id": reference["station_id"], "source": original["source"],
+                 "source_version": original["source_version"], "source_record_id": original["source_record_id"],
+                 "retained_datums": [events, hourly]}
+    transport_json = json.dumps(transport)
+    candidate["input_binding"]["computed_reference"] = {"source_candidate_json": transport_json,
+        "sha256": hashlib.sha256(transport_json.encode()).hexdigest(), "reference_model_json": model_json,
+        "reference_model_sha256": model_sha, "events_response_sha256": "d" * 64, "hourly_response_sha256": "e" * 64}
+    candidate["basis"]["reference_statistic_origin"] = "computed_harmonic_reference"
+    values = {item["name"]: item["value"] for item in body["datums"]}
+    shift = values["MSL"] - values["MLLW"]
+    high, low = 1.8 - 0.7 + shift, -0.3 - 0.7 + shift
+    own = json.loads(candidate["input_binding"]["published_offsets"]["response_json"])
+    if own["heightAdjustedType"] == "R":
+        high *= own["heightOffsetHighTide"]
+        low *= own["heightOffsetLowTide"]
+    else:
+        high += own["heightOffsetHighTide"] * 0.3048
+        low += own["heightOffsetLowTide"] * 0.3048
+    candidate["values"] = {"msl": (high + low) / 2}
+    row["retained_datums"] = [candidate]
+    return release, row
+
+
+def test_noaa_computed_reference_proxy_uses_actual_hourly_mean(noaa_computed_proxy_case, tmp_path):
+    release, row = noaa_computed_proxy_case
+    station, candidate, record, reference = _subordinate_context(release, row)
+    assert candidate_errors(candidate, record, {}, station=station, reference_station=reference) == []
+    assert retain_candidates(release, [row])["added_candidates"] == 1
+    assert validate_release(release) == []
+    write_release(release, tmp_path, datestamp=release["release"]["datestamp"], app_export=None, congen_run=None)
+    assert candidate["reliability"]["status"] == "low" and candidate["basis"]["never_default"] is True
+    assert "set_id" not in candidate and "window" not in candidate
+
+
+@pytest.mark.parametrize("defect", ["candidate_hash", "model_hash", "missing_member", "coefficients",
+                                    "window", "event_response", "hourly_response", "hourly_request",
+                                    "omit_mean", "published_origin"])
+def test_noaa_computed_reference_proxy_requires_native_model_and_archive_bindings(noaa_computed_proxy_case, defect):
+    release, row = noaa_computed_proxy_case
+    station, candidate, record, reference = _subordinate_context(release, row)
+    proof = candidate["input_binding"]["computed_reference"]
+    original = next(r for r in reference["source_records"] if r["source_record_id"] ==
+                    candidate["input_binding"]["published_reference"]["source_record_id"])
+    if defect == "candidate_hash":
+        proof["sha256"] = "0" * 64
+    elif defect == "model_hash":
+        proof["reference_model_sha256"] = "0" * 64
+    elif defect == "missing_member":
+        original["retained_datums"] = [c for c in original["retained_datums"] if c.get("kind") != "computed"]
+    elif defect == "coefficients":
+        reference["constant_sets"][0]["constituents"][0]["amplitude_m"] += 0.1
+    elif defect in ("window", "hourly_request"):
+        transport = json.loads(proof["source_candidate_json"])
+        hourly = transport["retained_datums"][1]
+        native_hourly = next(c for c in original["retained_datums"] if c.get("method") == "sdk_harmonic_hourly_mean_v1")
+        for source in (hourly, native_hourly):
+            if defect == "window":
+                source["window"]["end"] = "2037-12-31"
+                source["input_binding"]["hourly_heights"]["window"]["end"] = "2037-12-31"
+            else:
+                source["input_binding"]["hourly_heights"]["input_binding"]["request_sha256"] = "unbound"
+        proof["source_candidate_json"] = json.dumps(transport)
+        proof["sha256"] = hashlib.sha256(proof["source_candidate_json"].encode()).hexdigest()
+    elif defect == "event_response":
+        proof["events_response_sha256"] = "0" * 64
+    elif defect == "hourly_response":
+        proof["hourly_response_sha256"] = "0" * 64
+    elif defect == "omit_mean":
+        candidate["values"]["msl"] += 0.7
+    else:
+        candidate["basis"]["reference_statistic_origin"] = "published"
+    assert candidate_errors(candidate, record, {}, station=station, reference_station=reference)
+    before = copy.deepcopy(release)
+    with pytest.raises(ValueError):
+        retain_candidates(release, [row])
+    assert release == before

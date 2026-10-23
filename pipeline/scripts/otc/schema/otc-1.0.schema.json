@@ -184,7 +184,7 @@
                 "const": "computed"
               },
               "method": {
-                "not": {"const": "noaa_subordinate_reference_datums_v1"}
+                "not": {"enum": ["noaa_subordinate_reference_datums_v1","noaa_subordinate_reference_time_offsets_v1","noaa_subordinate_mtl_msl_proxy_v1"]}
               }
             }
           },
@@ -198,6 +198,14 @@
         {
           "if": {"properties": {"method": {"const": "noaa_subordinate_reference_datums_v1"}}},
           "then": {"$ref": "#/$defs/noaa_subordinate_reference_datum"}
+        },
+        {
+          "if": {"properties": {"method": {"const": "noaa_subordinate_reference_time_offsets_v1"}}},
+          "then": {"$ref": "#/$defs/noaa_subordinate_time_offsets_datum"}
+        },
+        {
+          "if": {"properties": {"method": {"const": "noaa_subordinate_mtl_msl_proxy_v1"}}},
+          "then": {"$ref": "#/$defs/noaa_subordinate_msl_proxy_datum"}
         },
         {
           "if": {
@@ -311,6 +319,385 @@
     "noaa_published_extrema_date": {
       "type": "object", "additionalProperties": false, "required": ["date"],
       "properties": {"date": {"type": ["string", "null"]}}
+    },
+    "noaa_subordinate_time_offsets_datum": {
+      "required": [
+        "basis"
+      ],
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "set_id"
+            ]
+          },
+          {
+            "required": [
+              "window"
+            ]
+          }
+        ]
+      },
+      "properties": {
+        "kind": {
+          "const": "computed"
+        },
+        "units": {
+          "const": "h"
+        },
+        "uncertainty_m": {
+          "const": null
+        },
+        "source_record_id": {
+          "$ref": "#/$defs/noaa_subordinate_reference_datum/properties/source_record_id"
+        },
+        "input_binding": {
+          "$ref": "#/$defs/noaa_subordinate_reference_datum/properties/input_binding"
+        },
+        "values": {
+          "propertyNames": {
+            "enum": [
+              "hwi",
+              "lwi"
+            ]
+          }
+        },
+        "frame": {
+          "const": {
+            "kind": "elapsed_time",
+            "name": "Greenwich lunar transit",
+            "tie_status": "not_applicable"
+          }
+        },
+        "reliability": {
+          "properties": {
+            "status": {
+              "const": "unverified"
+            },
+            "limitations": {
+              "allOf": [
+                {
+                  "contains": {
+                    "const": "derived NOAA subordinate time offsets from REF"
+                  }
+                },
+                {
+                  "contains": {
+                    "const": "carried published Greenwich reference; not a newly evaluated own local lunar-transit/event average"
+                  }
+                },
+                {
+                  "contains": {
+                    "const": "source reference hours and published minute-offset precision preserved"
+                  }
+                },
+                {
+                  "contains": {
+                    "const": "not_selected_for_prediction"
+                  }
+                },
+                {
+                  "contains": {
+                    "const": "accuracy_unverified"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "basis": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "native_offsets",
+            "reference_epoch",
+            "operation",
+            "offset_height_units",
+            "derivation_operation",
+            "reference_interval_basis",
+            "reference_interval_units",
+            "published_time_offset_units",
+            "output_interval_units",
+            "time_offset_precision",
+            "reference_meridian_policy",
+            "cycle_policy"
+          ],
+          "properties": {
+            "native_offsets": {
+              "$ref": "#/$defs/noaa_subordinate_reference_datum/properties/basis/properties/native_offsets"
+            },
+            "reference_epoch": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "operation": {
+              "enum": [
+                "R",
+                "F"
+              ]
+            },
+            "offset_height_units": {
+              "enum": [
+                "ratio",
+                "feet"
+              ]
+            },
+            "derivation_operation": {
+              "const": "published_interval_plus_time_offset"
+            },
+            "reference_interval_basis": {
+              "const": "published_greenwich"
+            },
+            "reference_interval_units": {
+              "const": "h"
+            },
+            "published_time_offset_units": {
+              "const": "min"
+            },
+            "output_interval_units": {
+              "const": "h"
+            },
+            "time_offset_precision": {
+              "const": "Sourcepublishedminutevalues; nofalsegreaterclockaccuracy"
+            },
+            "reference_meridian_policy": {
+              "const": "CarryactualpublishedGreenwichreference; noextraownlongitude/localtransitcorrection"
+            },
+            "cycle_policy": {
+              "const": "Noadditionalmoduloorcyclecorrectionintroducedbeyondownerapprovedstraightaddition"
+            }
+          }
+        }
+      }
+    },
+    "noaa_subordinate_msl_proxy_datum": {
+      "required": [
+        "basis"
+      ],
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "set_id"
+            ]
+          },
+          {
+            "required": [
+              "window"
+            ]
+          }
+        ]
+      },
+      "properties": {
+        "kind": {
+          "const": "computed"
+        },
+        "units": {
+          "const": "m"
+        },
+        "uncertainty_m": {
+          "const": null
+        },
+        "source_record_id": {
+          "$ref": "#/$defs/noaa_subordinate_reference_datum/properties/source_record_id"
+        },
+        "input_binding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "published_offsets",
+            "published_reference"
+          ],
+          "properties": {
+            "published_offsets": {
+              "$ref": "#/$defs/noaa_subordinate_reference_datum/properties/input_binding/properties/published_offsets"
+            },
+            "published_reference": {
+              "$ref": "#/$defs/noaa_subordinate_reference_datum/properties/input_binding/properties/published_reference"
+            },
+            "computed_reference": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "source_candidate_json",
+                "sha256",
+                "reference_model_json",
+                "reference_model_sha256",
+                "events_response_sha256",
+                "hourly_response_sha256"
+              ],
+              "properties": {
+                "source_candidate_json": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "sha256": {
+                  "$ref": "#/$defs/sha256"
+                },
+                "reference_model_json": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "reference_model_sha256": {
+                  "$ref": "#/$defs/sha256"
+                },
+                "events_response_sha256": {
+                  "$ref": "#/$defs/sha256"
+                },
+                "hourly_response_sha256": {
+                  "$ref": "#/$defs/sha256"
+                }
+              }
+            }
+          }
+        },
+        "values": {
+          "propertyNames": {
+            "enum": [
+              "msl"
+            ]
+          }
+        },
+        "frame": {
+          "const": {
+            "kind": "unknown",
+            "name": "NOAA subordinate MLLW",
+            "tie_status": "unknown"
+          }
+        },
+        "reliability": {
+          "properties": {
+            "status": {
+              "const": "low"
+            },
+            "limitations": {
+              "allOf": [
+                {
+                  "contains": {
+                    "const": "approximation: MTL used as MSL proxy, subordinate-derived"
+                  }
+                },
+                {
+                  "contains": {
+                    "const": "not_selected_for_prediction"
+                  }
+                },
+                {
+                  "contains": {
+                    "const": "accuracy_unverified"
+                  }
+                },
+                {
+                  "contains": {
+                    "const": "not_locally_observed_or_surveyed"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "basis": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "native_offsets",
+            "reference_epoch",
+            "operation",
+            "offset_height_units",
+            "derivation_operation",
+            "approximation",
+            "proxy_of",
+            "reference_statistic_origin",
+            "never_default",
+            "reference_zero",
+            "output_height_units"
+          ],
+          "properties": {
+            "native_offsets": {
+              "$ref": "#/$defs/noaa_subordinate_reference_datum/properties/basis/properties/native_offsets"
+            },
+            "reference_epoch": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "operation": {
+              "enum": [
+                "R",
+                "F"
+              ]
+            },
+            "offset_height_units": {
+              "enum": [
+                "ratio",
+                "feet"
+              ]
+            },
+            "derivation_operation": {
+              "const": "derived_mtl_as_msl_proxy"
+            },
+            "approximation": {
+              "const": "approximation: MTL used as MSL proxy, subordinate-derived"
+            },
+            "proxy_of": {
+              "const": "derived_mtl"
+            },
+            "reference_statistic_origin": {
+              "enum": [
+                "published",
+                "computed_harmonic_reference"
+              ]
+            },
+            "never_default": {
+              "const": true
+            },
+            "reference_zero": {
+              "const": "MLLW"
+            },
+            "output_height_units": {
+              "const": "m"
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "basis": {
+                "properties": {
+                  "reference_statistic_origin": {
+                    "const": "computed_harmonic_reference"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "input_binding": {
+                "required": [
+                  "computed_reference"
+                ]
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "input_binding": {
+                "not": {
+                  "required": [
+                    "computed_reference"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]
     },
     "meta": {
       "description": "OTC_{YYYYMMDD}.meta.json: the release document without stations.",

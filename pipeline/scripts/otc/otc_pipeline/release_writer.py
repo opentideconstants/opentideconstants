@@ -168,7 +168,7 @@ FORMAT_VERSION = "1.0"
 SCHEMA_NAME = f"otc-{FORMAT_VERSION}.schema.json"
 # SHA-256 of the schema source and its identical runtime copy. The writer checks
 # these exact bytes before validating a native release.
-SCHEMA_SHA256 = "20e130d4e803c2b009ac2ab175a3aa8cb3b58cb277645277f279c9dacd751187"
+SCHEMA_SHA256 = "4cab340b86e58371e53513502be48ca287718cc03650cb8fc2a132549d74ea5a"
 _MISSING = object()  # "key not present"; never equal to a value read from JSON
 _UNSUPPORTED_TICON_NAMES = {"3L2", "3N2", "MSQM", "MTM", "R3", "T3"}
 

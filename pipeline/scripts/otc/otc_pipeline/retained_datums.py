@@ -20,6 +20,8 @@ def _finite(value):
 
 
 _NOAA_SUBORDINATE_METHOD = "noaa_subordinate_reference_datums_v1"
+_NOAA_TIME_METHOD = "noaa_subordinate_reference_time_offsets_v1"
+_NOAA_MSL_PROXY_METHOD = "noaa_subordinate_mtl_msl_proxy_v1"
 _OFFSET_FIELDS = ("reference_station_id", "height_adjusted_type", "height_offset_high", "height_offset_low",
                   "time_offset_high_min", "time_offset_low_min")
 
@@ -148,12 +150,202 @@ def _noaa_subordinate_errors(candidate, record, station, reference_station):
     return []
 
 
+def _noaa_increment_source(candidate, record, station, reference_station):
+    """Authenticate original source material for time intervals and labelled proxies."""
+    if not isinstance(station, dict) or not isinstance(reference_station, dict):
+        raise ValueError("actual own and reference stations are required")
+    binding, basis = candidate["input_binding"], candidate["basis"]
+    own, ref = binding["published_offsets"], binding["published_reference"]
+    if (record.get("source") != "noaa" or record not in station.get("source_records", [])
+            or (own["source_record_id"], own["source_version"]) != (record["source_record_id"], record["source_version"])):
+        raise ValueError("published offsets differ from the actual own NOAA source tuple")
+    offsets = station.get("subordinate_offsets")
+    if (not isinstance(offsets, dict) or basis["native_offsets"] != {key: offsets.get(key) for key in _OFFSET_FIELDS}
+            or offsets.get("reference_station_id") != reference_station.get("station_id")
+            or ref["native_station_id"] != reference_station.get("station_id")):
+        raise ValueError("published proof differs from actual native offsets or reference station")
+    metadata = record.get("original_metadata")
+    if not isinstance(metadata, dict):
+        raise ValueError("original own source metadata is required")
+    rows = json.loads(metadata.get("raw_metadata_rows_json", "[]"))
+    ref_id = ref["source_record_id"]
+    if not isinstance(rows, list) or not any(isinstance(row, dict) and row.get("id") == record["source_record_id"]
+                                           and row.get("reference_id") == ref_id for row in rows):
+        raise ValueError("reference differs from original own source metadata")
+    endpoint = "https://api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations/"
+    ref_endpoint = endpoint + ref_id + "/datums.json"
+    if (own["source_url"] != endpoint + record["source_record_id"] + "/tidepredoffsets.json"
+            or ref["source_url"] != ref_endpoint + "?units=metric"):
+        raise ValueError("publisher URLs must identify the exact own offsets and metric reference")
+    published, reference = _published_body(own), _published_body(ref)
+    if (published.get("refStationId") != ref_id or own["reference_source_record_id"] != ref_id
+            or reference.get("self") != ref_endpoint or reference.get("units") != "meters"
+            or basis["reference_epoch"] != reference.get("epoch")):
+        raise ValueError("published reference identity, units or epoch differ")
+    operation = published.get("heightAdjustedType")
+    if (operation not in ("R", "F") or basis["operation"] != operation
+            or basis["offset_height_units"] != ("ratio" if operation == "R" else "feet")
+            or offsets.get("height_adjusted_type") != ("R" if operation == "R" else "A")):
+        raise ValueError("published height operation or normalized units differ")
+    high, low = published["heightOffsetHighTide"], published["heightOffsetLowTide"]
+    if not all(_finite(value) for value in (high, low)) or (operation == "R" and min(high, low) <= 0):
+        raise ValueError("height context requires finite differences or positive ratios")
+    for field, value in (("height_offset_high", high * (0.3048 if operation == "F" else 1)),
+                         ("height_offset_low", low * (0.3048 if operation == "F" else 1)),
+                         ("time_offset_high_min", published.get("timeOffsetHighTide")),
+                         ("time_offset_low_min", published.get("timeOffsetLowTide"))):
+        if not isinstance(value, (int, float)) or not _finite(value) or not _finite(offsets.get(field)) or not math.isclose(
+                value, offsets[field], rel_tol=0, abs_tol=1e-12):
+            raise ValueError("published adjustments differ from actual native offsets")
+    references = [r for r in reference_station.get("source_records", [])
+                  if isinstance(r, dict) and (r.get("source"), r.get("source_record_id")) == ("noaa", ref_id)]
+    if len(references) != 1:
+        raise ValueError("one actual native reference NOAA source record is required")
+    return published, reference, references[0]
+
+
+def _has_published_reference(record, binding, values, units, frame):
+    return any(isinstance(candidate, dict) and candidate.get("kind") == "published"
+               and candidate.get("method") == "source" and candidate.get("units") == units
+               and candidate.get("source_record_id") == record.get("source_record_id")
+               and candidate.get("frame") == frame and isinstance(candidate.get("input_binding"), dict)
+               and isinstance(candidate.get("values"), dict)
+               and candidate["input_binding"].get("sha256") == binding["sha256"]
+               and candidate["input_binding"].get("source_url") == binding["source_url"]
+               and all(candidate["values"].get(key) == value for key, value in values.items())
+               for candidate in record.get("retained_datums", []))
+
+
+def _computed_reference_levels(candidate, record, station):
+    """Resolve the retained own-model event means and their actual hourly mean."""
+    proof = candidate["input_binding"]["computed_reference"]
+    transport = _published_body({"response_json": proof["source_candidate_json"], "sha256": proof["sha256"]})
+    model = _published_body({"response_json": proof["reference_model_json"], "sha256": proof["reference_model_sha256"]})
+    identity = record["source"], record["source_version"], record["source_record_id"]
+    if (transport["station_id"] != station["station_id"]
+            or (transport["source"], transport["source_version"], transport["source_record_id"]) != identity
+            or (model["source"], model["source_version"], model["source_record_id"]) != identity
+            or model.get("quantity") != "water_level"):
+        raise ValueError("computed reference requires the actual own NOAA source and water-level model")
+    own_sets = {cs["set_id"]: cs for cs in station.get("constant_sets", [])}
+    actual_model = own_sets.get(model["set_id"])
+    if actual_model is None or ({key: value for key, value in model.items() if key != "datum"}
+                                != {key: value for key, value in actual_model.items() if key != "datum"}):
+        raise ValueError("computed reference model differs from actual native coefficients or scientific bindings")
+    prepared = {}
+    for method in ("sdk_harmonic_extremes_event_means_v1", "sdk_harmonic_hourly_mean_v1"):
+        matching = [c for c in transport["retained_datums"] if isinstance(c, dict) and c.get("method") == method]
+        if len(matching) != 1:
+            raise ValueError("computed reference requires one event-mean and one hourly-mean candidate")
+        source = matching[0]
+        if (source not in record.get("retained_datums", []) or source.get("kind") != "computed"
+                or source.get("units") != "m" or source.get("set_id") != model["set_id"]
+                or source.get("frame") != {"kind": "harmonic_mean", "name": None, "tie_status": "unknown"}
+                or list(_candidate_validator().iter_errors(source)) or candidate_errors(source, record, own_sets)):
+            raise ValueError("computed reference must be an exact retained own-set candidate with a valid window and frame")
+        binding = source["input_binding"]
+        if (binding.get("constant_set_sha256") != proof["reference_model_sha256"]
+                or binding.get("set_id") != model["set_id"]
+                or binding.get("convention_id") != model.get("convention_id")
+                or binding.get("source_provenance") != model.get("provenance")
+                or not isinstance(binding.get("request_sha256"), str)
+                or not re.fullmatch(r"[0-9a-f]{64}", binding["request_sha256"])):
+            raise ValueError("computed reference model, convention, provenance or request hash differs")
+        prepared[method] = source
+    events = prepared["sdk_harmonic_extremes_event_means_v1"]
+    hourly = prepared["sdk_harmonic_hourly_mean_v1"]
+    hourly_binding = hourly["input_binding"].get("hourly_heights")
+    if not isinstance(hourly_binding, dict) or not isinstance(hourly_binding.get("input_binding"), dict):
+        raise ValueError("computed reference requires its actual hourly-response binding")
+    hourly_input = hourly_binding["input_binding"]
+    if (events["window"] != hourly["window"] or hourly_binding.get("window") != hourly["window"]
+            or events["input_binding"]["request_sha256"] != hourly["input_binding"]["request_sha256"]
+            or events["input_binding"].get("results_sha256") != proof["events_response_sha256"]
+            or hourly["input_binding"].get("results_sha256") != proof["events_response_sha256"]
+            or hourly_input.get("results_sha256") != proof["hourly_response_sha256"]
+            or not isinstance(hourly_input.get("request_sha256"), str)
+            or not re.fullmatch(r"[0-9a-f]{64}", hourly_input["request_sha256"])):
+        raise ValueError("computed reference event/hourly windows, requests or response hashes differ")
+    values = events["values"].get("mhw"), events["values"].get("mlw"), hourly["values"].get("msl")
+    if not all(_finite(value) for value in values):
+        raise ValueError("computed reference requires finite event means and actual hourly MSL")
+    return values
+
+
+def _noaa_increment_errors(candidate, record, station, reference_station):
+    shape = [error.message for error in _candidate_validator().iter_errors(candidate)]
+    if shape:
+        return ["invalid NOAA time/proxy proof shape: " + error for error in shape]
+    try:
+        published, reference, reference_record = _noaa_increment_source(candidate, record, station, reference_station)
+        rows = {}
+        for row in reference.get("datums", []):
+            if row["name"] in rows:
+                raise ValueError("ambiguous duplicate published reference datum")
+            rows[row["name"]] = row
+        binding = candidate["input_binding"]["published_reference"]
+        if candidate["method"] == _NOAA_TIME_METHOD:
+            values = {}
+            for key, offset in (("hwi", "timeOffsetHighTide"), ("lwi", "timeOffsetLowTide")):
+                if key not in candidate["values"]:
+                    continue
+                row = rows[key.upper()]
+                description = row.get("description")
+                if (not _finite(row.get("value")) or not isinstance(description, str)
+                        or not re.search(r"\bGreenwich\b", description, re.IGNORECASE)
+                        or not re.search(r"\bhours?\b", description, re.IGNORECASE)):
+                    raise ValueError("reference interval requires explicit published Greenwich hours")
+                values[key.upper()] = row["value"]
+                actual = candidate["values"][key]
+                expected = row["value"] + published[offset] / 60
+                if not _finite(actual) or not math.isclose(actual, expected, rel_tol=0, abs_tol=1e-12):
+                    raise ValueError("interval must add the corresponding published minutes divided by 60")
+            if not _has_published_reference(reference_record, binding, values, "h", {
+                    "kind": "elapsed_time", "name": None, "tie_status": "not_applicable"}):
+                raise ValueError("reference hours are not bound to existing native published interval values")
+        else:
+            if (published["heightOffsetHighTide"] == published["heightOffsetLowTide"]
+                    and published["timeOffsetHighTide"] == published["timeOffsetLowTide"]):
+                raise ValueError("uniform affine MSL must not be replaced by a low-confidence MTL proxy")
+            computed = candidate["basis"]["reference_statistic_origin"] == "computed_harmonic_reference"
+            keys = ("MSL", "MLLW") if computed else ("MHW", "MLW", "MLLW")
+            values = {key: rows[key]["value"] for key in keys}
+            if not all(_finite(value) for value in values.values()):
+                raise ValueError("proxy requires finite same-body published reference levels")
+            if not _has_published_reference(reference_record, binding, values, "m", {
+                    "kind": "gauge_zero", "name": "STND", "tie_status": "source_declared"}):
+                raise ValueError("reference levels are not bound to existing native published values")
+            if computed:
+                if all(_finite(rows.get(key, {}).get("value")) for key in ("MHW", "MLW")):
+                    raise ValueError("published reference levels must take precedence over computed fallback")
+                high, low, mean = _computed_reference_levels(candidate, reference_record, reference_station)
+                shift = values["MSL"] - values["MLLW"]
+                high, low = high - mean + shift, low - mean + shift
+            else:
+                high, low = values["MHW"] - values["MLLW"], values["MLW"] - values["MLLW"]
+            if published["heightAdjustedType"] == "R":
+                high *= published["heightOffsetHighTide"]
+                low *= published["heightOffsetLowTide"]
+            else:
+                high += published["heightOffsetHighTide"] * 0.3048
+                low += published["heightOffsetLowTide"] * 0.3048
+            actual = candidate["values"]["msl"]
+            if not _finite(actual) or not math.isclose(actual, (high + low) / 2, rel_tol=0, abs_tol=1e-12):
+                raise ValueError("MSL proxy must be the mean of separately mapped MHW and MLW")
+    except (KeyError, TypeError, ValueError, UnicodeError) as error:
+        return [f"invalid NOAA time/proxy derivation: {error}"]
+    return []
+
+
 def candidate_errors(candidate, record, own_sets, *, station=None, reference_station=None):
     """Identity and interval checks additional to the independent carrier schema."""
     errors = []
-    source_computed = candidate.get("method") == _NOAA_SUBORDINATE_METHOD
-    if source_computed:
+    method = candidate.get("method")
+    source_computed = method in (_NOAA_SUBORDINATE_METHOD, _NOAA_TIME_METHOD, _NOAA_MSL_PROXY_METHOD)
+    if method == _NOAA_SUBORDINATE_METHOD:
         errors.extend(_noaa_subordinate_errors(candidate, record, station, reference_station))
+    elif method in (_NOAA_TIME_METHOD, _NOAA_MSL_PROXY_METHOD):
+        errors.extend(_noaa_increment_errors(candidate, record, station, reference_station))
     if candidate.get("source_record_id") != record.get("source_record_id"):
         errors.append("retained datum source_record_id differs from its original tuple")
     chart = candidate.get("basis", {}).get("chart_datum")
