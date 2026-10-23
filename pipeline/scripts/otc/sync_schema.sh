@@ -19,9 +19,9 @@
 # same schema SHA-256 (SCHEMA_SHA256) and refuses a copy that does not match it.
 set -euo pipefail
 
-SITE_COMMIT=3ce170bc7781166d829f95a11f48f3b9b676a169   # subordinate MLLW algebraic zero only
+SITE_COMMIT=5592c2683d520a6dd9f691124bfbb86e703387ad   # typed retained datum alternatives
 SCHEMA_SRC=src/schema/otc-1.0.schema.json
-SCHEMA_SHA256=1dea238c62e91dc3d4df2377412c310335bdcaa452467fe59b794c6cbf0038f4
+SCHEMA_SHA256=4cab340b86e58371e53513502be48ca287718cc03650cb8fc2a132549d74ea5a
 EXAMPLE_SRC=src/schema/example.json
 EXAMPLE_SHA256=568014659b42af433a198c8ff1a81ad624b638099794baea5758d4d12e7d28df
 
