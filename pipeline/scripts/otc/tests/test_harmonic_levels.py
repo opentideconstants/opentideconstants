@@ -178,6 +178,90 @@ def test_opt_in_spring_convention_uses_bound_hourly_mean_and_own_amplitudes():
         retained_levels(**data, spring_convention=True)
 
 
+def nllw_case():
+    data = hourly_case()
+    data["station"]["constant_sets"][0]["constituents"].extend([
+        {"name": "S2", "amplitude_m": 0.25}, {"name": "K1", "amplitude_m": 0.1},
+        {"name": "O1", "amplitude_m": 0.05}])
+    return data
+
+
+def test_nllw_uses_own_bound_hourly_mean_and_four_jhod_amplitudes():
+    data = nllw_case()
+    before = copy.deepcopy(data)
+    original = retained_levels(**data)
+    result = retained_levels(**data, nllw_convention=True, spring_convention=True)
+    assert result["retained_datums"][:2] == original["retained_datums"]
+    datum = next(d for d in result["retained_datums"] if "nllw" in d["values"])
+    assert datum["values"] == pytest.approx({"nllw": 0.5 - 1 - 0.25 - 0.1 - 0.05})
+    assert datum["basis"]["amplitudes_m"] == {"M2": 1, "S2": 0.25, "K1": 0.1, "O1": 0.05}
+    assert datum["basis"]["computed_msl_m"] == 0.5
+    assert datum["frame"] == {"kind": "harmonic_mean", "name": None, "tie_status": "unknown"}
+    assert datum["uncertainty_m"] is None
+    assert datum["reliability"]["status"] == "accuracy_unverified"
+    assert "Computed JHOD four-constituent NLLW convention in the same harmonic-mean frame." in datum["reliability"]["limitations"]
+    assert data == before
+
+
+@pytest.mark.parametrize("change", ["hourly", "missing", "duplicate", "negative", "nonfinite", "boolean"])
+def test_nllw_rejects_missing_mean_or_invalid_own_constituents(change):
+    data = nllw_case()
+    rows = data["station"]["constant_sets"][0]["constituents"]
+    if change == "hourly":
+        del data["hourly_heights"]
+    elif change == "missing":
+        rows.pop()
+    elif change == "duplicate":
+        rows.append(copy.deepcopy(rows[-1]))
+    else:
+        rows[-1]["amplitude_m"] = {"negative": -0.1, "nonfinite": float("nan"), "boolean": True}[change]
+    with pytest.raises(ValueError, match="NLLW"):
+        retained_levels(**data, nllw_convention=True)
+
+
+def annual_low_case():
+    data = case()
+    data["prediction"]["items"] = [
+        {"time": f"{year}-01-02T0{index}:00:00+00:00", "type": kind, "height_m": height}
+        for year in range(2020, 2039)
+        for index, (kind, height) in enumerate([("high", -100), ("low", -1 - (year - 2020)), ("low", 1)])]
+    return data
+
+
+def test_llwlt_is_the_mean_of_nineteen_annual_low_event_minima():
+    data = annual_low_case()
+    before = copy.deepcopy(data)
+    original = retained_levels(**data)
+    result = retained_levels(**data, llwlt_convention=True)
+    assert result["retained_datums"][:-1] == original["retained_datums"]
+    datum = result["retained_datums"][-1]
+    assert datum["values"] == {"llwlt": -10}
+    assert datum["basis"]["annual_minimum_low_events_m"] == {str(year): -1 - (year - 2020) for year in range(2020, 2039)}
+    assert datum["basis"]["annual_low_event_counts"] == {str(year): 2 for year in range(2020, 2039)}
+    assert datum["basis"]["year_count"] == 19
+    assert datum["frame"]["kind"] == "harmonic_mean"
+    assert datum["uncertainty_m"] is None
+    assert datum["reliability"]["status"] == "accuracy_unverified"
+    assert "Mean annual lowest predicted low water over nineteen complete calendar years." in datum["reliability"]["limitations"]
+    assert data == before
+
+
+@pytest.mark.parametrize("change", ["missing_year", "eighteen_years", "partial_year", "timezone"])
+def test_llwlt_requires_nineteen_complete_calendar_years_with_low_events(change):
+    data = annual_low_case()
+    if change == "missing_year":
+        data["prediction"]["items"] = [e for e in data["prediction"]["items"] if not (e["time"].startswith("2025") and e["type"] == "low")]
+    elif change == "eighteen_years":
+        data["window"]["end"] = "2038-01-01T00:00:00+00:00"
+        data["prediction"]["items"] = [e for e in data["prediction"]["items"] if not e["time"].startswith("2038")]
+    elif change == "partial_year":
+        data["window"]["start"] = "2020-01-01T01:00:00+00:00"
+    else:
+        data["window"]["start"] = "2020-01-01T00:00:00+01:00"
+    with pytest.raises(ValueError, match="LLWLT"):
+        retained_levels(**data, llwlt_convention=True)
+
+
 def lunitidal_case():
     data = case()
     data["station"]["lon"] = -70.0
