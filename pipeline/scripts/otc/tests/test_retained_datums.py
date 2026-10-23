@@ -10,6 +10,7 @@ import pytest
 from otc_pipeline.release_writer import validate_release, write_release
 from otc_pipeline import build_otc
 from otc_pipeline.datums import derive_chart_datums
+from otc_pipeline.retained_datums import append_source_sets
 
 
 @pytest.fixture(scope="module")
@@ -207,3 +208,97 @@ def test_actual_source_projection_preserves_complete_native_profiles():
             for key in ("provenance", "original_harmonics", "licence_id"):
                 assert record.get(key) == original.get(key)
     assert append_source_sets(release, projection)["added_sets"] == 0
+
+
+@pytest.fixture
+def metadata_only_source_projection():
+    release = json.loads((Path(__file__).parent / "fixtures/example-1.0.json").read_text())
+    station = next(s for s in release["stations"] if s["station_id"] == "OTC-EXAMPLE-0007")
+    reference = next(s for s in release["stations"] if s["station_id"] == "OTC-EXAMPLE-0006")
+    cs = copy.deepcopy(reference["constant_sets"][0])
+    cs["set_id"] = station["station_id"] + "/noaa"
+    record = {key: cs[key] for key in ("source", "source_version", "source_record_id", "licence_id")}
+    record.update({"role": "gauge_station", "disposition": "metadata_only", "detail": "Held source metadata.",
+                   "published_set_ids": [], "original_metadata": {"station_type": "S"},
+                   "provenance": {"input_sha256": ["a" * 64], "inventory_sha256": "b" * 64}})
+    station["source_records"] = [record]
+    incoming = copy.deepcopy(station)
+    incoming["constant_sets"] = [cs]
+    original = incoming["source_records"][0]
+    original["disposition"] = "retained"
+    original["published_set_ids"] = [cs["set_id"]]
+    original["original_metadata"]["published_response_json"] = '{"held":true}'
+    return release, {"stations": [incoming]}
+
+
+def test_published_set_promotes_only_its_metadata_source_and_survives_writer(
+        metadata_only_source_projection, tmp_path):
+    release, projection = metadata_only_source_projection
+    before = copy.deepcopy(release)
+    assert validate_release(release) == []
+    assert append_source_sets(release, projection) == {"added_sets": 1}
+    assert validate_release(release) == []
+    station = next(s for s in release["stations"] if s["station_id"] == "OTC-EXAMPLE-0007")
+    record = station["source_records"][0]
+    assert record["disposition"] == "retained"
+    assert record["published_set_ids"] == ["OTC-EXAMPLE-0007/noaa"]
+    assert station["recommended_set_id"] is None
+    assert station["constant_sets"] == projection["stations"][0]["constant_sets"]
+    write_release(release, tmp_path, datestamp=release["release"]["datestamp"],
+                  app_export=None, congen_run=None)
+    stem = "OTC_" + release["release"]["datestamp"]
+    delivered = [json.loads(line) for line in (tmp_path / (stem + ".jsonl")).read_text().splitlines()]
+    assert {s["station_id"]: s for s in delivered} == {s["station_id"]: s for s in release["stations"]}
+    unchanged = copy.deepcopy(release)
+    restored_station = next(s for s in unchanged["stations"] if s["station_id"] == station["station_id"])
+    restored_record = restored_station["source_records"][0]
+    restored_record["disposition"] = "metadata_only"
+    restored_record["published_set_ids"] = []
+    restored_record["original_metadata"].pop("published_response_json")
+    restored_station["constant_sets"] = []
+    assert unchanged == before
+    published = copy.deepcopy(release)
+    assert append_source_sets(release, projection) == {"added_sets": 0}
+    assert release == published
+
+
+def test_source_without_new_set_keeps_disposition(metadata_only_source_projection):
+    release, projection = metadata_only_source_projection
+    projection["stations"][0]["constant_sets"] = []
+    before = copy.deepcopy(release)
+    assert append_source_sets(release, projection) == {"added_sets": 0}
+    assert release == before
+
+
+@pytest.mark.parametrize("disposition", ["retained", "unavailable", "not_fitted", "licence_restricted"])
+def test_append_preserves_other_source_dispositions(metadata_only_source_projection, disposition):
+    release, projection = metadata_only_source_projection
+    station = next(s for s in release["stations"] if s["station_id"] == "OTC-EXAMPLE-0007")
+    record = station["source_records"][0]
+    record["disposition"] = disposition
+    assert append_source_sets(release, projection) == {"added_sets": 1}
+    assert record["disposition"] == disposition
+
+
+@pytest.mark.parametrize("conflict", ["station_id", "source", "source_version", "source_record_id",
+                                      "published_set_ids", "provenance", "original_harmonics", "licence_id",
+                                      "original_metadata"])
+def test_source_promotion_requires_existing_original_binding(metadata_only_source_projection, conflict):
+    release, projection = metadata_only_source_projection
+    incoming = projection["stations"][0]
+    record = incoming["source_records"][0]
+    if conflict == "station_id":
+        incoming[conflict] = "OTC-foreign"
+    elif conflict == "published_set_ids":
+        record[conflict] = []
+    elif conflict == "original_harmonics":
+        record[conflict] = [{"source_name": "foreign"}]
+    elif conflict == "original_metadata":
+        key = next(iter(record[conflict]))
+        record[conflict][key] = "foreign"
+    else:
+        record[conflict] = "foreign"
+    before = copy.deepcopy(release)
+    with pytest.raises(ValueError):
+        append_source_sets(release, projection)
+    assert release == before

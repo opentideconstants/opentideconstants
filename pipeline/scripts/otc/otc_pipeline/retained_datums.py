@@ -243,6 +243,8 @@ def append_source_sets(release, source_release):
                 metadata[key] = copy.deepcopy(value)
             record.setdefault("published_set_ids", []).append(cs["set_id"])
             station.setdefault("constant_sets", []).append(copy.deepcopy(cs))
+            if record.get("disposition") == "metadata_only":
+                record["disposition"] = "retained"
             current_sets[cs["set_id"]] = cs
             added += 1
         if station.get("recommended_set_id") is None and current_sets:
