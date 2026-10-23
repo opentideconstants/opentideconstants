@@ -1,5 +1,7 @@
 """Retained harmonic levels: arithmetic and exact source/frame binding."""
 import copy
+from datetime import datetime, timedelta
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -260,6 +262,104 @@ def test_llwlt_requires_nineteen_complete_calendar_years_with_low_events(change)
         data["window"]["start"] = "2020-01-01T00:00:00+01:00"
     with pytest.raises(ValueError, match="LLWLT"):
         retained_levels(**data, llwlt_convention=True)
+
+
+def model_digest(model):
+    return hashlib.sha256(json.dumps(model, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
+
+
+def tlt_case():
+    data = case()
+    original = data["station"]["constant_sets"][0]
+    original["constituents"].extend({"name": name, "amplitude_m": 0.1} for name in ["S2", "N2", "K2", "K1", "O1", "P1", "Q1", "M4", "SA"])
+    for row in original["constituents"]:
+        row.update({"phase_deg": 0.0, "speed_deg_per_hour": 1.0})
+    projected = copy.deepcopy(original)
+    projected["set_id"] += "/tlt-projection-v1"
+    projected["recommended"] = False
+    projected["constituents"] = [row for row in projected["constituents"] if row["name"] != "SA"]
+    start = datetime.fromisoformat(data["window"]["start"])
+    window = {"start": start.isoformat(), "end": (start + timedelta(seconds=18.6 * 365.25 * 86400)).isoformat()}
+    prediction = copy.deepcopy(data["prediction"])
+    prediction["set_id"] = projected["set_id"]
+    boundaries = copy.deepcopy(prediction)
+    boundaries["items"] = [{"time": window["start"], "height_m": -10}, {"time": window["end"], "height_m": -20}]
+    data["tlt_projection"] = {
+        "constant_set": projected, "prediction": prediction, "boundary_prediction": boundaries,
+        "window": window, "year_basis_days": 365.25,
+        "input_binding": {"native_sha256": "c" * 64, "sdk_commit": data["input_binding"]["sdk_commit"],
+                          "source_native_sha256": data["input_binding"]["native_sha256"],
+                          "source_constant_set_sha256": model_digest(original),
+                          "projected_constant_set_sha256": model_digest(projected),
+                          "events_request_sha256": "d" * 64, "events_results_sha256": "e" * 64,
+                          "boundaries_request_sha256": "f" * 64, "boundaries_results_sha256": "1" * 64},
+    }
+    return data
+
+
+def test_tlt_retains_only_explicit_selected_projection_minimum_including_boundaries():
+    data = tlt_case()
+    before = copy.deepcopy(data)
+    original = retained_levels(**{key: value for key, value in data.items() if key != "tlt_projection"})
+    result = retained_levels(**data)
+    assert result["retained_datums"][:-1] == original["retained_datums"]
+    datum = result["retained_datums"][-1]
+    assert datum["values"] == {"tlt": -20}
+    assert datum["set_id"] == "s/model"
+    assert datum["basis"]["selected_constituents"] == ["M2", "S2", "N2", "K2", "K1", "O1", "P1", "Q1", "M4"]
+    assert datum["basis"]["excluded_constituents"] == ["SA"]
+    assert datum["basis"]["duration_years"] == 18.6
+    assert datum["basis"]["year_basis_days"] == 365.25
+    assert datum["window"] == data["tlt_projection"]["window"]
+    assert datum["input_binding"]["tlt_projection"] == data["tlt_projection"]["input_binding"]
+    assert datum["frame"] == {"kind": "harmonic_mean", "name": None, "tie_status": "unknown"}
+    assert datum["uncertainty_m"] is None
+    assert datum["reliability"]["status"] == "accuracy_unverified"
+    assert "Not the full formal thirteen-constituent Vladimirsky result or an official GB datum." in datum["reliability"]["limitations"]
+    assert data == before
+
+
+@pytest.mark.parametrize("change", ["required", "optional", "coefficient", "original_hash", "projected_hash", "native", "sdk", "request", "frame", "boundary_frame", "boundary_missing", "boundary_time", "boundary_nonfinite", "window", "year_basis"])
+def test_tlt_rejects_unbound_or_different_projection_and_incomplete_boundary_values(change):
+    data = tlt_case()
+    projection = data["tlt_projection"]
+    if change in ("required", "optional"):
+        name = "Q1" if change == "required" else "M4"
+        projection["constant_set"]["constituents"] = [row for row in projection["constant_set"]["constituents"] if row["name"] != name]
+    elif change == "coefficient":
+        projection["constant_set"]["constituents"][0]["amplitude_m"] = 42
+    elif change in ("original_hash", "projected_hash", "native", "sdk", "request"):
+        key = {"original_hash": "source_constant_set_sha256", "projected_hash": "projected_constant_set_sha256", "native": "source_native_sha256", "sdk": "sdk_commit", "request": "events_request_sha256"}[change]
+        projection["input_binding"][key] = "" if change == "request" else "different"
+    elif change == "frame":
+        projection["prediction"]["datum"] = "msl"
+    elif change == "boundary_frame":
+        projection["boundary_prediction"]["set_id"] = data["set_id"]
+    elif change == "boundary_missing":
+        projection["boundary_prediction"]["items"].pop()
+    elif change == "boundary_time":
+        projection["boundary_prediction"]["items"][-1]["time"] = data["window"]["end"]
+    elif change == "boundary_nonfinite":
+        projection["boundary_prediction"]["items"][-1]["height_m"] = float("nan")
+    elif change == "window":
+        projection["window"]["end"] = data["window"]["end"]
+    else:
+        projection["year_basis_days"] = 365
+    with pytest.raises(ValueError, match="TLT"):
+        retained_levels(**data)
+
+
+@pytest.mark.parametrize("field,value", [("amplitude_m", None), ("amplitude_m", -1), ("phase_deg", None), ("phase_deg", float("nan")), ("speed_deg_per_hour", None)])
+def test_tlt_never_accepts_missing_or_invalid_selected_source_coefficients(field, value):
+    data = tlt_case()
+    cs = data["station"]["constant_sets"][0]
+    cs["constituents"][0][field] = value
+    projected = data["tlt_projection"]["constant_set"]
+    projected["constituents"][0][field] = value
+    data["tlt_projection"]["input_binding"].update({
+        "source_constant_set_sha256": model_digest(cs), "projected_constant_set_sha256": model_digest(projected)})
+    with pytest.raises(ValueError, match="TLT"):
+        retained_levels(**data)
 
 
 def lunitidal_case():

@@ -36,7 +36,7 @@ def retained_levels(*, station: dict, set_id: str, prediction: dict,
                     window: dict, input_binding: dict, tidal_day_padding: dict | None = None,
                     hourly_heights: dict | None = None, spring_convention: bool = False,
                     lunitidal_convention: dict | None = None, nllw_convention: bool = False,
-                    llwlt_convention: bool = False) -> dict:
+                    llwlt_convention: bool = False, tlt_projection: dict | None = None) -> dict:
     """Build a source-bound candidate; leave all original source/set data intact."""
     station_id = station.get("id", station.get("station_id"))
     sets = [cs for cs in station["constant_sets"] if cs["set_id"] == set_id]
@@ -139,10 +139,93 @@ def retained_levels(*, station: dict, set_id: str, prediction: dict,
     if llwlt_convention:
         result["retained_datums"].append(_annual_low_levels(
             result["retained_datums"][0], prediction, window))
+    if tlt_projection is not None:
+        result["retained_datums"].append(_projected_window_low(
+            result["retained_datums"][0], cs, station, tlt_projection))
     if lunitidal_convention is not None:
         result["retained_datums"].append(_lunitidal_intervals(
             result["retained_datums"][0], cs, station, lunitidal_convention))
     return result
+
+
+def _projected_window_low(base: dict, cs: dict, station: dict, projection: dict) -> dict:
+    """An explicitly selected model/window minimum, not formal Vladimirsky TLT."""
+    required, optional = ["M2", "S2", "N2", "K2", "K1", "O1", "P1", "Q1"], ["M4", "MS4", "M6"]
+    names = [row["name"] for row in cs["constituents"]]
+    selected = required + [name for name in optional if name in names]
+    if any(names.count(name) != 1 for name in selected):
+        raise ValueError("TLT projection requires each main constituent and each present optional constituent exactly once")
+    for row in cs["constituents"]:
+        if row["name"] in selected:
+            for key in ("amplitude_m", "phase_deg", "speed_deg_per_hour"):
+                value = row.get(key)
+                if (isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value)
+                        or (key == "amplitude_m" and value < 0) or (key == "phase_deg" and not 0 <= value < 360)
+                        or (key == "speed_deg_per_hour" and value <= 0)):
+                    raise ValueError("TLT projection requires finite own-model amplitude, phase and speed for every selected constituent")
+    expected = copy.deepcopy(cs)
+    expected["set_id"] = cs["set_id"] + "/tlt-projection-v1"
+    expected["recommended"] = False
+    expected["constituents"] = [row for row in cs["constituents"] if row["name"] in selected]
+    if projection["constant_set"] != expected:
+        raise ValueError("TLT projection must retain the exact selected own-model coefficients and metadata")
+    window, pins = projection["window"], projection["input_binding"]
+    start, end = (_instant(window[key]) for key in ("start", "end"))
+    if projection.get("year_basis_days") != 365.25 or (end - start).total_seconds() != 18.6 * 365.25 * 86400:
+        raise ValueError("TLT projection requires an explicit 18.6-Julian-year evaluation window")
+    if (pins.get("sdk_commit") != base["input_binding"]["sdk_commit"]
+            or pins.get("source_native_sha256") != base["input_binding"].get("current_native_sha256", base["input_binding"]["native_sha256"])
+            or pins.get("source_constant_set_sha256") != base["input_binding"]["constant_set_sha256"]
+            or any(not pins.get(key) for key in ("events_request_sha256", "events_results_sha256",
+                                                "boundaries_request_sha256", "boundaries_results_sha256"))):
+        raise ValueError("TLT projection requires the original source/model and bound prediction requests/results")
+    private = copy.deepcopy(station)
+    private["constant_sets"].append(expected)
+    source = {"gesla-fit": "gesla", "ticon-4": "ticon"}.get(cs["source"], cs["source"])
+    record = next(record for record in private["source_records"]
+                  if (record["source"], record["source_record_id"], record.get("source_version")) ==
+                  (source, cs["source_record_id"], cs.get("source_version"))
+                  and cs["set_id"] in record.get("published_set_ids", []))
+    record["published_set_ids"].append(expected["set_id"])
+    try:
+        reduced = retained_levels(station=private, set_id=expected["set_id"], prediction=projection["prediction"],
+                                  window=window, input_binding=pins)["retained_datums"][0]
+    except ValueError as error:
+        raise ValueError(f"TLT projected events: {error}") from error
+    if pins.get("projected_constant_set_sha256") != reduced["input_binding"]["constant_set_sha256"]:
+        raise ValueError("TLT projected model hash must describe the actual selected prediction input")
+    boundaries, events = projection["boundary_prediction"], projection["prediction"]
+    fields = ("station_id", "set_id", "convention_id", "astro_table_id", "method", "datum", "algorithm", "release")
+    if any(boundaries.get(key) != events.get(key) for key in fields) or len(boundaries["items"]) != 2:
+        raise ValueError("TLT boundaries must use the same projected model and frame")
+    heights = []
+    for item, instant in zip(boundaries["items"], (start, end)):
+        value = item["height_m"]
+        if (_instant(item["time"]) != instant or isinstance(value, bool)
+                or not isinstance(value, (int, float)) or not math.isfinite(value)):
+            raise ValueError("TLT boundaries require finite heights at both exact window endpoints")
+        heights.append(value)
+    candidate = copy.deepcopy(base)
+    candidate["method"] = "sdk_harmonic_selected_constituent_window_minimum_v1"
+    candidate["values"] = {"tlt": min(reduced["values"]["lat"], *heights)}
+    candidate["window"] = copy.deepcopy(window)
+    candidate["input_binding"]["tlt_projection"] = copy.deepcopy(pins)
+    candidate["basis"].update({
+        "selected_constituents": selected, "excluded_constituents": [name for name in names if name not in selected],
+        "projected_set_id": expected["set_id"], "duration_years": 18.6, "year_basis_days": 365.25,
+        "duration_seconds": (end - start).total_seconds(), "boundary_heights_m": heights,
+        "high_count": reduced["basis"]["high_count"], "low_count": reduced["basis"]["low_count"],
+        "definition_url": "https://castjournals.cast.org.cn/joweb/aos/EN/1198944206447280371",
+    })
+    candidate["reliability"]["limitations"] = [
+        "Computed minimum of the explicit eight-main-plus-present-M4/MS4/M6 projection over 18.6 Julian years.",
+        "Minimum uses predicted extrema and both window-boundary heights in the harmonic-mean frame.",
+        "Not the full formal thirteen-constituent Vladimirsky result or an official GB datum.",
+        "Sa/Ssa and other unselected constituents are excluded; this is not an all-constituent LAT.",
+        "No surveyed datum tie, chart-datum tie or numeric uncertainty is established.",
+        "Original source quality and convention limitations remain applicable.",
+    ]
+    return candidate
 
 
 def _nllw_levels(mean: dict, cs: dict) -> dict:
