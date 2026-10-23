@@ -166,9 +166,9 @@ _CHILD_KEYS = {
 
 FORMAT_VERSION = "1.0"
 SCHEMA_NAME = f"otc-{FORMAT_VERSION}.schema.json"
-# SHA-256 of the site's src/schema/otc-1.0.schema.json at the commit sync_schema.sh pins
-# (e2ae45a, approved source identities, original rows and restricted TICON policies). sync_schema.sh holds the same value; a test keeps the two equal.
-SCHEMA_SHA256 = "1dea238c62e91dc3d4df2377412c310335bdcaa452467fe59b794c6cbf0038f4"
+# SHA-256 of the schema source and its identical runtime copy. The writer checks
+# these exact bytes before validating a native release.
+SCHEMA_SHA256 = "4cab340b86e58371e53513502be48ca287718cc03650cb8fc2a132549d74ea5a"
 _MISSING = object()  # "key not present"; never equal to a value read from JSON
 _UNSUPPORTED_TICON_NAMES = {"3L2", "3N2", "MSQM", "MTM", "R3", "T3"}
 
@@ -292,7 +292,7 @@ def _dicts(value) -> list[dict]:
 
 
 def _source_record_errors(st: dict, where: str, own_sets: dict, licences: dict,
-                          source_owners: dict, release: dict, errors: list[str]) -> None:
+                          source_owners: dict, release: dict, errors: list[str], stations_by_id: dict) -> None:
     """Original source references and row annotations; never convert them to predictions."""
     fes_convention = next((row for row in _dicts(release.get("conventions"))
                            if row.get("convention_id") == "fes2022b-ocean-greenwich"
@@ -334,7 +334,11 @@ def _source_record_errors(st: dict, where: str, own_sets: dict, licences: dict,
                     errors.append(f"{sw}: published_set_ids must come from the original source tuple")
         from otc_pipeline.retained_datums import candidate_errors
         for candidate in _dicts(record.get("retained_datums")):
-            errors.extend(f"{sw}: {error}" for error in candidate_errors(candidate, record, own_sets))
+            offsets = st.get("subordinate_offsets")
+            reference_id = offsets.get("reference_station_id") if isinstance(offsets, dict) else None
+            reference_station = stations_by_id.get(reference_id) if isinstance(reference_id, str) else None
+            errors.extend(f"{sw}: {error}" for error in candidate_errors(
+                candidate, record, own_sets, station=st, reference_station=reference_station))
         raw = record.get("original_harmonics")
         if not isinstance(raw, dict):
             continue
@@ -461,7 +465,7 @@ def _cross_reference_errors(release: dict) -> list[str]:
                 if isinstance(version, str) and (version, name) not in table:
                     errors.append(f"{sw}: constituents name {name!r} is not in the constituents "
                                   f"table for constituent_table_version {version!r}")
-        _source_record_errors(st, where, own_by_id, licences, source_owners, release, errors)
+        _source_record_errors(st, where, own_by_id, licences, source_owners, release, errors, by_id)
         rec = st.get("recommended_set_id", _MISSING)
         off = st.get("subordinate_offsets")
         cur_off = _dicts(st.get("current_offsets"))

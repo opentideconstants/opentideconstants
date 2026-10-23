@@ -35,7 +35,9 @@ def _instant(value: str) -> datetime:
 def retained_levels(*, station: dict, set_id: str, prediction: dict,
                     window: dict, input_binding: dict, tidal_day_padding: dict | None = None,
                     hourly_heights: dict | None = None, spring_convention: bool = False,
-                    lunitidal_convention: dict | None = None) -> dict:
+                    lunitidal_convention: dict | None = None, nllw_convention: bool = False,
+                    llwlt_convention: bool = False, tlt_projection: dict | None = None,
+                    neap_proxy: bool = False) -> dict:
     """Build a source-bound candidate; leave all original source/set data intact."""
     station_id = station.get("id", station.get("station_id"))
     sets = [cs for cs in station["constant_sets"] if cs["set_id"] == set_id]
@@ -123,17 +125,175 @@ def retained_levels(*, station: dict, set_id: str, prediction: dict,
     if tidal_day_padding is not None:
         result["retained_datums"].append(_higher_lower_levels(
             result["retained_datums"][0], prediction, window, input_binding, tidal_day_padding))
+    mean = None
     if hourly_heights is not None:
-        result["retained_datums"].append(_hourly_mean(
-            result["retained_datums"][0], prediction, window, input_binding, hourly_heights))
+        mean = _hourly_mean(result["retained_datums"][0], prediction, window, input_binding, hourly_heights)
+        result["retained_datums"].append(mean)
     if spring_convention:
         if hourly_heights is None:
             raise ValueError("Spring convention requires the bound same-frame hourly mean")
         result["retained_datums"].append(_spring_levels(result["retained_datums"][-1], cs))
+    if neap_proxy:
+        if mean is None:
+            raise ValueError("Neap proxy requires the bound same-frame hourly mean")
+        result["retained_datums"].append(_neap_plane_proxy(mean, cs))
+    if nllw_convention:
+        if mean is None:
+            raise ValueError("NLLW convention requires the bound same-frame hourly mean")
+        result["retained_datums"].append(_nllw_levels(mean, cs))
+    if llwlt_convention:
+        result["retained_datums"].append(_annual_low_levels(
+            result["retained_datums"][0], prediction, window))
+    if tlt_projection is not None:
+        result["retained_datums"].append(_projected_window_low(
+            result["retained_datums"][0], cs, station, tlt_projection))
     if lunitidal_convention is not None:
         result["retained_datums"].append(_lunitidal_intervals(
             result["retained_datums"][0], cs, station, lunitidal_convention))
     return result
+
+
+def _projected_window_low(base: dict, cs: dict, station: dict, projection: dict) -> dict:
+    """An explicitly selected model/window minimum, not formal Vladimirsky TLT."""
+    required, optional = ["M2", "S2", "N2", "K2", "K1", "O1", "P1", "Q1"], ["M4", "MS4", "M6"]
+    names = [row["name"] for row in cs["constituents"]]
+    selected = required + [name for name in optional if name in names]
+    if any(names.count(name) != 1 for name in selected):
+        raise ValueError("TLT projection requires each main constituent and each present optional constituent exactly once")
+    for row in cs["constituents"]:
+        if row["name"] in selected:
+            for key in ("amplitude_m", "phase_deg", "speed_deg_per_hour"):
+                value = row.get(key)
+                if (isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value)
+                        or (key == "amplitude_m" and value < 0) or (key == "phase_deg" and not 0 <= value < 360)
+                        or (key == "speed_deg_per_hour" and value <= 0)):
+                    raise ValueError("TLT projection requires finite own-model amplitude, phase and speed for every selected constituent")
+    expected = copy.deepcopy(cs)
+    expected["set_id"] = cs["set_id"] + "/tlt-projection-v1"
+    expected["recommended"] = False
+    expected["constituents"] = [row for row in cs["constituents"] if row["name"] in selected]
+    if projection["constant_set"] != expected:
+        raise ValueError("TLT projection must retain the exact selected own-model coefficients and metadata")
+    window, pins = projection["window"], projection["input_binding"]
+    start, end = (_instant(window[key]) for key in ("start", "end"))
+    if projection.get("year_basis_days") != 365.25 or (end - start).total_seconds() != 18.6 * 365.25 * 86400:
+        raise ValueError("TLT projection requires an explicit 18.6-Julian-year evaluation window")
+    if (pins.get("sdk_commit") != base["input_binding"]["sdk_commit"]
+            or pins.get("source_native_sha256") != base["input_binding"].get("current_native_sha256", base["input_binding"]["native_sha256"])
+            or pins.get("source_constant_set_sha256") != base["input_binding"]["constant_set_sha256"]
+            or any(not pins.get(key) for key in ("events_request_sha256", "events_results_sha256",
+                                                "boundaries_request_sha256", "boundaries_results_sha256"))):
+        raise ValueError("TLT projection requires the original source/model and bound prediction requests/results")
+    private = copy.deepcopy(station)
+    private["constant_sets"].append(expected)
+    source = {"gesla-fit": "gesla", "ticon-4": "ticon"}.get(cs["source"], cs["source"])
+    record = next(record for record in private["source_records"]
+                  if (record["source"], record["source_record_id"], record.get("source_version")) ==
+                  (source, cs["source_record_id"], cs.get("source_version"))
+                  and cs["set_id"] in record.get("published_set_ids", []))
+    record["published_set_ids"].append(expected["set_id"])
+    try:
+        reduced = retained_levels(station=private, set_id=expected["set_id"], prediction=projection["prediction"],
+                                  window=window, input_binding=pins)["retained_datums"][0]
+    except ValueError as error:
+        raise ValueError(f"TLT projected events: {error}") from error
+    if pins.get("projected_constant_set_sha256") != reduced["input_binding"]["constant_set_sha256"]:
+        raise ValueError("TLT projected model hash must describe the actual selected prediction input")
+    boundaries, events = projection["boundary_prediction"], projection["prediction"]
+    fields = ("station_id", "set_id", "convention_id", "astro_table_id", "method", "datum", "algorithm", "release")
+    if any(boundaries.get(key) != events.get(key) for key in fields) or len(boundaries["items"]) != 2:
+        raise ValueError("TLT boundaries must use the same projected model and frame")
+    heights = []
+    for item, instant in zip(boundaries["items"], (start, end)):
+        value = item["height_m"]
+        if (_instant(item["time"]) != instant or isinstance(value, bool)
+                or not isinstance(value, (int, float)) or not math.isfinite(value)):
+            raise ValueError("TLT boundaries require finite heights at both exact window endpoints")
+        heights.append(value)
+    candidate = copy.deepcopy(base)
+    candidate["method"] = "sdk_harmonic_selected_constituent_window_minimum_v1"
+    candidate["values"] = {"tlt": min(reduced["values"]["lat"], *heights)}
+    candidate["window"] = copy.deepcopy(window)
+    candidate["input_binding"]["tlt_projection"] = copy.deepcopy(pins)
+    candidate["basis"].update({
+        "selected_constituents": selected, "excluded_constituents": [name for name in names if name not in selected],
+        "projected_set_id": expected["set_id"], "duration_years": 18.6, "year_basis_days": 365.25,
+        "duration_seconds": (end - start).total_seconds(), "boundary_heights_m": heights,
+        "high_count": reduced["basis"]["high_count"], "low_count": reduced["basis"]["low_count"],
+        "definition_url": "https://castjournals.cast.org.cn/joweb/aos/EN/1198944206447280371",
+    })
+    candidate["reliability"]["limitations"] = [
+        "Computed minimum of the explicit eight-main-plus-present-M4/MS4/M6 projection over 18.6 Julian years.",
+        "Minimum uses predicted extrema and both window-boundary heights in the harmonic-mean frame.",
+        "Not the full formal thirteen-constituent Vladimirsky result or an official GB datum.",
+        "Sa/Ssa and other unselected constituents are excluded; this is not an all-constituent LAT.",
+        "No surveyed datum tie, chart-datum tie or numeric uncertainty is established.",
+        "Original source quality and convention limitations remain applicable.",
+    ]
+    return candidate
+
+
+def _nllw_levels(mean: dict, cs: dict) -> dict:
+    """JHOD four-constituent convention using this model's hourly mean."""
+    amplitudes = {}
+    for name in ("M2", "S2", "K1", "O1"):
+        rows = [row for row in cs["constituents"] if row["name"] == name]
+        if len(rows) != 1:
+            raise ValueError("NLLW convention requires one own-set M2, S2, K1 and O1 amplitude")
+        value = rows[0].get("amplitude_m")
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+            raise ValueError("NLLW convention requires finite nonnegative amplitudes")
+        amplitudes[name] = value
+    msl = mean["values"]["msl"]
+    candidate = copy.deepcopy(mean)
+    candidate["method"] = "harmonic_jhod_nllw_convention_v1"
+    candidate["values"] = {"nllw": msl - math.fsum(amplitudes.values())}
+    candidate["basis"].update({
+        "nllw_convention": "computed JHOD convention: MSL - (H_M2 + H_S2 + H_K1 + H_O1)",
+        "definition_url": "https://www1.kaiho.mlit.go.jp/TIDE/harmonic/kaisetsu.html",
+        "amplitudes_m": amplitudes, "computed_msl_m": msl,
+    })
+    candidate["reliability"]["limitations"] = [
+        "Computed JHOD four-constituent NLLW convention in the same harmonic-mean frame.",
+        "MSL is this model's hourly predicted mean, not long-term observed or surveyed MSL.",
+        "This is not an official JHOD datum or chart-datum tie; no Z0 is inferred.",
+        "No surveyed datum tie or numeric uncertainty is established.",
+        "Original source quality and convention limitations remain applicable.",
+    ]
+    return candidate
+
+
+def _annual_low_levels(base: dict, prediction: dict, window: dict) -> dict:
+    """Mean of nineteen annual minimum low events in complete calendar years."""
+    start, end = (_instant(window[key]).astimezone(timezone.utc) for key in ("start", "end"))
+    if (any((t.month, t.day, t.hour, t.minute, t.second, t.microsecond) != (1, 1, 0, 0, 0, 0)
+            for t in (start, end)) or end.year - start.year != 19):
+        raise ValueError("LLWLT requires nineteen complete calendar years in the evaluation window")
+    lows = {year: [] for year in range(start.year, end.year)}
+    for event in prediction["items"]:
+        if event["type"] == "low":
+            lows[_instant(event["time"]).astimezone(timezone.utc).year].append(event["height_m"])
+    if any(not values for values in lows.values()):
+        raise ValueError("LLWLT requires predicted low events in all nineteen calendar years")
+    minima = {str(year): min(values) for year, values in lows.items()}
+    candidate = copy.deepcopy(base)
+    candidate["method"] = "sdk_harmonic_mean_annual_low_water_v1"
+    candidate["values"] = {"llwlt": math.fsum(minima.values()) / 19}
+    candidate["basis"].update({
+        "llwlt_convention": "mean annual lowest predicted low water",
+        "definition_url": "https://tides.gc.ca/en/definitions-content-tides-and-currents",
+        "year_count": 19, "calendar_timezone": "UTC",
+        "annual_minimum_low_events_m": minima,
+        "annual_low_event_counts": {str(year): len(values) for year, values in lows.items()},
+    })
+    candidate["reliability"]["limitations"] = [
+        "Mean annual lowest predicted low water over nineteen complete calendar years.",
+        "Only predicted low events enter the annual minima; hourly minima and MLLW are not used.",
+        "Computed harmonic-relative estimate; not an official CHS datum or chart-datum tie.",
+        "No surveyed datum tie or numeric uncertainty is established.",
+        "Original source quality and convention limitations remain applicable.",
+    ]
+    return candidate
 
 
 def _spring_levels(mean: dict, cs: dict) -> dict:
@@ -159,6 +319,32 @@ def _spring_levels(mean: dict, cs: dict) -> dict:
         "No station-local spring definition is evidenced; this is not an agency datum.",
         "No surveyed datum tie or numeric uncertainty is established.",
         "Original source quality and convention limitations remain applicable.",
+    ]
+    return candidate
+
+
+def _neap_plane_proxy(mean: dict, cs: dict) -> dict:
+    """Low-reliability two-constituent envelope planes, not mean neap tides."""
+    try:
+        candidate = _spring_levels(mean, cs)
+    except ValueError as error:
+        raise ValueError(f"Neap proxy: {error}") from error
+    amplitudes = candidate["basis"]["amplitudes_m"]
+    amplitude = abs(amplitudes["M2"] - amplitudes["S2"])
+    msl = candidate["basis"]["computed_msl_m"]
+    candidate["method"] = "harmonic_m2_s2_neap_plane_proxy_v1"
+    candidate["values"] = {"mhwn": msl + amplitude, "mlwn": msl - amplitude}
+    candidate["basis"].pop("spring_convention")
+    candidate["basis"].update({"neap_plane_proxy": "approximation: two-constituent neap-plane proxy",
+                               "analytic_basis": "hourly MSL +/- abs(H_M2 - H_S2)",
+                               "neap_envelope_amplitude_m": amplitude, "not_selected_for_prediction": True})
+    candidate["reliability"]["status"] = "low"
+    candidate["reliability"]["limitations"] = [
+        "LOW-reliability two-constituent neap-plane proxy using this model's actual hourly mean.",
+        "Not formal mean high/low water neaps: no neap-event averaging or surveyed datum is established.",
+        "Other constituents and time-varying nodal modulation are omitted from the plane amplitude.",
+        "No chart-datum tie is established; these alternatives are not selected for prediction.",
+        "Original source quality and convention limitations remain applicable; uncertainty is unknown.",
     ]
     return candidate
 
