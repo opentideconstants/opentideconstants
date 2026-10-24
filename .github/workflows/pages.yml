@@ -31,6 +31,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Check Row31 source-aware score
+        run: ruby scripts/test_row31_score.rb
       - name: Build
         run: node build.mjs
       - name: Check internal links

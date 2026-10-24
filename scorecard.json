@@ -1007,15 +1007,72 @@
       "historical_label": "LOSS",
       "label": "LOSS",
       "historical_predicate": "Original matched-place datum-key availability and frozen X31 obligations retained; actual exported data carry datums/chart_datum for existing readers. No npm API shim.",
-      "comparison_predicate": "Original matched-place datum-key availability and frozen X31 obligations retained; actual exported data carry datums/chart_datum for existing readers. No npm API shim.",
-      "predicate_changed": false,
-      "comparison_and_limit": "Matched comparator-place named datum-key availability is a like-for-like feature. Actual all_sets readers confirm ordinary keys absent at named witnesses and at least 72 matched leaders lack MHW. This LOSS is not caused merely by a stricter default filter.",
+      "comparison_predicate": "At the frozen 6,353 matched places, retain every original named-key requirement except the 2,703 evidenced comparator inherited-reference survey/geodetic cells under the owner-approved 2026-10-23 source-aware amendment. All own published keys and original chosen-datum/X31 reader obligations remain required; no borrowed physical ties.",
+      "predicate_changed": true,
+      "comparison_and_limit": "Actual closed ba2c7d39 data provide every source-aware required key at 6,353/6,353 places (availability TIE). This metadata union does not prove selectable chosen-datum/default-chart paths, method/uncertainty disclosure or applicable reader closure. Full Row31 remains LOSS; no WIN follows from removing inherited-reference obligations.",
       "historical_measured_result": null,
       "retained_product_or_scientific_requirement": "Original matched-place datum-key availability and frozen X31 obligations retained; actual exported data carry datums/chart_datum for existing readers. No npm API shim.",
       "source_evidence_packet_sha256": "c6444af505e034cb476a49f495baccbf2437228e1d7195b9112aa2100f7f02f2",
       "source_evidence": {
         "description": "post-ticon/sdk/rows.json (historical evidence retained locally; unbundled)",
         "bundled": false
+      },
+      "source_aware_amendment": {
+        "date": "2026-10-23",
+        "requirements_evidence": "pipeline/data/scorecard/row31-source-aware-20261023.json",
+        "requirements_evidence_sha256": "7ee2fa40cf13578befd83ea0b3add047933b8f4e493868080b13f600221dceea",
+        "excluded_inherited_cells": 2703,
+        "affected_leads": 1752,
+        "historical_strict": {
+          "complete": 4600,
+          "incomplete": 1753,
+          "missing_cells": 2705,
+          "verdict": "LOSS"
+        },
+        "full_row_runtime_acceptance": "UNPROVED; source-aware key availability alone is insufficient",
+        "measurement_evidence": "pipeline/data/scorecard/row31-source-aware-measurement-20261023.json",
+        "measurement_evidence_sha256": "ad91664b524b5a237a6d12adeb322e62521d41efd6d8d6d471162bc7b022d28e"
+      },
+      "measured_result": {
+        "native_sha256": "ba2c7d390683962309f1a6182ba2bb2c0eb62958a7ebdf17c5b7db28cdb5d1e5",
+        "places": 6353,
+        "historical_strict": {
+          "complete": 4600,
+          "incomplete": 1753,
+          "missing_cells": 2705,
+          "verdict": "LOSS"
+        },
+        "strict_current": {
+          "complete": 4602,
+          "incomplete": 1751,
+          "missing_cells": 2701,
+          "verdict": "LOSS"
+        },
+        "source_aware": {
+          "complete": 6353,
+          "incomplete": 0,
+          "missing_cells": 0,
+          "excluded_inherited_cells": 2703,
+          "affected_leads": 1752,
+          "availability_verdict": "TIE"
+        },
+        "full_row_runtime_acceptance": "UNPROVED",
+        "scope": "Source-aware named-key availability subgate only; no chosen-datum runtime, all-SDK, accuracy or export-reader WIN",
+        "classification_manifest_sha256": "6ae3fd4cab75ef357ed8529340c537a10670d88a7c62152b3b7105cc7eceba31",
+        "frozen_full_key_map_sha256": "11ae0cf6889d74c14b663f71a8b73a74340fb7c2c31dcf39232fbc3e29e635a4",
+        "full_measurement_sha256": "cb8c56dfed54b404cc677d64430cdc8e0cb72e5ca5e83651bc7a17d6f53b0a06",
+        "full_measurement_location": "row31-source-aware-amendment/gold-final-full-measurement.json (accepted local evidence; unbundled)",
+        "closed_native_receipt_sha256": "ff3e559de33f08470fbe41c008d91c9010b883e216bbbe84f1a6ce0dd30cd331",
+        "closed_preservation_sha256": "c6278b7af4fdd87aae40978354d8fad5e0b10507dc1fc74c6886a824ca25e7bc",
+        "source_overlap_audit_sha256": "8ba74a3fb2980af9a62b04e298fe8363f5d0bceedfc0a6ef3f1625ea87402422",
+        "source_overlap_limit": "Gold own NOAA published records and mechanical TWC0817 matched-place overlap are separately labelled; same_gauge=false and no local physical tie is asserted.",
+        "full_row31_verdict": "LOSS",
+        "remaining_required_behaviors": [
+          "Selected candidate is consumable by chosen-datum prediction paths, not only retained metadata enumeration.",
+          "Default chart behavior, named-key method and uncertainty disclosure, and applicable unchanged export readers satisfy original Row31/X31 contract."
+        ],
+        "new_sdk_behavior_claimed": false,
+        "closed_formats_sha256": "66b4b5271440d96faf657416fa066fdb64d6c4fea0921f12005f027cf841574e"
       }
     },
     {
